@@ -26,7 +26,14 @@ go.work.sum
 
 # env file
 .env
+.env_example
 
+
+# samples
+seed_db.sh
+seed_out.log
+api.log
+api.pid
 # Editor/IDE
 # .idea/
 # .vscode/

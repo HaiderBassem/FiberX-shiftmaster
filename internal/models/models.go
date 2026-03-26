@@ -1,0 +1,290 @@
+package models
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Internal models
+type Department struct {
+	ID             uuid.UUID `json:"id"`
+	DepartmentCode string    `json:"department_code"`
+	Name           string    `json:"name"`
+	Description    *string   `json:"description"`
+	ManagerID      *uuid.UUID `json:"manager_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type Employee struct {
+	ID                 uuid.UUID `json:"id"`
+	EmployeeCode       string    `json:"employee_code"`
+	FirstName          string    `json:"first_name"`
+	LastName           string    `json:"last_name"`
+	Gender             string    `json:"gender"`
+	Phone              *string   `json:"phone"`
+	Email              string    `json:"email"`
+	PasswordHash       *string   `json:"-"` // Omit from JSON
+	HireDate           time.Time `json:"hire_date"`
+	Role               string    `json:"role"`
+	DepartmentID       *uuid.UUID `json:"department_id"`
+	Position           *string   `json:"position"`
+	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
+	WeeklyOffDays      int       `json:"weekly_off_days"`
+	CanCoverNightShift bool      `json:"can_cover_night_shift"`
+	Status             string    `json:"status"`
+	ProfileImage       *string   `json:"profile_image"`
+	RememberToken      *string   `json:"-"`
+	LastLogin          *time.Time `json:"last_login"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	CreatedBy          *uuid.UUID `json:"created_by"`
+}
+
+type Shift struct {
+	ID              uuid.UUID `json:"id"`
+	ShiftCode       string    `json:"shift_code"`
+	Name            string    `json:"name"`
+	NameEn          *string   `json:"name_en"`
+	StartTime       time.Time `json:"start_time"` // Storing TIME as time.Time
+	EndTime         time.Time `json:"end_time"`
+	ColorCode       *string   `json:"color_code"`
+	RequiresVehicle bool      `json:"requires_vehicle"`
+	MinRestHours    int       `json:"min_rest_hours"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+type ScheduleTemplate struct {
+	ID          uuid.UUID  `json:"id"`
+	EmployeeID  uuid.UUID  `json:"employee_id"`
+	DayOfWeek   int        `json:"day_of_week"`
+	ShiftID     *uuid.UUID `json:"shift_id"`
+	IsOff       bool       `json:"is_off"`
+	ValidFrom   *time.Time `json:"valid_from"`
+	ValidTo     *time.Time `json:"valid_to"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type WeeklySchedule struct {
+	ID            uuid.UUID  `json:"id"`
+	WeekStartDate time.Time  `json:"week_start_date"`
+	WeekEndDate   time.Time  `json:"week_end_date"`
+	TemplateID    *uuid.UUID `json:"template_id"`
+	Status        string     `json:"status"`
+	PublishedBy   *uuid.UUID `json:"published_by"`
+	PublishedAt   *time.Time `json:"published_at"`
+	Notes         *string    `json:"notes"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+type EmployeeShift struct {
+	ID                    uuid.UUID  `json:"id"`
+	ScheduleID            uuid.UUID  `json:"schedule_id"`
+	EmployeeID            uuid.UUID  `json:"employee_id"`
+	ShiftID               *uuid.UUID `json:"shift_id"`
+	ShiftDate             time.Time  `json:"shift_date"`
+	ShiftStatus           string     `json:"shift_status"`
+	LeaveReason           *string    `json:"leave_reason"`
+	IsReplacement         bool       `json:"is_replacement"`
+	ReplacedEmployeeID    *uuid.UUID `json:"replaced_employee_id"`
+	ReplacementApprovedBy *uuid.UUID `json:"replacement_approved_by"`
+	CheckInTime           *time.Time `json:"check_in_time"`
+	CheckOutTime          *time.Time `json:"check_out_time"`
+	ActualWorkedHours     *float64   `json:"actual_worked_hours"`
+	OvertimeHours         *float64   `json:"overtime_hours"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	CreatedBy             *uuid.UUID `json:"created_by"`
+}
+
+type TaskBoard struct {
+	ID             uuid.UUID  `json:"id"`
+	Name           string     `json:"name"`
+	Description    *string    `json:"description"`
+	RecurrenceType string     `json:"recurrence_type"` // "daily" or "weekly"
+	IsActive       bool       `json:"is_active"`
+	CreatedBy      *uuid.UUID `json:"created_by"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type TaskSchedule struct {
+	ID             uuid.UUID  `json:"id"`
+	Title          string     `json:"title"`
+	Description    *string    `json:"description"`
+	ScheduleType   string     `json:"schedule_type"`
+	BoardID        *uuid.UUID `json:"board_id"`
+	ShiftID        *uuid.UUID `json:"shift_id"`
+	Recurrence     string     `json:"recurrence"`
+	RecurrenceDays []int      `json:"recurrence_days"` // Array of integers mapping to days
+	MaxAssignees   int        `json:"max_assignees"`
+	IsActive       bool       `json:"is_active"`
+	CreatedBy      *uuid.UUID `json:"created_by"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+type TaskAssignment struct {
+	ID           uuid.UUID  `json:"id"`
+	ScheduleID   uuid.UUID  `json:"schedule_id"`
+	EmployeeID   uuid.UUID  `json:"employee_id"`
+	AssignedDate time.Time  `json:"assigned_date"`
+	AssignedBy   *uuid.UUID `json:"assigned_by"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+type TaskExecution struct {
+	ID           uuid.UUID  `json:"id"`
+	AssignmentID uuid.UUID  `json:"assignment_id"`
+	Status       string     `json:"status"` // pending, in_progress, completed, cancelled
+	StartedAt    *time.Time `json:"started_at"`
+	CompletedAt  *time.Time `json:"completed_at"`
+	Notes        *string    `json:"notes"`
+	Attachments  *string    `json:"attachments"` // JSONB mapping to string usually, or custom type
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type Leave struct {
+	ID                   uuid.UUID  `json:"id"`
+	EmployeeID           uuid.UUID  `json:"employee_id"`
+	LeaveType            string     `json:"leave_type"`
+	StartDate            time.Time  `json:"start_date"`
+	EndDate              time.Time  `json:"end_date"`
+	TotalDays            int        `json:"total_days"`
+	Reason               *string    `json:"reason"`
+	Status               string     `json:"status"`
+	AppliedDate          *time.Time `json:"applied_date"` // usually CURRENT_DATE
+	ApprovedByTeamLeader *uuid.UUID `json:"approved_by_team_leader"`
+	ApprovedByManager    *uuid.UUID `json:"approved_by_manager"`
+	RejectionReason      *string    `json:"rejection_reason"`
+	Attachments          *string    `json:"attachments"` // JSONB
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+type ShiftSwap struct {
+	ID                   uuid.UUID  `json:"id"`
+	RequesterID          uuid.UUID  `json:"requester_id"`
+	RequesterName        string     `json:"requester_name"`
+	TargetEmployeeID     uuid.UUID  `json:"target_employee_id"`
+	TargetEmployeeName   string     `json:"target_employee_name"`
+	ShiftDate            time.Time  `json:"shift_date"`
+	ShiftID              uuid.UUID  `json:"shift_id"`
+	Reason               *string    `json:"reason"`
+	Status               string     `json:"status"`
+	ApprovedByTeamLeader *uuid.UUID `json:"approved_by_team_leader"`
+	ApprovedByManager    *uuid.UUID `json:"approved_by_manager"`
+	ApprovalDate         *time.Time `json:"approval_date"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+type Permission struct {
+	ID                   uuid.UUID `json:"id"`
+	Role                 string    `json:"role"`
+	PermissionName       string    `json:"permission_name"`
+	Resource             string    `json:"resource"`
+	CanView              bool      `json:"can_view"`
+	CanCreate            bool      `json:"can_create"`
+	CanEdit              bool      `json:"can_edit"`
+	CanDelete            bool      `json:"can_delete"`
+	CanApprove           bool      `json:"can_approve"`
+	DepartmentRestricted bool      `json:"department_restricted"`
+}
+
+type Notification struct {
+	ID                uuid.UUID  `json:"id"`
+	RecipientID       uuid.UUID  `json:"recipient_id"`
+	SenderID          *uuid.UUID `json:"sender_id"`
+	Type              string     `json:"type"`
+	Title             string     `json:"title"`
+	Message           *string    `json:"message"`
+	RelatedEntityType *string    `json:"related_entity_type"`
+	RelatedEntityID   *uuid.UUID `json:"related_entity_id"`
+	Priority          string     `json:"priority"`
+	IsRead            bool       `json:"is_read"`
+	ReadAt            *time.Time `json:"read_at"`
+	ActionUrl         *string    `json:"action_url"`
+	CreatedAt         time.Time  `json:"created_at"`
+}
+
+type AuditLog struct {
+	ID         uuid.UUID  `json:"id"`
+	EmployeeID *uuid.UUID `json:"employee_id"`
+	Action     string     `json:"action"`
+	TableName  string     `json:"table_name"`
+	RecordID   *uuid.UUID `json:"record_id"`
+	OldData    *string    `json:"old_data"` // JSONB
+	NewData    *string    `json:"new_data"` // JSONB
+	IPAddress  *string    `json:"ip_address"` // INET maps to string
+	UserAgent  *string    `json:"user_agent"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// SwapEligibleEmployee represents an employee available for a shift swap
+type SwapEligibleEmployee struct {
+	Employee
+	IsOff bool `json:"is_off"`
+}
+
+// ShiftCoverage provides staffing metrics for a specific shift on a specific date
+type ShiftCoverage struct {
+	ShiftID      uuid.UUID `json:"shift_id"`
+	ShiftDate    time.Time `json:"shift_date"`
+	TotalAssigned int      `json:"total_assigned"`
+	TotalWorking  int      `json:"total_working"`
+	TotalOff      int      `json:"total_off"`
+	TotalOnLeave  int      `json:"total_on_leave"`
+}
+
+// ═══════════════════════════════════════════════════════════
+// Task View Models (Rich Responses)
+// ═══════════════════════════════════════════════════════════
+
+// MyTaskRow — one task for one day for the employee's weekly view.
+type MyTaskRow struct {
+	AssignmentID   uuid.UUID  `json:"assignment_id"`
+	AssignedDate   time.Time  `json:"assigned_date"`
+	TaskTitle      string     `json:"task_title"`
+	TaskDesc       *string    `json:"task_description"`
+	BoardName      *string    `json:"board_name"`
+	ShiftName      *string    `json:"shift_name"`
+	ShiftCode      *string    `json:"shift_code"`
+	ShiftColor     *string    `json:"shift_color"`
+	ExecutionID    *uuid.UUID `json:"execution_id"`
+	Status         string     `json:"status"`    // pending, in_progress, completed
+	StartedAt      *time.Time `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	Notes          *string    `json:"notes"`
+}
+
+// BoardViewRow — one cell in the board tracker grid (employee × day × task).
+type BoardViewRow struct {
+	EmployeeID   uuid.UUID  `json:"employee_id"`
+	EmployeeName string     `json:"employee_name"`
+	EmployeeCode string     `json:"employee_code"`
+	DayOfWeek    int        `json:"day_of_week"` // 0=Sun..6=Sat
+	AssignedDate *time.Time `json:"assigned_date"`
+	TaskID       *uuid.UUID `json:"task_id"`
+	TaskTitle    *string    `json:"task_title"`
+	AssignmentID *uuid.UUID `json:"assignment_id"`
+	ExecutionID  *uuid.UUID `json:"execution_id"`
+	Status       *string    `json:"status"`       // pending, in_progress, completed
+	StartedAt    *time.Time `json:"started_at"`
+	CompletedAt  *time.Time `json:"completed_at"`
+}
+
+// TaskBoardStats — aggregate completion stats for a board.
+type TaskBoardStats struct {
+	BoardID         uuid.UUID `json:"board_id"`
+	BoardName       string    `json:"board_name"`
+	TotalAssigned   int       `json:"total_assigned"`
+	TotalPending    int       `json:"total_pending"`
+	TotalInProgress int       `json:"total_in_progress"`
+	TotalCompleted  int       `json:"total_completed"`
+	CompletionPct   float64   `json:"completion_pct"`
+}
+
