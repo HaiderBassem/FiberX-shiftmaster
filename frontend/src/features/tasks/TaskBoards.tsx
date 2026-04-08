@@ -73,6 +73,7 @@ interface BoardViewRow {
   completed_at: string | null;
 }
 
+const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
 
 // ───────────────────────────────────────────────────────────
 // Main Component
@@ -199,19 +200,16 @@ const BoardListView = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white mb-2 flex items-center gap-3">
-            <LayoutGrid className="w-8 h-8 text-violet-400" />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
+            <LayoutGrid className="w-8 h-8 text-primary" />
             Task Boards
           </h2>
-          <p className="text-zinc-400">
+          <p className="text-muted-foreground">
             Create and manage task boards. Each board shows an employee×day grid with task completion tracking.
           </p>
         </div>
         {canEdit && (
-          <Button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-violet-600 hover:bg-violet-500 text-white gap-2 shadow-[0_0_20px_rgba(139,92,246,0.2)]"
-          >
+          <Button onClick={() => setShowForm(!showForm)} className="gap-2">
             {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {showForm ? 'Cancel' : 'New Board'}
           </Button>
@@ -219,36 +217,36 @@ const BoardListView = ({
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
           <span className="flex-1">⚠️ {error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold">×</button>
+          <button onClick={() => setError(null)} className="text-destructive hover:text-destructive/80 font-bold">×</button>
         </div>
       )}
 
       {/* Create Form */}
       {showForm && canEdit && (
-        <Card className="bg-zinc-900/80 border-violet-500/20 shadow-[0_0_30px_rgba(139,92,246,0.08)]">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-violet-100 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-violet-400" />
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
               Create New Board
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label className="text-violet-200">Board Name</Label>
+                <Label>Board Name</Label>
                 <Input value={boardName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBoardName(e.target.value)}
-                  placeholder="e.g. Node Check, Mobile Ticket..." className="bg-black/20 border-violet-500/20" />
+                  placeholder="e.g. Node Check, Mobile Ticket..." />
               </div>
               <div className="space-y-2">
-                <Label className="text-violet-200">Description</Label>
+                <Label>Description</Label>
                 <Input value={boardDesc} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBoardDesc(e.target.value)}
-                  placeholder="Optional description..." className="bg-black/20 border-violet-500/20" />
+                  placeholder="Optional description..." />
               </div>
               <div className="space-y-2">
-                <Label className="text-violet-200">Recurrence</Label>
-                <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-violet-500/30 text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                <Label>Recurrence</Label>
+                <select className={selectClass}
                   value={boardRecurrence} onChange={(e) => setBoardRecurrence(e.target.value as 'daily' | 'weekly')}>
                   <option value="daily">Daily (Repeats every day)</option>
                   <option value="weekly">Weekly (Specific days)</option>
@@ -258,7 +256,7 @@ const BoardListView = ({
           </CardContent>
           <CardFooter>
             <Button onClick={() => createBoard.mutate()} disabled={createBoard.isPending || !boardName.trim()}
-              className="bg-violet-600 hover:bg-violet-500 text-white gap-2">
+              className="gap-2">
               <Plus className="w-4 h-4" /> Create Board
             </Button>
           </CardFooter>
@@ -268,13 +266,13 @@ const BoardListView = ({
       {/* Board Cards */}
       {isLoading ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse bg-zinc-900/30 h-52" />)}
+          {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-52" />)}
         </div>
       ) : !boards || boards.length === 0 ? (
-        <div className="p-16 text-center border border-zinc-800/60 border-dashed rounded-xl bg-zinc-900/20">
-          <LayoutGrid className="w-16 h-16 mx-auto mb-4 text-zinc-700" />
-          <h3 className="text-xl font-semibold text-zinc-400 mb-2">No boards yet</h3>
-          <p className="text-zinc-500">
+        <div className="p-16 text-center border border-border border-dashed rounded-xl bg-muted/10">
+          <LayoutGrid className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
+          <h3 className="text-xl font-semibold text-muted-foreground mb-2">No boards yet</h3>
+          <p className="text-muted-foreground">
             {canEdit ? 'Create your first task board to start organizing tasks.' : 'No task boards have been created yet.'}
           </p>
         </div>
@@ -286,76 +284,73 @@ const BoardListView = ({
             return (
               <div key={board.id}>
                 {editId === board.id ? (
-                  <Card className="bg-zinc-900/80 border-violet-500/30">
+                  <Card>
                     <CardContent className="pt-6 space-y-3">
-                      <Input value={editName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
-                        className="bg-black/20 border-violet-500/20" />
+                      <Input value={editName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)} />
                       <Input value={editDesc} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditDesc(e.target.value)}
-                        placeholder="Description..." className="bg-black/20 border-violet-500/20" />
-                      <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-violet-500/30 text-white text-sm"
+                        placeholder="Description..." />
+                      <select className={selectClass}
                         value={editRecurrence} onChange={(e) => setEditRecurrence(e.target.value as 'daily' | 'weekly')}>
                         <option value="daily">Daily</option><option value="weekly">Weekly</option>
                       </select>
                       <div className="flex gap-2">
-                        <Button size="sm" onClick={() => updateBoard.mutate()} disabled={updateBoard.isPending || !editName.trim()}
-                          className="bg-violet-600 hover:bg-violet-500 text-white">Save</Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditId(null)}
-                          className="border-zinc-700 text-zinc-300">Cancel</Button>
+                        <Button size="sm" onClick={() => updateBoard.mutate()} disabled={updateBoard.isPending || !editName.trim()}>Save</Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditId(null)}>Cancel</Button>
                       </div>
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="bg-zinc-900/40 border-zinc-800/60 hover:border-violet-500/30 transition-all duration-300 cursor-pointer group hover:shadow-[0_0_30px_rgba(139,92,246,0.06)]"
+                  <Card className="hover:shadow-md transition-all duration-300 cursor-pointer group"
                     onClick={() => onSelectBoard(board)}>
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between">
-                        <CardTitle className="text-lg text-white group-hover:text-violet-200 transition-colors flex items-center gap-2">
-                          <ClipboardList className="w-5 h-5 text-violet-400" />
+                        <CardTitle className="text-lg group-hover:text-primary transition-colors flex items-center gap-2">
+                          <ClipboardList className="w-5 h-5 text-primary" />
                           {board.name}
                         </CardTitle>
                         {canEdit && (
                           <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={(e) => { e.stopPropagation(); startEdit(board); }}
-                              className="p-1.5 rounded-md hover:bg-zinc-800 transition-colors" title="Edit">
-                              <Edit3 className="w-4 h-4 text-zinc-400" />
+                              className="p-1.5 rounded-md hover:bg-muted transition-colors" title="Edit">
+                              <Edit3 className="w-4 h-4 text-muted-foreground" />
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); if (confirm(`Delete "${board.name}"?`)) deleteBoard.mutate(board.id); }}
-                              className="p-1.5 rounded-md hover:bg-red-500/10 transition-colors" title="Delete">
-                              <Trash2 className="w-4 h-4 text-red-400" />
+                              className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors" title="Delete">
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </button>
                           </div>
                         )}
                       </div>
-                      <CardDescription className="text-zinc-500 text-xs">{board.description || 'No description'}</CardDescription>
+                      <CardDescription className="text-xs">{board.description || 'No description'}</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0 space-y-3">
                       {/* Stats mini-bar */}
                       {bs && bs.total_assigned > 0 && (
                         <div>
                           <div className="flex items-center justify-between text-xs mb-1.5">
-                            <span className="text-zinc-500">Completion</span>
-                            <span className="text-zinc-300 font-semibold">{bs.completion_pct}%</span>
+                            <span className="text-muted-foreground">Completion</span>
+                            <span className="text-foreground font-semibold">{bs.completion_pct}%</span>
                           </div>
-                          <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
                               style={{ width: `${bs.completion_pct}%` }} />
                           </div>
                           <div className="flex items-center gap-3 mt-2 text-[10px]">
-                            <span className="text-emerald-400">✓ {bs.total_completed}</span>
-                            <span className="text-amber-400">▶ {bs.total_in_progress}</span>
-                            <span className="text-zinc-500">◌ {bs.total_pending}</span>
+                            <span className="text-emerald-500">✓ {bs.total_completed}</span>
+                            <span className="text-amber-500">▶ {bs.total_in_progress}</span>
+                            <span className="text-muted-foreground">◌ {bs.total_pending}</span>
                           </div>
                         </div>
                       )}
                       <div className="flex items-center gap-3 text-xs">
                         <span className={`px-2 py-0.5 rounded-full font-medium ${
                           board.recurrence_type === 'daily'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                            : 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
                         }`}>
                           {board.recurrence_type === 'daily' ? '🔄 Daily' : '📅 Weekly'}
                         </span>
-                        <span className="text-zinc-600">Created {format(new Date(board.created_at), 'MMM d, yyyy')}</span>
+                        <span className="text-muted-foreground/60">Created {format(new Date(board.created_at), 'MMM d, yyyy')}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -492,7 +487,6 @@ const BoardDetailView = ({
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   // ── Build grid: merge eligible employees with board view data ──
-  // Key: empId → { name, code, days: { dayOfWeek: [tasks] } }
   const gridData: Record<string, {
     name: string;
     code: string;
@@ -551,17 +545,17 @@ const BoardDetailView = ({
 
   const statusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20';
-      case 'in_progress': return 'bg-amber-500/15 text-amber-400 border-amber-500/20';
-      default: return 'bg-zinc-700/20 text-zinc-400 border-zinc-600/20';
+      case 'completed': return 'bg-emerald-500/15 text-emerald-500 border-emerald-500/20';
+      case 'in_progress': return 'bg-amber-500/15 text-amber-500 border-amber-500/20';
+      default: return 'bg-muted/40 text-muted-foreground border-border';
     }
   };
 
   const statusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle2 className="w-3 h-3 text-emerald-400" />;
-      case 'in_progress': return <Play className="w-3 h-3 text-amber-400" />;
-      default: return <Clock className="w-3 h-3 text-zinc-500" />;
+      case 'completed': return <CheckCircle2 className="w-3 h-3 text-emerald-500" />;
+      case 'in_progress': return <Play className="w-3 h-3 text-amber-500" />;
+      default: return <Clock className="w-3 h-3 text-muted-foreground" />;
     }
   };
 
@@ -570,27 +564,27 @@ const BoardDetailView = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={onBack} className="border-zinc-700 text-zinc-300 gap-2 hover:bg-zinc-800">
+          <Button variant="outline" size="sm" onClick={onBack} className="gap-2">
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-              <ClipboardList className="w-7 h-7 text-violet-400" />
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+              <ClipboardList className="w-7 h-7 text-primary" />
               {board.name}
             </h2>
-            <p className="text-sm text-zinc-500">{board.description || 'No description'}</p>
+            <p className="text-sm text-muted-foreground">{board.description || 'No description'}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           {gridTotal > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800/60">
-              <BarChart3 className="w-4 h-4 text-violet-400" />
-              <span className="text-sm text-zinc-300 font-semibold">{gridPct}%</span>
-              <span className="text-xs text-zinc-500">({gridDone}/{gridTotal})</span>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-border">
+              <BarChart3 className="w-4 h-4 text-primary" />
+              <span className="text-sm text-foreground font-semibold">{gridPct}%</span>
+              <span className="text-xs text-muted-foreground">({gridDone}/{gridTotal})</span>
             </div>
           )}
           {canEdit && (
-            <Button onClick={() => setShowTaskForm(!showTaskForm)} className="bg-violet-600 hover:bg-violet-500 text-white gap-2">
+            <Button onClick={() => setShowTaskForm(!showTaskForm)} className="gap-2">
               {showTaskForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
               {showTaskForm ? 'Cancel' : 'Add Task'}
             </Button>
@@ -599,55 +593,54 @@ const BoardDetailView = ({
       </div>
 
       {error && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
           <span className="flex-1">⚠️ {error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold">×</button>
+          <button onClick={() => setError(null)} className="text-destructive hover:text-destructive/80 font-bold">×</button>
         </div>
       )}
 
       {/* Create Task Form */}
       {showTaskForm && canEdit && (
-        <Card className="bg-zinc-900/80 border-violet-500/20">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-violet-100 text-base flex items-center gap-2">
-              <Plus className="w-5 h-5 text-violet-400" />
+            <CardTitle className="text-base flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
               Add New Task to "{board.name}"
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-2">
-                <Label className="text-violet-200">Task Title</Label>
+                <Label>Task Title</Label>
                 <Input value={taskTitle} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskTitle(e.target.value)}
-                  placeholder="e.g. Check Node #42" className="bg-black/20 border-violet-500/20" />
+                  placeholder="e.g. Check Node #42" />
               </div>
               <div className="space-y-2">
-                <Label className="text-violet-200">Description</Label>
+                <Label>Description</Label>
                 <Input value={taskDesc} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskDesc(e.target.value)}
-                  placeholder="Optional..." className="bg-black/20 border-violet-500/20" />
+                  placeholder="Optional..." />
               </div>
               <div className="space-y-2">
-                <Label className="text-violet-200">Recurrence</Label>
-                <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-violet-500/30 text-white text-sm"
+                <Label>Recurrence</Label>
+                <select className={selectClass}
                   value={taskRecurrence} onChange={(e) => setTaskRecurrence(e.target.value)}>
                   <option value="daily">Every Day</option>
                   <option value="periodic">Specific Days</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <Label className="text-violet-200">Max Assignees</Label>
+                <Label>Max Assignees</Label>
                 <Input type="number" min={1} value={taskMaxAssignees}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskMaxAssignees(parseInt(e.target.value) || 1)}
-                  className="bg-black/20 border-violet-500/20" />
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTaskMaxAssignees(parseInt(e.target.value) || 1)} />
               </div>
             </div>
             {taskRecurrence === 'periodic' && (
               <div className="mt-4 space-y-2">
-                <Label className="text-violet-200">Select Days</Label>
+                <Label>Select Days</Label>
                 <div className="flex flex-wrap gap-2">
                   {DAYS.map((day, i) => (
                     <button key={i} onClick={() => toggleDay(i)} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      taskDays.includes(i) ? 'bg-violet-600 text-white shadow-lg' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                      taskDays.includes(i) ? 'bg-primary text-primary-foreground shadow-lg' : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}>{day.slice(0, 3)}</button>
                   ))}
                 </div>
@@ -655,8 +648,7 @@ const BoardDetailView = ({
             )}
           </CardContent>
           <CardFooter>
-            <Button onClick={() => createTask.mutate()} disabled={createTask.isPending || !taskTitle.trim()}
-              className="bg-violet-600 hover:bg-violet-500 text-white gap-2">
+            <Button onClick={() => createTask.mutate()} disabled={createTask.isPending || !taskTitle.trim()} className="gap-2">
               <Plus className="w-4 h-4" /> Add Task
             </Button>
           </CardFooter>
@@ -666,8 +658,8 @@ const BoardDetailView = ({
       {/* Filters Row */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-zinc-500" />
-          <select className="h-9 px-3 rounded-md bg-zinc-900/80 border border-zinc-700/60 text-white text-sm"
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <select className={selectClass + " w-auto min-w-[160px]"}
             value={selectedShiftId} onChange={(e) => setSelectedShiftId(e.target.value)}>
             <option value="">All Shifts</option>
             {shifts?.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
@@ -675,15 +667,15 @@ const BoardDetailView = ({
         </div>
         <div className="flex items-center gap-2 ml-auto">
           <Button variant="outline" size="sm" onClick={() => setWeekStart((prev) => subDays(prev, 7))}
-            className="border-zinc-700 text-zinc-300 h-9 w-9 p-0">
+            className="h-9 w-9 p-0">
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <span className="text-sm text-zinc-300 min-w-[180px] text-center font-medium">
-            <Calendar className="w-4 h-4 inline-block mr-1.5 text-zinc-500" />
+          <span className="text-sm text-foreground min-w-[180px] text-center font-medium">
+            <Calendar className="w-4 h-4 inline-block mr-1.5 text-muted-foreground" />
             {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
           </span>
           <Button variant="outline" size="sm" onClick={() => setWeekStart((prev) => addDays(prev, 7))}
-            className="border-zinc-700 text-zinc-300 h-9 w-9 p-0">
+            className="h-9 w-9 p-0">
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -691,30 +683,30 @@ const BoardDetailView = ({
 
       {/* Tasks of this Board */}
       {tasksLoading ? (
-        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-zinc-500" /></div>
+        <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : boardTasks && boardTasks.length > 0 ? (
-        <Card className="bg-zinc-900/30 border-zinc-800/60">
+        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base text-zinc-200 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-violet-400" />
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-primary" />
               Tasks in this Board ({boardTasks.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {boardTasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/60 border border-zinc-700/40 text-sm">
-                  <span className="text-zinc-200 font-medium">{task.title}</span>
-                  <span className="text-xs text-zinc-500">
+                <div key={task.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border text-sm">
+                  <span className="text-foreground font-medium">{task.title}</span>
+                  <span className="text-xs text-muted-foreground">
                     {task.recurrence === 'daily' ? 'Daily' : `Days: ${task.recurrence_days?.map((d) => DAYS[d]?.slice(0, 3)).join(', ')}`}
                   </span>
                   {task.max_assignees > 1 && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400">×{task.max_assignees}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">×{task.max_assignees}</span>
                   )}
                   {canEdit && (
                     <button onClick={() => { if (confirm(`Delete task "${task.title}"?`)) deleteTask.mutate(task.id); }}
-                      className="p-0.5 rounded hover:bg-red-500/10">
-                      <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                      className="p-0.5 rounded hover:bg-destructive/10">
+                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
                     </button>
                   )}
                 </div>
@@ -723,8 +715,8 @@ const BoardDetailView = ({
           </CardContent>
         </Card>
       ) : (
-        <Card className="bg-zinc-900/20 border-zinc-800/60 border-dashed">
-          <CardContent className="py-8 text-center text-zinc-500">
+        <Card className="border-dashed">
+          <CardContent className="py-8 text-center text-muted-foreground">
             <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-20" />
             <p>No tasks in this board yet. {canEdit ? 'Add a task above to get started.' : ''}</p>
           </CardContent>
@@ -732,12 +724,12 @@ const BoardDetailView = ({
       )}
 
       {/* Employee × Day Grid */}
-      <Card className="bg-zinc-900/30 border-zinc-800/60">
-        <CardHeader className="pb-3 border-b border-zinc-800/40">
-          <CardTitle className="text-base text-zinc-200 flex items-center gap-2">
-            <Users className="w-4 h-4 text-emerald-400" />
+      <Card>
+        <CardHeader className="pb-3 border-b border-border">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" />
             Employee Schedule Tracker
-            <span className="text-xs text-zinc-500 font-normal ml-2">
+            <span className="text-xs text-muted-foreground font-normal ml-2">
               ({Object.keys(gridData).length} employees)
             </span>
           </CardTitle>
@@ -745,9 +737,9 @@ const BoardDetailView = ({
         </CardHeader>
         <CardContent className="p-0">
           {viewLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-zinc-500" /></div>
+            <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
           ) : Object.keys(gridData).length === 0 ? (
-            <div className="py-12 text-center text-zinc-500">
+            <div className="py-12 text-center text-muted-foreground">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p>No employees found. Make sure employees have been created with the right shift assigned.</p>
             </div>
@@ -755,22 +747,22 @@ const BoardDetailView = ({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800/60">
-                    <th className="text-left px-4 py-3 text-zinc-400 font-semibold sticky left-0 bg-zinc-900/80 min-w-[180px] z-10">Employee</th>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-4 py-3 text-muted-foreground font-semibold sticky left-0 bg-card min-w-[180px] z-10">Employee</th>
                     {weekDates.map((date, i) => (
-                      <th key={i} className="text-center px-3 py-3 text-zinc-400 font-medium min-w-[140px]">
+                      <th key={i} className="text-center px-3 py-3 text-muted-foreground font-medium min-w-[140px]">
                         <div className="text-xs">{DAYS[i]}</div>
-                        <div className="text-[10px] text-zinc-600">{format(date, 'MMM d')}</div>
+                        <div className="text-[10px] text-muted-foreground/60">{format(date, 'MMM d')}</div>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(gridData).map(([empId, emp]) => (
-                    <tr key={empId} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
-                      <td className="px-4 py-3 sticky left-0 bg-zinc-900/80 z-10">
-                        <div className="font-medium text-zinc-200">{emp.name}</div>
-                        <div className="text-xs text-zinc-500">{emp.code}</div>
+                    <tr key={empId} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 sticky left-0 bg-card z-10">
+                        <div className="font-medium text-foreground">{emp.name}</div>
+                        <div className="text-xs text-muted-foreground">{emp.code}</div>
                       </td>
                       {weekDates.map((_date, dayIdx) => {
                         const dayTasks = emp.days[dayIdx] || [];
@@ -785,7 +777,7 @@ const BoardDetailView = ({
                                   <span className="truncate font-medium">{t.taskTitle}</span>
                                   {canEdit && (
                                     <button onClick={() => removeAssignment.mutate(t.assignmentId)}
-                                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white text-[10px] hidden group-hover/tag:flex items-center justify-center shadow-lg">
+                                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-white text-[10px] hidden group-hover/tag:flex items-center justify-center shadow-lg">
                                       ×
                                     </button>
                                   )}
@@ -800,13 +792,13 @@ const BoardDetailView = ({
                                     // Reset dropdown selection when toggling/opening a different cell.
                                     setAssignTaskId('');
                                   }}
-                                  className="w-full py-1 rounded-md border border-dashed border-zinc-700/30 text-zinc-600 hover:border-violet-500/30 hover:text-violet-400 transition-colors text-[10px]"
+                                  className="w-full py-1 rounded-md border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors text-[10px]"
                                 >+</button>
                               )}
                               {/* Quick Assign Dropdown */}
                               {isAssigning && (
-                                <div className="mt-1 p-2 bg-zinc-900 rounded-lg border border-violet-500/20 shadow-xl z-20 relative space-y-1.5">
-                                  <select className="w-full h-7 px-2 rounded bg-zinc-950 border border-zinc-700 text-white text-[11px]"
+                                <div className="mt-1 p-2 bg-popover rounded-lg border border-border shadow-xl z-20 relative space-y-1.5">
+                                  <select className="w-full h-7 px-2 rounded bg-background border border-input text-foreground text-[11px]"
                                     value={assignTaskId} onChange={(e) => setAssignTaskId(e.target.value)}>
                                     <option value="">Select task...</option>
                                     {boardTasks
@@ -826,7 +818,7 @@ const BoardDetailView = ({
                                         });
                                       }
                                     }}
-                                    className="w-full h-7 text-[11px] bg-violet-600 hover:bg-violet-500 text-white">
+                                    className="w-full h-7 text-[11px]">
                                     Assign
                                   </Button>
                                 </div>
@@ -846,4 +838,3 @@ const BoardDetailView = ({
     </div>
   );
 };
-

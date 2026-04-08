@@ -1,111 +1,141 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
-import { Lock, User as UserIcon } from 'lucide-react';
-import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import api from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useTheme } from '@/components/ThemeProvider';
+import { Clock, LogIn, Loader2, Sun, Moon } from 'lucide-react';
 
 export const Login = () => {
-  const [email, setEmail] = useState('');
+  const [employeeCode, setEmployeeCode] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
-  const setAuth = useAuthStore().setAuth;
+  const { theme, toggleTheme } = useTheme();
 
-  const loginMutation = useMutation({
-    mutationFn: async () => {
-      const response = await api.post('/auth/login', { email: email.trim(), password });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setAuth(data.data.access_token, data.data.employee);
-      navigate('/');
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    loginMutation.mutate();
+    setError('');
+    setIsLoading(true);
+
+    try {
+      const response = await api.post('/auth/login', {
+        employee_code: employeeCode,
+        password,
+      });
+
+      const { token, user } = response.data.data;
+      setAuth(token, user);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center bg-zinc-950 px-4 sm:px-6 lg:px-8">
-      {/* Background gradients and blobs for a premium modern feel */}
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-blue-600/20 to-transparent rounded-full blur-3xl opacity-50" />
-        <div className="absolute top-1/2 left-1/2 w-[800px] h-[800px] -translate-x-1/2 -translate-y-1/2 bg-blue-900/10 rounded-full blur-[100px] opacity-60" />
-        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-indigo-600/20 to-transparent rounded-full blur-3xl opacity-50" />
+        <div className="absolute -top-1/2 -right-1/4 w-[800px] h-[800px] rounded-full bg-primary/[0.03] blur-3xl" />
+        <div className="absolute -bottom-1/2 -left-1/4 w-[600px] h-[600px] rounded-full bg-accent/[0.04] blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold tracking-tight text-white mb-2">ShiftMaster</h1>
-          <p className="text-zinc-400 text-lg">Workforce Scheduling Reimagined</p>
+      {/* Theme toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 text-muted-foreground hover:text-foreground"
+        title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+      </Button>
+
+      <div className="w-full max-w-md relative z-10">
+        {/* Brand header */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 glow-teal">
+            <Clock className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-4xl font-bold tracking-tight text-gradient-teal mb-2">
+            Shiftmaster
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Intelligent Shift & Task Management
+          </p>
         </div>
 
-        <Card className="w-full border-zinc-800 bg-zinc-900/50 backdrop-blur-2xl shadow-2xl">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-semibold text-white">Welcome back</CardTitle>
-            <CardDescription className="text-zinc-400">
-              Enter your email to sign in to your dashboard
-            </CardDescription>
+        <Card className="border-border/50 shadow-xl">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-xl text-foreground">Welcome back</CardTitle>
+            <CardDescription>Sign in to access your dashboard</CardDescription>
           </CardHeader>
+
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              {loginMutation.isError && (
-                <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                  Invalid email or password.
+              {error && (
+                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm text-center animate-in fade-in duration-200">
+                  {error}
                 </div>
               )}
+
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-300">Email Address</Label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    placeholder="admin@company.com"
-                    className="pl-9 bg-zinc-950/50 border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-blue-500"
-                    value={email}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                  />
-                </div>
+                <Label>Employee Code</Label>
+                <Input
+                  value={employeeCode}
+                  onChange={(e) => setEmployeeCode(e.target.value)}
+                  placeholder="e.g. EMP001"
+                  required
+                  autoFocus
+                  className="h-11"
+                />
               </div>
+
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-zinc-300">Password</Label>
-                  <a href="#" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                    Forgot password?
-                  </a>
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    className="pl-9 bg-zinc-950/50 border-zinc-800 text-white placeholder:text-zinc-600 focus-visible:ring-blue-500"
-                    value={password}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                  />
-                </div>
+                <Label>Password</Label>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="h-11"
+                />
               </div>
             </CardContent>
-            <CardFooter className="pt-2">
-              <Button 
-                type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-6"
-                disabled={loginMutation.isPending}
+
+            <CardFooter>
+              <Button
+                type="submit"
+                disabled={isLoading || !employeeCode || !password}
+                className="w-full h-11 gap-2 font-semibold text-base"
               >
-                {loginMutation.isPending ? 'Authenticating...' : 'Sign In'}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4" />
+                    Sign In
+                  </>
+                )}
               </Button>
             </CardFooter>
           </form>
         </Card>
+
+        <p className="text-center text-xs text-muted-foreground/50 mt-6">
+          © {new Date().getFullYear()} Shiftmaster · All rights reserved
+        </p>
       </div>
     </div>
   );
