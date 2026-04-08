@@ -166,7 +166,7 @@ func loadSecurityConfig() SecurityConfig {
 		RateLimitWindowMin: getEnvInt("RATE_LIMIT_WINDOW_MIN", 15),
 		MaxLoginAttempts:   getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
 		LockoutDurationMin: getEnvInt("LOCKOUT_DURATION_MIN", 15),
-		TrustedProxies:     getEnvSlice("TRUSTED_PROXIES", "127.0.0.1"),
+		TrustedProxies:     getEnvSlice("TRUSTED_PROXIES", "0.0.0.0"),
 	}
 }
 

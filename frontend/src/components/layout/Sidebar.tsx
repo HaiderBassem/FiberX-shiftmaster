@@ -1,102 +1,88 @@
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { 
-  Building2, 
-  Users, 
-  Calendar, 
-  CheckSquare, 
-  CalendarOff, 
-  ArrowLeftRight,
-  Bell,
-  ShieldCheck,
-  ClipboardList,
-  LayoutDashboard
+import {
+  LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
+  ArrowLeftRight, ShieldCheck, Bell, ClipboardList, Building2, Columns3,
+  Clock,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+
+const navItems = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/leaves', label: 'Leaves', icon: CalendarOff, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/swaps', label: 'Swaps', icon: ArrowLeftRight, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/task-management', label: 'Task Mgmt', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/task-boards', label: 'Task Boards', icon: Columns3, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
+  { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
+];
 
 export const Sidebar = () => {
   const { user } = useAuthStore();
-  const role = user?.role;
+  const location = useLocation();
 
-  const mainLinks = [
-    { to: '/', icon: <LayoutDashboard className="w-5 h-5" />, label: 'Dashboard', roles: ['employee', 'team_leader', 'manager', 'admin'] },
-    { to: '/tasks', icon: <CheckSquare className="w-5 h-5" />, label: 'My Tasks', roles: ['employee', 'team_leader', 'manager', 'admin'] },
-    { to: '/leaves', icon: <CalendarOff className="w-5 h-5" />, label: 'My Leaves', roles: ['employee', 'team_leader', 'manager', 'admin'] },
-    { to: '/swaps', icon: <ArrowLeftRight className="w-5 h-5" />, label: 'My Swaps', roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  ];
-
-  const supervisorLinks = [
-    { to: '/approvals', icon: <ShieldCheck className="w-5 h-5" />, label: 'Approvals', roles: ['team_leader', 'manager', 'admin'] },
-    { to: '/task-management', icon: <ClipboardList className="w-5 h-5" />, label: 'Task Management', roles: ['team_leader', 'manager', 'admin'] },
-    { to: '/task-boards', icon: <CheckSquare className="w-5 h-5" />, label: 'Task Boards', roles: ['team_leader', 'manager', 'admin'] },
-    { to: '/shifts', icon: <Calendar className="w-5 h-5" />, label: 'Shifts & Schedules', roles: ['team_leader', 'manager', 'admin'] },
-  ];
-
-  const adminLinks = [
-    { to: '/departments', icon: <Building2 className="w-5 h-5" />, label: 'Departments', roles: ['admin'] },
-    { to: '/employees', icon: <Users className="w-5 h-5" />, label: 'Employees', roles: ['admin', 'manager', 'team_leader'] },
-  ];
-
-  const renderSection = (title: string, links: typeof mainLinks) => {
-    const visible = links.filter(l => role && l.roles.includes(role));
-    if (visible.length === 0) return null;
-    return (
-      <div className="space-y-1">
-        <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-2">{title}</p>
-        {visible.map(link => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            end={link.to === '/'}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group relative overflow-hidden",
-                isActive
-                  ? "text-blue-400 bg-blue-500/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-                  : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-md shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
-                )}
-                <span className={cn("transition-colors", isActive ? "text-blue-400" : "text-zinc-500 group-hover:text-zinc-300")}>
-                  {link.icon}
-                </span>
-                {link.label}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </div>
-    );
-  };
+  const visibleItems = navItems.filter(
+    (item) => user && item.roles.includes(user.role)
+  );
 
   return (
-    <aside className="w-64 bg-zinc-950/80 border-r border-zinc-800/60 backdrop-blur-xl h-screen sticky top-0 flex flex-col transition-all duration-300 shadow-2xl z-20 hidden md:flex">
-      <div className="h-16 flex items-center px-6 border-b border-zinc-800/60 bg-zinc-900/50">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">ShiftMaster</h1>
+    <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
+      {/* ── Brand ── */}
+      <div className="px-5 py-6 flex items-center gap-3 border-b border-white/5">
+        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center glow-teal-sm">
+          <Clock className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-gradient-teal">
+            Shiftmaster
+          </h1>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">
+            Shift Management
+          </p>
+        </div>
       </div>
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
-        {renderSection('Main', mainLinks)}
-        {renderSection('Management', supervisorLinks)}
-        {renderSection('Administration', adminLinks)}
+
+      {/* ── Nav ── */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {visibleItems.map((item) => {
+          const isActive =
+            item.to === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.to);
+
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`
+                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                transition-all duration-200 group
+                ${isActive
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                }
+              `}
+            >
+              <item.icon className={`w-[18px] h-[18px] flex-shrink-0 transition-colors ${
+                isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+              }`} />
+              {item.label}
+              {isActive && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              )}
+            </Link>
+          );
+        })}
       </nav>
-      <div className="p-4 border-t border-zinc-800/60 bg-zinc-900/30">
-        <NavLink
-            to="/notifications"
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                isActive ? "text-blue-400 bg-blue-500/10" : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
-              )
-            }
-          >
-            <Bell className="w-5 h-5" />
-            Notifications
-          </NavLink>
+
+      {/* ── Footer ── */}
+      <div className="px-5 py-4 border-t border-white/5">
+        <p className="text-[10px] text-muted-foreground/50 text-center">
+          © {new Date().getFullYear()} Shiftmaster
+        </p>
       </div>
     </aside>
   );

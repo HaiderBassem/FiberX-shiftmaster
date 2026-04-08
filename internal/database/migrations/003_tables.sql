@@ -1,4 +1,20 @@
 -- =====================================================
+-- Departments Table
+-- =====================================================
+
+CREATE TABLE departments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    department_code VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    manager_id UUID, -- Will be linked after creating the employees table
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE departments IS 'Company departments';
+
+-- =====================================================
 -- Employees Table
 -- =====================================================
 
@@ -9,23 +25,40 @@ CREATE TABLE employees (
     last_name VARCHAR(50) NOT NULL,
     gender gender_type NOT NULL,
     phone VARCHAR(20),
-    email VARCHAR(100) UNIQUE,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255), -- Encrypted password
+
+    -- Job information
     hire_date DATE NOT NULL,
     role employee_role NOT NULL DEFAULT 'employee',
-    department VARCHAR(50),
+    department_id UUID REFERENCES departments(id),
     position VARCHAR(100),
+
+    -- Shifts
     default_shift_id UUID,          -- Will be linked later to shifts table
     weekly_off_days INTEGER DEFAULT 1,
     can_cover_night_shift BOOLEAN DEFAULT false,
+
+    -- Status
     status employee_status DEFAULT 'active',
     profile_image VARCHAR(255),
+
+    -- Login token (remember me)
+    remember_token VARCHAR(100),
+    last_login TIMESTAMP,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by UUID REFERENCES employees(id)
 );
 
-COMMENT ON TABLE employees IS 'Core employee data';
+COMMENT ON TABLE employees IS 'Core employee data with authentication';
+COMMENT ON COLUMN employees.password_hash IS 'Password encrypted using bcrypt';
 COMMENT ON COLUMN employees.can_cover_night_shift IS 'Can this employee cover a night shift?';
+
+-- Link manager_id in departments table
+ALTER TABLE departments ADD CONSTRAINT fk_departments_manager
+    FOREIGN KEY (manager_id) REFERENCES employees(id);
 
 -- =====================================================
 -- Shifts Table (Shift Types)
@@ -45,7 +78,6 @@ CREATE TABLE shifts (
 );
 
 COMMENT ON TABLE shifts IS 'Shift types (morning, evening, night)';
-
 
 -- =====================================================
 -- Weekly Schedule Templates (Base Fixed Schedule)
@@ -81,6 +113,7 @@ CREATE TABLE weekly_schedule (
     published_at TIMESTAMP,
     notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID REFERENCES employees(id),
     UNIQUE (week_start_date)
 );
 
@@ -145,7 +178,7 @@ CREATE TABLE task_schedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(200) NOT NULL,
     description TEXT,
-    schedule_type VARCHAR(20) NOT NULL CHECK (schedule_type IN ('daily_task', 'node_check', 'mobile_ticket')),
+    schedule_type VARCHAR(20) CHECK (schedule_type IN ('daily_task', 'node_check', 'mobile_ticket')),
     shift_id UUID REFERENCES shifts(id),
     recurrence VARCHAR(10) NOT NULL DEFAULT 'daily' CHECK (recurrence IN ('daily', 'periodic')),
     recurrence_days INTEGER[],              -- for periodic: e.g. [4] = Thursday, NULL = every day

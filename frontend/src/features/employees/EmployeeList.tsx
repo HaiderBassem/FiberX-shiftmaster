@@ -1,98 +1,94 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Users, Mail, Phone, Briefcase, UserPlus, ShieldCheck, Trash2, UserX, UserCheck, Edit3, Save, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { format } from 'date-fns';
+import { Users, Plus, Search, Loader2, X, Edit3, Trash2, Save, UserCircle } from 'lucide-react';
 
 interface Employee {
   id: string;
   employee_code: string;
   first_name: string;
   last_name: string;
-  gender?: 'male' | 'female' | string;
-  email: string;
+  gender: string;
   phone: string | null;
-  role: 'employee' | 'team_leader' | 'manager' | 'admin';
-  status: 'active' | 'inactive' | string;
+  email: string;
+  hire_date: string;
+  role: string;
   department_id: string | null;
+  position: string | null;
   default_shift_id: string | null;
-  position?: string | null;
-  weekly_off_days?: number;
-  can_cover_night_shift?: boolean;
-}
-
-interface Shift {
-  id: string;
-  name: string;
-  shift_code: string;
+  weekly_off_days: number;
+  can_cover_night_shift: boolean;
+  status: string;
+  created_at: string;
 }
 
 interface Department {
   id: string;
   department_code: string;
   name: string;
-  manager_id: string | null;
+}
+
+interface Shift {
+  id: string;
+  shift_code: string;
+  name: string;
 }
 
 export const EmployeeList = () => {
-  const { user } = useAuthStore();
   const queryClient = useQueryClient();
-
-  const isTL = user?.role === 'team_leader';
-  const isManager = user?.role === 'manager';
+  const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
-  const allowedRoles: Array<Employee['role']> = isTL
-    ? ['employee']
-    : isManager
-      ? ['employee', 'team_leader']
-      : ['employee', 'team_leader', 'manager', 'admin'];
+  // ── State ──
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterRole, setFilterRole] = useState<string>('');
 
-  // ── Create form state ──
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [hireDate, setHireDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [role, setRole] = useState<Employee['role']>(allowedRoles[0] ?? 'employee');
-  const [departmentId, setDepartmentId] = useState<string>('');
-  const [defaultShiftId, setDefaultShiftId] = useState<string>('');
-  const [position, setPosition] = useState('');
-  const [weeklyOffDays, setWeeklyOffDays] = useState<number>(1);
-  const [canCoverNightShift, setCanCoverNightShift] = useState(false);
-  const [password, setPassword] = useState('');
-
-  const [createdLogin, setCreatedLogin] = useState<{ email: string; password: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
-  const [roleFilter, setRoleFilter] = useState<'all' | Employee['role']>('all');
-  const [search, setSearch] = useState('');
+  const [filterShift, setFilterShift] = useState<string>('');
+  const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editFirstName, setEditFirstName] = useState('');
-  const [editLastName, setEditLastName] = useState('');
-  const [editGender, setEditGender] = useState<'male' | 'female'>('male');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editRole, setEditRole] = useState<Employee['role']>('employee');
-  const [editDepartmentId, setEditDepartmentId] = useState<string>('');
-  const [editDefaultShiftId, setEditDefaultShiftId] = useState<string>('');
-  const [editPosition, setEditPosition] = useState('');
-  const [editWeeklyOffDays, setEditWeeklyOffDays] = useState<number>(1);
-  const [editCanCoverNightShift, setEditCanCoverNightShift] = useState(false);
-  const [editStatus, setEditStatus] = useState<'active' | 'inactive' | string>('active');
+  const [error, setError] = useState<string | null>(null);
 
-  const { data: shifts } = useQuery<Shift[]>({
-    queryKey: ['shifts'],
+  // Create form
+  const [createCode, setCreateCode] = useState('');
+  const [createFirst, setCreateFirst] = useState('');
+  const [createLast, setCreateLast] = useState('');
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPhone, setCreatePhone] = useState('');
+  const [createGender, setCreateGender] = useState('male');
+  const [createHireDate, setCreateHireDate] = useState('');
+  const [createRole, setCreateRole] = useState('employee');
+  const [createDept, setCreateDept] = useState('');
+  const [createShift, setCreateShift] = useState('');
+  const [createPosition, setCreatePosition] = useState('');
+  const [createOffDays, setCreateOffDays] = useState(1);
+  const [createNight, setCreateNight] = useState(false);
+  const [createPassword, setCreatePassword] = useState('');
+
+  // Edit form
+  const [editCode, setEditCode] = useState('');
+  const [editFirst, setEditFirst] = useState('');
+  const [editLast, setEditLast] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editGender, setEditGender] = useState('male');
+  const [editRole, setEditRole] = useState('employee');
+  const [editDept, setEditDept] = useState('');
+  const [editShift, setEditShift] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editOffDays, setEditOffDays] = useState(1);
+  const [editNight, setEditNight] = useState(false);
+
+  // ── Queries ──
+  const { data: employees, isLoading } = useQuery<Employee[]>({
+    queryKey: ['employees'],
     queryFn: async () => {
-      const res = await api.get('/shifts');
+      const res = await api.get('/employees');
       return res.data?.data || [];
     },
   });
@@ -103,7 +99,14 @@ export const EmployeeList = () => {
       const res = await api.get('/departments');
       return res.data?.data || [];
     },
-    enabled: true,
+  });
+
+  const { data: shifts } = useQuery<Shift[]>({
+    queryKey: ['shifts'],
+    queryFn: async () => {
+      const res = await api.get('/shifts');
+      return res.data?.data || [];
+    },
   });
 
   const deptMap = useMemo(() => {
@@ -118,95 +121,56 @@ export const EmployeeList = () => {
     return m;
   }, [shifts]);
 
-  const { data: employees, isLoading, isError } = useQuery<Employee[]>({
-    queryKey: ['employees'],
-    queryFn: async () => {
-      const response = await api.get('/employees');
-      return response.data?.data || [];
-    },
-  });
-
+  // ── Mutations ──
   const createEmployee = useMutation({
     mutationFn: async () => {
-      setCreatedLogin(null);
       setError(null);
       await api.post('/employees', {
-        first_name: firstName,
-        last_name: lastName,
-        gender,
-        phone: phone || null,
-        email,
-        password,
-        hire_date: hireDate,
-        role,
-        department_id: departmentId || null,
-        position: position || null,
-        default_shift_id: defaultShiftId || null,
-        weekly_off_days: weeklyOffDays,
-        can_cover_night_shift: canCoverNightShift,
-        status: 'active',
-        profile_image: null,
+        employee_code: createCode,
+        first_name: createFirst,
+        last_name: createLast,
+        email: createEmail,
+        phone: createPhone || null,
+        gender: createGender,
+        hire_date: createHireDate,
+        role: createRole,
+        department_id: createDept || null,
+        default_shift_id: createShift || null,
+        position: createPosition || null,
+        weekly_off_days: createOffDays,
+        can_cover_night_shift: createNight,
+        password: createPassword,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
-      setCreatedLogin({ email, password });
-      setFirstName('');
-      setLastName('');
-      setPhone('');
-      setEmail('');
-      setPosition('');
-      setPassword('');
-      setCanCoverNightShift(false);
-      setWeeklyOffDays(1);
-      setShowCreateForm(false);
+      setShowCreate(false);
+      setCreateCode(''); setCreateFirst(''); setCreateLast('');
+      setCreateEmail(''); setCreatePhone(''); setCreatePassword('');
+      setCreatePosition(''); setCreateDept(''); setCreateShift('');
     },
     onError: (err: any) => {
       setError(err?.response?.data?.error || err?.message || 'Failed to create employee');
     },
   });
 
-  const filteredEmployees = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (employees || []).filter((emp) => {
-      if (statusFilter !== 'all' && emp.status !== statusFilter) return false;
-      if (departmentFilter !== 'all' && emp.department_id !== departmentFilter) return false;
-      if (roleFilter !== 'all' && emp.role !== roleFilter) return false;
-      if (!q) return true;
-      const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
-      return (
-        fullName.includes(q) ||
-        emp.employee_code.toLowerCase().includes(q) ||
-        emp.email.toLowerCase().includes(q)
-      );
-    });
-  }, [employees, statusFilter, departmentFilter, roleFilter, search]);
-
-  const updateEmployeeStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'active' | 'inactive' }) => {
-      await api.patch(`/employees/${id}/status`, { status });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update employee status'),
-  });
-
   const updateEmployee = useMutation({
     mutationFn: async () => {
       if (!editId) return;
+      setError(null);
       await api.put(`/employees/${editId}`, {
-        first_name: editFirstName,
-        last_name: editLastName,
-        gender: editGender,
-        phone: editPhone || null,
+        employee_code: editCode,
+        first_name: editFirst,
+        last_name: editLast,
         email: editEmail,
+        phone: editPhone || null,
+        gender: editGender,
         role: editRole,
-        department_id: editDepartmentId || null,
+        department_id: editDept || null,
+        default_shift_id: editShift || null,
         position: editPosition || null,
-        default_shift_id: editDefaultShiftId || null,
-        weekly_off_days: editWeeklyOffDays,
-        can_cover_night_shift: editCanCoverNightShift,
-        status: editStatus,
-        profile_image: null,
+        weekly_off_days: editOffDays,
+        can_cover_night_shift: editNight,
       });
     },
     onSuccess: () => {
@@ -218,6 +182,7 @@ export const EmployeeList = () => {
 
   const deleteEmployee = useMutation({
     mutationFn: async (id: string) => {
+      setError(null);
       await api.delete(`/employees/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
@@ -226,420 +191,288 @@ export const EmployeeList = () => {
 
   const startEdit = (emp: Employee) => {
     setEditId(emp.id);
-    setEditFirstName(emp.first_name);
-    setEditLastName(emp.last_name);
-    setEditGender((emp.gender as 'male' | 'female') || 'male');
+    setEditCode(emp.employee_code);
+    setEditFirst(emp.first_name);
+    setEditLast(emp.last_name);
+    setEditEmail(emp.email);
     setEditPhone(emp.phone || '');
-    setEditEmail(emp.email || '');
+    setEditGender(emp.gender);
     setEditRole(emp.role);
-    setEditDepartmentId(emp.department_id || '');
-    setEditDefaultShiftId(emp.default_shift_id || '');
+    setEditDept(emp.department_id || '');
+    setEditShift(emp.default_shift_id || '');
     setEditPosition(emp.position || '');
-    setEditWeeklyOffDays(emp.weekly_off_days ?? 1);
-    setEditCanCoverNightShift(!!emp.can_cover_night_shift);
-    setEditStatus(emp.status || 'active');
+    setEditOffDays(emp.weekly_off_days);
+    setEditNight(emp.can_cover_night_shift);
   };
+
+  // ── Filter ──
+  const filteredEmployees = useMemo(() => {
+    let list = employees || [];
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((e) =>
+        `${e.first_name} ${e.last_name}`.toLowerCase().includes(q) ||
+        e.employee_code.toLowerCase().includes(q) ||
+        e.email.toLowerCase().includes(q)
+      );
+    }
+    if (filterRole) list = list.filter((e) => e.role === filterRole);
+    if (filterShift) list = list.filter((e) => e.default_shift_id === filterShift);
+    return list;
+  }, [employees, searchQuery, filterRole, filterShift]);
+
+  // Helper for select styling
+  const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">Employees</h2>
-          <p className="text-zinc-400">
-            {isTL || isManager ? 'Your department employees.' : 'View and manage the workforce directory.'}
-          </p>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <Users className="w-8 h-8 text-primary" />
+            Employees
+          </h2>
+          <p className="text-muted-foreground">Manage employee records, roles, and shift assignments.</p>
         </div>
+        {isAdmin && (
+          <Button
+            onClick={() => { setShowCreate((v) => !v); setError(null); }}
+            className="gap-2"
+          >
+            {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {showCreate ? 'Close' : 'New Employee'}
+          </Button>
+        )}
       </div>
 
-      {/* Create Account */}
-      <Card className="bg-zinc-900/50 border-zinc-800/60">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-white flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-emerald-400" />
-              Create Account
-            </CardTitle>
-            <Button
-              variant="outline"
-              className="border-zinc-700 text-zinc-200"
-              onClick={() => setShowCreateForm((v) => !v)}
-            >
-              {showCreateForm ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
-              Create an employee
-            </Button>
-          </div>
-          <CardDescription>
-            {isTL && 'Team leaders can create employee accounts only.'}
-            {isManager && 'Managers can create employee and team leader accounts.'}
-            {isAdmin && 'Admins can create any role and assign departments/shifts.'}
-          </CardDescription>
-        </CardHeader>
-        {showCreateForm && <CardContent className="space-y-4">
-          {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          {error}
+        </div>
+      )}
 
-          {createdLogin && (
-            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-sm space-y-1">
-              <div className="flex items-center gap-2 font-semibold">
-                <ShieldCheck className="w-4 h-4" />
-                Login credentials (give to the employee)
+      {/* Filters */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="space-y-2 md:col-span-2">
+              <Label>Search</Label>
+              <div className="relative">
+                <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, code, or email..."
+                  className="pl-9"
+                />
               </div>
-              <div><span className="text-emerald-300/80">Email:</span> {createdLogin.email}</div>
-              <div><span className="text-emerald-300/80">Password:</span> {createdLogin.password}</div>
-            </div>
-          )}
-
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label className="text-zinc-300">First Name</Label>
-              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} className="bg-black/20 border-zinc-700" />
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-300">Last Name</Label>
-              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} className="bg-black/20 border-zinc-700" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Gender</Label>
-              <select
-                className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                value={gender}
-                onChange={(e) => setGender(e.target.value as any)}
-              >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+              <Label>Role</Label>
+              <select className={selectClass} value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+                <option value="">All Roles</option>
+                <option value="employee">Employee</option>
+                <option value="team_leader">Team Leader</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
             <div className="space-y-2">
-              <Label className="text-zinc-300">Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="bg-black/20 border-zinc-700" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Email (login)</Label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/20 border-zinc-700" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Password</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/20 border-zinc-700" />
-              <p className="text-[11px] text-zinc-500">Minimum 8 characters.</p>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Hire Date</Label>
-              <Input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="bg-black/20 border-zinc-700" />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Role</Label>
-              <select
-                className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-              >
-                {allowedRoles.map((r) => (
-                  <option key={r} value={r}>{r.replace('_', ' ')}</option>
-                ))}
+              <Label>Shift</Label>
+              <select className={selectClass} value={filterShift} onChange={(e) => setFilterShift(e.target.value)}>
+                <option value="">All Shifts</option>
+                {shifts?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-
-            {(isAdmin || isManager) && (
-              <div className="space-y-2">
-                <Label className="text-zinc-300">Department</Label>
-                <select
-                  className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(e.target.value)}
-                >
-                  <option value="">(Optional)</option>
-                  {departments?.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} ({d.department_code})</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Default Shift</Label>
-              <select
-                className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                value={defaultShiftId}
-                onChange={(e) => setDefaultShiftId(e.target.value)}
-              >
-                <option value="">(Optional)</option>
-                {shifts?.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Position</Label>
-              <Input value={position} onChange={(e) => setPosition(e.target.value)} className="bg-black/20 border-zinc-700" />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-zinc-300">Weekly Off Days</Label>
-              <Input
-                type="number"
-                min={0}
-                value={weeklyOffDays}
-                onChange={(e) => setWeeklyOffDays(parseInt(e.target.value) || 0)}
-                className="bg-black/20 border-zinc-700"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              id="night"
-              type="checkbox"
-              checked={canCoverNightShift}
-              onChange={(e) => setCanCoverNightShift(e.target.checked)}
-            />
-            <Label htmlFor="night" className="text-zinc-300">Can cover night shift</Label>
-          </div>
-          <p className="text-xs text-zinc-500">Employee code is auto-generated.</p>
-        </CardContent>}
-        {showCreateForm && <CardFooter>
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2"
-            onClick={() => createEmployee.mutate()}
-            disabled={
-              createEmployee.isPending ||
-              !firstName || !lastName || !email || !password || !hireDate || !role
-            }
-          >
-            <UserPlus className="w-4 h-4" />
-            Create Account
-          </Button>
-        </CardFooter>}
-      </Card>
-
-      <Card className="bg-zinc-900/50 border-zinc-800/60">
-        <CardHeader>
-          <CardTitle className="text-white">Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="grid md:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label className="text-zinc-300">Search</Label>
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name, code, email..."
-              className="bg-black/20 border-zinc-700"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-zinc-300">Status</Label>
-            <select
-              className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-            >
-              <option value="all">All</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-zinc-300">Department</Label>
-            <select
-              className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-              value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
-            >
-              <option value="all">All departments</option>
-              {departments?.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-zinc-300">Role</Label>
-            <select
-              className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-            >
-              <option value="all">All roles</option>
-              <option value="employee">Employee</option>
-              <option value="team_leader">Team Leader</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-            </select>
           </div>
         </CardContent>
       </Card>
 
+      {/* Create Form */}
+      {isAdmin && showCreate && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Create Employee
+            </CardTitle>
+            <CardDescription>Add a new employee to the system</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Employee Code</Label>
+                <Input value={createCode} onChange={(e) => setCreateCode(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>First Name</Label>
+                <Input value={createFirst} onChange={(e) => setCreateFirst(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name</Label>
+                <Input value={createLast} onChange={(e) => setCreateLast(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input value={createPhone} onChange={(e) => setCreatePhone(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <select className={selectClass} value={createGender} onChange={(e) => setCreateGender(e.target.value)}>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Hire Date</Label>
+                <Input type="date" value={createHireDate} onChange={(e) => setCreateHireDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <select className={selectClass} value={createRole} onChange={(e) => setCreateRole(e.target.value)}>
+                  <option value="employee">Employee</option>
+                  <option value="team_leader">Team Leader</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <select className={selectClass} value={createDept} onChange={(e) => setCreateDept(e.target.value)}>
+                  <option value="">No Department</option>
+                  {departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Default Shift</Label>
+                <select className={selectClass} value={createShift} onChange={(e) => setCreateShift(e.target.value)}>
+                  <option value="">No Shift</option>
+                  {shifts?.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Position</Label>
+                <Input value={createPosition} onChange={(e) => setCreatePosition(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Password</Label>
+                <Input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Weekly Off Days</Label>
+                <Input type="number" min={0} value={createOffDays} onChange={(e) => setCreateOffDays(parseInt(e.target.value) || 0)} />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input id="create-night" type="checkbox" checked={createNight} onChange={(e) => setCreateNight(e.target.checked)} />
+                <Label htmlFor="create-night">Can cover night shifts</Label>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button
+              onClick={() => createEmployee.mutate()}
+              disabled={createEmployee.isPending || !createCode || !createFirst || !createLast || !createEmail || !createPassword}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {createEmployee.isPending ? 'Creating…' : 'Create'}
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+
+      {/* Employee List */}
       {isLoading ? (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Card key={i} className="animate-pulse bg-zinc-900/50">
-              <CardHeader className="h-24 bg-zinc-800/50 rounded-t-xl" />
-              <CardContent className="h-24" />
-            </Card>
-          ))}
-        </div>
-      ) : isError ? (
-        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
-          Failed to load employees. Please try again.
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredEmployees?.map((emp) => (
-            <Card key={emp.id} className="bg-zinc-900/40 hover:bg-zinc-800/60 transition-colors border-zinc-800/60 overflow-hidden relative">
-              <div className={`absolute top-0 w-full h-1 ${emp.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
-              <CardHeader className="flex flex-row items-center gap-4 pb-4">
-                <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0 text-xl font-bold">
-                  {emp.first_name?.[0]}{emp.last_name?.[0]}
-                </div>
-                <div className="space-y-1 overflow-hidden">
-                  <CardTitle className="text-lg font-medium text-white truncate">
-                    {emp.first_name} {emp.last_name}
-                  </CardTitle>
-                  <p className="text-xs font-mono text-zinc-500">{emp.employee_code}</p>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {editId === emp.id ? (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <Input value={editFirstName} onChange={(e) => setEditFirstName(e.target.value)} className="bg-black/20 border-zinc-700" placeholder="First name" />
-                    <Input value={editLastName} onChange={(e) => setEditLastName(e.target.value)} className="bg-black/20 border-zinc-700" placeholder="Last name" />
-                    <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white" value={editGender} onChange={(e) => setEditGender(e.target.value as any)}>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                    </select>
-                    <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="bg-black/20 border-zinc-700" placeholder="Phone" />
-                    <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="bg-black/20 border-zinc-700 col-span-2" placeholder="Email" />
-                    <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white" value={editRole} onChange={(e) => setEditRole(e.target.value as any)}>
-                      {allowedRoles.map((r) => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
-                    </select>
-                    <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white" value={editStatus} onChange={(e) => setEditStatus(e.target.value)}>
-                      <option value="active">active</option>
-                      <option value="inactive">inactive</option>
-                      <option value="on_leave">on_leave</option>
-                      <option value="terminated">terminated</option>
-                    </select>
-                    <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white col-span-2" value={editDepartmentId} onChange={(e) => setEditDepartmentId(e.target.value)}>
-                      <option value="">No department</option>
-                      {departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </select>
-                    <select className="w-full h-10 px-3 py-2 rounded-md bg-zinc-950/50 border border-zinc-700 text-white col-span-2" value={editDefaultShiftId} onChange={(e) => setEditDefaultShiftId(e.target.value)}>
-                      <option value="">No default shift</option>
-                      {shifts?.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
-                    </select>
-                    <Input value={editPosition} onChange={(e) => setEditPosition(e.target.value)} className="bg-black/20 border-zinc-700" placeholder="Position" />
-                    <Input type="number" min={0} value={editWeeklyOffDays} onChange={(e) => setEditWeeklyOffDays(parseInt(e.target.value) || 0)} className="bg-black/20 border-zinc-700" placeholder="Weekly off days" />
-                    <div className="col-span-2 flex items-center gap-2">
-                      <input id={`edit-night-${emp.id}`} type="checkbox" checked={editCanCoverNightShift} onChange={(e) => setEditCanCoverNightShift(e.target.checked)} />
-                      <Label htmlFor={`edit-night-${emp.id}`} className="text-zinc-300">Can cover night shift</Label>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {filteredEmployees.map((emp) => (
+            <Card key={emp.id} className="group hover:shadow-md transition-all">
+              {editId === emp.id ? (
+                /* Edit mode */
+                <div className="p-5 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1"><Label className="text-xs">Code</Label><Input value={editCode} onChange={(e) => setEditCode(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Role</Label>
+                      <select className={selectClass + " h-9"} value={editRole} onChange={(e) => setEditRole(e.target.value)}>
+                        <option value="employee">Employee</option><option value="team_leader">Team Leader</option><option value="manager">Manager</option><option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1"><Label className="text-xs">First</Label><Input value={editFirst} onChange={(e) => setEditFirst(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Last</Label><Input value={editLast} onChange={(e) => setEditLast(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1 col-span-2"><Label className="text-xs">Email</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Department</Label>
+                      <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
+                        <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1"><Label className="text-xs">Shift</Label>
+                      <select className={selectClass + " h-9"} value={editShift} onChange={(e) => setEditShift(e.target.value)}>
+                        <option value="">None</option>{shifts?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
                     </div>
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center gap-2 text-zinc-400">
-                      <Briefcase className="w-4 h-4 text-emerald-400/70" />
-                      <span className="capitalize">{emp.role.replace('_', ' ')}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400">
-                      <Users className="w-4 h-4 text-purple-400/70" />
-                      <span>
-                        Dept: {emp.department_id && deptMap[emp.department_id]
-                          ? deptMap[emp.department_id].name
-                          : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400 col-span-2">
-                      <Briefcase className="w-4 h-4 text-blue-400/70 shrink-0" />
-                      <span>
-                        Shift: {emp.default_shift_id && shiftMap[emp.default_shift_id]
-                          ? `${shiftMap[emp.default_shift_id].name} (${shiftMap[emp.default_shift_id].shift_code})`
-                          : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400 col-span-2">
-                      <Mail className="w-4 h-4 text-blue-400/70 shrink-0" />
-                      <span className="truncate">{emp.email || 'No email provided'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-zinc-400 col-span-2">
-                      <Phone className="w-4 h-4 text-orange-400/70 shrink-0" />
-                      <span>{emp.phone || 'No phone provided'}</span>
-                    </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button size="sm" variant="outline" onClick={() => setEditId(null)}><X className="w-4 h-4 mr-1" /> Cancel</Button>
+                    <Button size="sm" onClick={() => updateEmployee.mutate()} disabled={updateEmployee.isPending}><Save className="w-4 h-4 mr-1" /> Save</Button>
                   </div>
-                )}
-                <div className="pt-2 border-t border-zinc-800/60 flex items-center justify-end gap-2">
-                  {editId === emp.id ? (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                        onClick={() => setEditId(null)}
-                      >
-                        <X className="w-4 h-4 mr-1" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                        onClick={() => updateEmployee.mutate()}
-                        disabled={updateEmployee.isPending || !editFirstName || !editLastName || !editEmail}
-                      >
-                        <Save className="w-4 h-4 mr-1" />
-                        Save
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                      onClick={() => startEdit(emp)}
-                    >
-                      <Edit3 className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                  )}
-                  {emp.status === 'active' ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
-                      onClick={() => updateEmployeeStatus.mutate({ id: emp.id, status: 'inactive' })}
-                    >
-                      <UserX className="w-4 h-4 mr-1" />
-                      Deactivate
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
-                      onClick={() => updateEmployeeStatus.mutate({ id: emp.id, status: 'active' })}
-                    >
-                      <UserCheck className="w-4 h-4 mr-1" />
-                      Activate
-                    </Button>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-500/30 text-red-300 hover:bg-red-500/10"
-                    onClick={() => {
-                      if (confirm(`Delete employee "${emp.first_name} ${emp.last_name}"?`)) {
-                        deleteEmployee.mutate(emp.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4 mr-1" />
-                    Delete
-                  </Button>
                 </div>
-              </CardContent>
+              ) : (
+                /* View mode */
+                <Link to={`/employees/${emp.id}`} className="block">
+                  <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <UserCircle className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="text-base truncate">{emp.first_name} {emp.last_name}</CardTitle>
+                        <CardDescription className="text-xs font-mono">{emp.employee_code}</CardDescription>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${
+                      emp.role === 'admin' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
+                      emp.role === 'manager' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' :
+                      emp.role === 'team_leader' ? 'bg-primary/10 text-primary border border-primary/20' :
+                      'bg-muted text-muted-foreground border border-border'
+                    }`}>
+                      {emp.role.replace('_', ' ')}
+                    </span>
+                  </CardHeader>
+                  <CardContent className="text-sm space-y-1.5 text-muted-foreground">
+                    <p>{emp.email}</p>
+                    {emp.department_id && deptMap[emp.department_id] && (
+                      <p className="text-xs">Dept: <span className="text-foreground font-medium">{deptMap[emp.department_id].name}</span></p>
+                    )}
+                    {emp.default_shift_id && shiftMap[emp.default_shift_id] && (
+                      <p className="text-xs">Shift: <span className="text-foreground font-medium">{shiftMap[emp.default_shift_id].name}</span></p>
+                    )}
+                  </CardContent>
+                  {isAdmin && (
+                    <CardFooter className="pt-0 flex justify-end gap-2" onClick={(e) => e.preventDefault()}>
+                      <Button size="sm" variant="outline" onClick={() => startEdit(emp)}>
+                        <Edit3 className="w-4 h-4 mr-1" /> Edit
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                        onClick={() => { if (confirm(`Delete ${emp.first_name} ${emp.last_name}?`)) deleteEmployee.mutate(emp.id); }}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete
+                      </Button>
+                    </CardFooter>
+                  )}
+                </Link>
+              )}
             </Card>
           ))}
-          {filteredEmployees?.length === 0 && (
-            <div className="col-span-full p-8 text-center text-zinc-500 border border-zinc-800/60 border-dashed rounded-xl bg-zinc-900/20">
+          {filteredEmployees.length === 0 && (
+            <div className="col-span-full p-12 text-center text-muted-foreground border border-border border-dashed rounded-xl bg-muted/10">
+              <Users className="w-12 h-12 mx-auto mb-4 opacity-20" />
               No employees match current filters.
             </div>
           )}

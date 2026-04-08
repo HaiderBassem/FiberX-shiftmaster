@@ -35,19 +35,13 @@ export const DepartmentDetail = () => {
 
   const { data: dept, isLoading: deptLoading } = useQuery<Department>({
     queryKey: ['department', id],
-    queryFn: async () => {
-      const res = await api.get(`/departments/${id}`);
-      return res.data?.data;
-    },
+    queryFn: async () => { const res = await api.get(`/departments/${id}`); return res.data?.data; },
     enabled: !!id,
   });
 
   const { data: shifts } = useQuery<Shift[]>({
     queryKey: ['shifts'],
-    queryFn: async () => {
-      const res = await api.get('/shifts');
-      return res.data?.data || [];
-    },
+    queryFn: async () => { const res = await api.get('/shifts'); return res.data?.data || []; },
   });
 
   const shiftMap = useMemo(() => {
@@ -58,32 +52,23 @@ export const DepartmentDetail = () => {
 
   const { data: employees, isLoading: empLoading } = useQuery<Employee[]>({
     queryKey: ['employees', 'department', id],
-    queryFn: async () => {
-      const res = await api.get(`/employees?department_id=${id}`);
-      return res.data?.data || [];
-    },
+    queryFn: async () => { const res = await api.get(`/employees?department_id=${id}`); return res.data?.data || []; },
     enabled: !!id,
   });
 
   const { data: manager } = useQuery<Employee | null>({
     queryKey: ['employee', 'manager', dept?.manager_id],
-    queryFn: async () => {
-      if (!dept?.manager_id) return null;
-      const res = await api.get(`/employees/${dept.manager_id}`);
-      return res.data?.data;
-    },
+    queryFn: async () => { if (!dept?.manager_id) return null; const res = await api.get(`/employees/${dept.manager_id}`); return res.data?.data; },
     enabled: !!dept?.manager_id,
   });
 
-  if (deptLoading) {
-    return <Card className="animate-pulse bg-zinc-900/40 border-zinc-800/60 h-40" />;
-  }
+  if (deptLoading) return <Card className="animate-pulse h-40" />;
 
   if (!dept) {
     return (
       <div className="space-y-4">
-        <p className="text-zinc-400">Department not found.</p>
-        <Link to="/departments"><Button variant="outline" className="border-zinc-700 text-zinc-300">Back</Button></Link>
+        <p className="text-muted-foreground">Department not found.</p>
+        <Link to="/departments"><Button variant="outline">Back</Button></Link>
       </div>
     );
   }
@@ -95,16 +80,14 @@ export const DepartmentDetail = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/departments">
-            <Button variant="outline" className="border-zinc-700 text-zinc-300 gap-2">
-              <ArrowLeft className="w-4 h-4" /> Back
-            </Button>
+            <Button variant="outline" className="gap-2"><ArrowLeft className="w-4 h-4" /> Back</Button>
           </Link>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-              <Building2 className="w-8 h-8 text-blue-400" />
+            <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              <Building2 className="w-8 h-8 text-primary" />
               {dept.name}
             </h2>
-            <p className="text-zinc-400">
+            <p className="text-muted-foreground">
               {dept.department_code}
               {dept.description ? ` · ${dept.description}` : ''}
             </p>
@@ -113,10 +96,10 @@ export const DepartmentDetail = () => {
       </div>
 
       {/* Manager */}
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Crown className="w-5 h-5 text-amber-400" />
+          <CardTitle className="flex items-center gap-2">
+            <Crown className="w-5 h-5 text-amber-500" />
             Department Manager
           </CardTitle>
           <CardDescription>Assigned manager for this department</CardDescription>
@@ -124,26 +107,22 @@ export const DepartmentDetail = () => {
         <CardContent>
           {manager ? (
             <Link to={`/employees/${manager.id}`} className="block">
-              <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30 hover:bg-zinc-800/50 transition-colors">
-                <div className="font-semibold text-zinc-100">
-                  {manager.first_name} {manager.last_name}
-                </div>
-                <div className="text-sm text-zinc-400">
-                  {manager.email} · {manager.employee_code}
-                </div>
+              <div className="p-4 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+                <div className="font-semibold text-foreground">{manager.first_name} {manager.last_name}</div>
+                <div className="text-sm text-muted-foreground">{manager.email} · {manager.employee_code}</div>
               </div>
             </Link>
           ) : (
-            <p className="text-zinc-500">No manager assigned yet.</p>
+            <p className="text-muted-foreground">No manager assigned yet.</p>
           )}
         </CardContent>
       </Card>
 
       {/* Employees */}
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-400" />
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
             Employees ({employeesOnly.length})
           </CardTitle>
           <CardDescription>Employees in {dept.name}</CardDescription>
@@ -151,7 +130,7 @@ export const DepartmentDetail = () => {
         <CardContent>
           {empLoading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-14 bg-zinc-800/40 rounded-xl" />)}
+              {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-14 bg-muted/40 rounded-xl" />)}
             </div>
           ) : employeesOnly.length ? (
             <div className="grid md:grid-cols-2 gap-4">
@@ -159,29 +138,20 @@ export const DepartmentDetail = () => {
                 const shift = e.default_shift_id ? shiftMap[e.default_shift_id] : undefined;
                 return (
                   <Link key={e.id} to={`/employees/${e.id}`} className="block">
-                    <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30 hover:bg-zinc-800/50 transition-colors">
-                      <div className="font-semibold text-zinc-100">
-                        {e.first_name} {e.last_name}
-                      </div>
-                      <div className="text-sm text-zinc-400">
-                        {e.employee_code} · {e.email}
-                      </div>
-                      {shift && (
-                        <div className="text-xs text-zinc-500 mt-1">
-                          Shift: {shift.name} ({shift.shift_code})
-                        </div>
-                      )}
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
+                      <div className="font-semibold text-foreground">{e.first_name} {e.last_name}</div>
+                      <div className="text-sm text-muted-foreground">{e.employee_code} · {e.email}</div>
+                      {shift && <div className="text-xs text-muted-foreground mt-1">Shift: {shift.name} ({shift.shift_code})</div>}
                     </div>
                   </Link>
                 );
               })}
             </div>
           ) : (
-            <p className="text-zinc-500">No employees in this department yet.</p>
+            <p className="text-muted-foreground">No employees in this department yet.</p>
           )}
         </CardContent>
       </Card>
     </div>
   );
 };
-

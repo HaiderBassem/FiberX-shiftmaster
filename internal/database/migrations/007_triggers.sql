@@ -7,6 +7,10 @@ CREATE TRIGGER trigger_update_employees_updated_at
     BEFORE UPDATE ON employees
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER trigger_update_departments_updated_at
+    BEFORE UPDATE ON departments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER trigger_update_employee_shifts_updated_at
     BEFORE UPDATE ON employee_shifts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

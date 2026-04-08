@@ -23,6 +23,8 @@ export const ScheduleView = () => {
   const [setShiftId, setSetShiftId] = useState('');
   const [setError, setSetError] = useState<string | null>(null);
 
+  const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
+
   // Query for fetching daily schedule
   const { data: activeSchedule, isLoading: isLoadingSchedule } = useQuery({
     queryKey: ['schedules', viewDate],
@@ -143,9 +145,7 @@ export const ScheduleView = () => {
     mutationFn: async ({ employeeShiftId, replacementEmployeeId }: { employeeShiftId: string; replacementEmployeeId: string }) => {
       await api.post(`/schedules/shifts/${employeeShiftId}/replace`, { replacement_employee_id: replacementEmployeeId });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
   });
 
   const setEmployeeShift = useMutation({
@@ -161,8 +161,7 @@ export const ScheduleView = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      setSetEmployeeId('');
-      setSetShiftId('');
+      setSetEmployeeId(''); setSetShiftId('');
     },
     onError: (err: any) => {
       setSetError(err?.response?.data?.error || err?.message || 'Failed to set shift');
@@ -172,77 +171,57 @@ export const ScheduleView = () => {
   const setOffQuick = useMutation({
     mutationFn: async ({ employeeId, date }: { employeeId: string; date: string }) => {
       await api.post('/schedules/shifts/set', {
-        employee_id: employeeId,
-        shift_date: date,
-        shift_status: 'off',
-        shift_id: null,
-        leave_reason: null,
+        employee_id: employeeId, shift_date: date, shift_status: 'off', shift_id: null, leave_reason: null,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
   });
 
   const setWorkingQuick = useMutation({
     mutationFn: async ({ employeeId, date, shiftId }: { employeeId: string; date: string; shiftId: string }) => {
       await api.post('/schedules/shifts/set', {
-        employee_id: employeeId,
-        shift_date: date,
-        shift_status: 'working',
-        shift_id: shiftId,
-        leave_reason: null,
+        employee_id: employeeId, shift_date: date, shift_status: 'working', shift_id: shiftId, leave_reason: null,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
-    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
   });
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-white mb-2">Schedules</h2>
-        <p className="text-zinc-400">Daily staffing view grouped by shift, with clear status and quick actions.</p>
+        <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
+          <CalendarIcon className="w-8 h-8 text-primary" />
+          Schedules
+        </h2>
+        <p className="text-muted-foreground">Daily staffing view grouped by shift, with clear status and quick actions.</p>
       </div>
 
       {/* Filters */}
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
+      <Card>
         <CardContent className="p-5 flex flex-col md:flex-row md:items-end gap-4">
           <div className="space-y-2">
-            <Label className="text-zinc-300">View day</Label>
+            <Label>View day</Label>
             <div className="relative">
-              <CalendarIcon className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-              <Input
-                type="date"
-                value={viewDate}
+              <CalendarIcon className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+              <Input type="date" value={viewDate}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setViewDate(e.target.value)}
-                className="pl-9 bg-zinc-950/50 border-zinc-700"
-              />
+                className="pl-9" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-zinc-300">Shift filter</Label>
+            <Label>Shift filter</Label>
             <div className="relative">
-              <Filter className="w-4 h-4 text-zinc-400 absolute left-3 top-3" />
-              <select
-                className="w-full h-10 pl-9 pr-3 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                value={filterShiftId}
-                onChange={(e) => setFilterShiftId(e.target.value)}
-              >
+              <Filter className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
+              <select className={selectClass + " pl-9"} value={filterShiftId} onChange={(e) => setFilterShiftId(e.target.value)}>
                 <option value="">All shifts</option>
-                {shifts?.map((s: any) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.shift_code})
-                  </option>
-                ))}
+                {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:ml-auto w-full md:w-auto">
-            <Stat label="Total" value={stats.total} tone="zinc" />
+            <Stat label="Total" value={stats.total} tone="default" />
             <Stat label="Working" value={stats.working} tone="emerald" />
             <Stat label="Off" value={stats.off} tone="amber" />
             <Stat label="Leave" value={stats.leave} tone="rose" />
@@ -253,78 +232,44 @@ export const ScheduleView = () => {
 
       {/* Manual schedule creation / update */}
       {isSupervisor && (
-        <Card className="bg-zinc-900/40 border-zinc-800/60">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Wand2 className="w-5 h-5 text-emerald-400" />
+              <Wand2 className="w-5 h-5 text-primary" />
               Assign / Update Shift (manual)
             </CardTitle>
-            <CardDescription>Set one employee’s shift status for the selected day.</CardDescription>
+            <CardDescription>Set one employee's shift status for the selected day.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {setError && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
-                {setError}
-              </div>
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{setError}</div>
             )}
             <div className="grid md:grid-cols-4 gap-4">
               <div className="space-y-2 md:col-span-2">
-                <Label className="text-zinc-300">Employee</Label>
-                <select
-                  className="w-full h-10 px-3 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                  value={setEmployeeId}
-                  onChange={(e) => setSetEmployeeId(e.target.value)}
-                >
+                <Label>Employee</Label>
+                <select className={selectClass} value={setEmployeeId} onChange={(e) => setSetEmployeeId(e.target.value)}>
                   <option value="">Select employee…</option>
-                  {employees?.map((e: any) => (
-                    <option key={e.id} value={e.id}>
-                      {e.first_name} {e.last_name} — {e.employee_code}
-                    </option>
-                  ))}
+                  {employees?.map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
                 </select>
               </div>
-
               <div className="space-y-2">
-                <Label className="text-zinc-300">Status</Label>
-                <select
-                  className="w-full h-10 px-3 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                  value={setShiftStatus}
-                  onChange={(e) => setSetShiftStatus(e.target.value as any)}
-                >
+                <Label>Status</Label>
+                <select className={selectClass} value={setShiftStatus} onChange={(e) => setSetShiftStatus(e.target.value as any)}>
                   <option value="working">Working</option>
                   <option value="off">Off</option>
                 </select>
               </div>
-
               <div className="space-y-2">
-                <Label className="text-zinc-300">Shift</Label>
-                <select
-                  className="w-full h-10 px-3 rounded-md bg-zinc-950/50 border border-zinc-700 text-white"
-                  value={setShiftId}
-                  onChange={(e) => setSetShiftId(e.target.value)}
-                  disabled={setShiftStatus !== 'working'}
-                >
+                <Label>Shift</Label>
+                <select className={selectClass} value={setShiftId} onChange={(e) => setSetShiftId(e.target.value)} disabled={setShiftStatus !== 'working'}>
                   <option value="">{setShiftStatus === 'working' ? 'Select shift…' : 'Not required'}</option>
-                  {shifts?.map((s: any) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.shift_code})
-                    </option>
-                  ))}
+                  {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
                 </select>
               </div>
             </div>
-
             <div className="flex justify-end">
-              <Button
-                className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                onClick={() => setEmployeeShift.mutate()}
-                disabled={
-                  setEmployeeShift.isPending ||
-                  !setEmployeeId ||
-                  !viewDate ||
-                  (setShiftStatus === 'working' && !setShiftId)
-                }
-              >
+              <Button onClick={() => setEmployeeShift.mutate()}
+                disabled={setEmployeeShift.isPending || !setEmployeeId || !viewDate || (setShiftStatus === 'working' && !setShiftId)}>
                 {setEmployeeShift.isPending ? 'Saving…' : 'Save'}
               </Button>
             </div>
@@ -333,18 +278,18 @@ export const ScheduleView = () => {
       )}
 
       {/* Daily schedule */}
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
-        <CardHeader className="pb-3 border-b border-zinc-800/60">
+      <Card>
+        <CardHeader className="pb-3 border-b border-border">
           <CardTitle className="text-xl">Daily Schedule · {format(new Date(viewDate), 'MMM d, yyyy')}</CardTitle>
           <CardDescription>Grouped by shift with readable employee info.</CardDescription>
         </CardHeader>
         <CardContent className="p-6">
           {isLoadingSchedule ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-zinc-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
             </div>
           ) : !activeSchedule || activeSchedule.length === 0 ? (
-            <div className="py-16 text-center text-zinc-500">
+            <div className="py-16 text-center text-muted-foreground">
               <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
               <p>No schedule rows found for this day.</p>
             </div>
@@ -359,21 +304,21 @@ export const ScheduleView = () => {
                 const vacation = rows.filter((r: any) => r.shift_status === 'vacation').length;
 
                 return (
-                  <div key={shiftId} className="rounded-2xl border border-zinc-800/60 overflow-hidden">
-                    <div className="px-4 py-3 bg-zinc-950/40 flex items-center justify-between gap-3">
+                  <div key={shiftId} className="rounded-2xl border border-border overflow-hidden">
+                    <div className="px-4 py-3 bg-muted/30 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 min-w-0">
-                        <Briefcase className="w-4 h-4 text-zinc-400" />
-                        <span className="text-zinc-200 font-semibold truncate">{title}</span>
+                        <Briefcase className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-foreground font-semibold truncate">{title}</span>
                       </div>
-                      <div className="text-xs text-zinc-500 flex gap-3 shrink-0">
-                        <span className="text-emerald-400">Working: {working}</span>
-                        <span className="text-amber-400">Off: {off}</span>
-                        <span className="text-rose-400">Leave: {leave}</span>
-                        <span className="text-blue-400">Vacation: {vacation}</span>
+                      <div className="text-xs text-muted-foreground flex gap-3 shrink-0">
+                        <span className="text-emerald-500">Working: {working}</span>
+                        <span className="text-amber-500">Off: {off}</span>
+                        <span className="text-rose-500">Leave: {leave}</span>
+                        <span className="text-blue-500">Vacation: {vacation}</span>
                       </div>
                     </div>
 
-                    <div className="divide-y divide-zinc-800/50">
+                    <div className="divide-y divide-border">
                       {rows.map((es: any) => {
                         const emp = employeeMap[es.employee_id];
                         const name = emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown Employee';
@@ -381,24 +326,24 @@ export const ScheduleView = () => {
                         const status = (es.shift_status || '—') as string;
 
                         const statusTone =
-                          status === 'working' ? 'text-emerald-400' :
-                          status === 'off' ? 'text-amber-400' :
-                          status === 'leave' ? 'text-rose-400' :
-                          status === 'vacation' ? 'text-blue-400' :
-                          'text-zinc-400';
+                          status === 'working' ? 'text-emerald-500' :
+                          status === 'off' ? 'text-amber-500' :
+                          status === 'leave' ? 'text-rose-500' :
+                          status === 'vacation' ? 'text-blue-500' :
+                          'text-muted-foreground';
 
                         return (
-                          <div key={es.id} className="px-4 py-3 flex items-center justify-between gap-4 bg-zinc-900/20">
+                          <div key={es.id} className="px-4 py-3 flex items-center justify-between gap-4 bg-card">
                             <div className="min-w-0 flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-zinc-800/60 border border-zinc-700/40 flex items-center justify-center text-zinc-200 font-semibold">
+                              <div className="w-9 h-9 rounded-xl bg-muted/60 border border-border flex items-center justify-center text-foreground font-semibold">
                                 {name?.[0] || '?'}
                               </div>
                               <div className="min-w-0">
-                                <div className="text-zinc-100 font-medium truncate flex items-center gap-2">
-                                  <Users className="w-4 h-4 text-zinc-500" />
+                                <div className="text-foreground font-medium truncate flex items-center gap-2">
+                                  <Users className="w-4 h-4 text-muted-foreground" />
                                   {name}
                                 </div>
-                                <div className="text-xs text-zinc-500 truncate">{code}</div>
+                                <div className="text-xs text-muted-foreground truncate">{code}</div>
                               </div>
                             </div>
 
@@ -431,8 +376,8 @@ export const ScheduleView = () => {
       </Card>
 
       {/* Weekly roster table */}
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
-        <CardHeader className="pb-3 border-b border-zinc-800/60">
+      <Card>
+        <CardHeader className="pb-3 border-b border-border">
           <CardTitle className="text-xl">Weekly Team Roster</CardTitle>
           <CardDescription>
             One row per employee with day-by-day status. Quick "Off" action included.
@@ -441,16 +386,16 @@ export const ScheduleView = () => {
         <CardContent className="p-0">
           {weeklyLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-7 h-7 animate-spin text-zinc-500" />
+              <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1080px]">
                 <thead>
-                  <tr className="bg-zinc-950/40 border-b border-zinc-800/60">
-                    <th className="text-left p-3 text-xs uppercase tracking-wider text-zinc-500">Employee</th>
+                  <tr className="bg-muted/30 border-b border-border">
+                    <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground">Employee</th>
                     {weekDays.map((d) => (
-                      <th key={d.toISOString()} className="text-left p-3 text-xs uppercase tracking-wider text-zinc-500">
+                      <th key={d.toISOString()} className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground">
                         {format(d, 'EEE dd')}
                       </th>
                     ))}
@@ -458,20 +403,20 @@ export const ScheduleView = () => {
                 </thead>
                 <tbody>
                   {filteredWeeklyRows.map((row: any) => (
-                    <tr key={row.employee.id} className="border-b border-zinc-800/40 align-top">
+                    <tr key={row.employee.id} className="border-b border-border align-top">
                       <td className="p-3">
-                        <div className="text-zinc-100 font-medium">
+                        <div className="text-foreground font-medium">
                           {row.employee.first_name} {row.employee.last_name}
                         </div>
-                        <div className="text-xs text-zinc-500">{row.employee.employee_code}</div>
+                        <div className="text-xs text-muted-foreground">{row.employee.employee_code}</div>
                       </td>
                       {row.days.map((d: any) => {
                         const tone =
-                          d.status === 'working' ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/5'
-                            : d.status === 'off' ? 'text-amber-300 border-amber-500/30 bg-amber-500/5'
-                              : d.status === 'leave' ? 'text-rose-300 border-rose-500/30 bg-rose-500/5'
-                                : d.status === 'vacation' ? 'text-blue-300 border-blue-500/30 bg-blue-500/5'
-                                  : 'text-zinc-400 border-zinc-700/40 bg-zinc-900/30';
+                          d.status === 'working' ? 'text-emerald-500 border-emerald-500/30 bg-emerald-500/5'
+                            : d.status === 'off' ? 'text-amber-500 border-amber-500/30 bg-amber-500/5'
+                              : d.status === 'leave' ? 'text-rose-500 border-rose-500/30 bg-rose-500/5'
+                                : d.status === 'vacation' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
+                                  : 'text-muted-foreground border-border bg-muted/20';
 
                         return (
                           <td key={`${row.employee.id}-${d.date}`} className="p-3">
@@ -482,7 +427,7 @@ export const ScheduleView = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="mt-2 h-7 border-zinc-700 text-zinc-200 hover:bg-zinc-800 text-[11px]"
+                                  className="mt-2 h-7 text-[11px]"
                                   onClick={() => {
                                     if (d.status === 'off') {
                                       const fallbackShiftId = d.row?.shift_id || row.employee?.default_shift_id || '';
@@ -513,7 +458,7 @@ export const ScheduleView = () => {
                   ))}
                   {filteredWeeklyRows.length === 0 && (
                     <tr>
-                      <td className="p-8 text-center text-zinc-500" colSpan={8}>
+                      <td className="p-8 text-center text-muted-foreground" colSpan={8}>
                         No employees available for this shift filter.
                       </td>
                     </tr>
@@ -527,10 +472,10 @@ export const ScheduleView = () => {
 
       {/* Vacation request alarms */}
       {isSupervisor && (
-        <Card className="bg-zinc-900/40 border-zinc-800/60">
+        <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
               Vacation / Leave Alerts
             </CardTitle>
             <CardDescription>Pending requests that need attention.</CardDescription>
@@ -541,13 +486,13 @@ export const ScheduleView = () => {
                 .filter((l: any) => l.leave_type === 'annual' || l.leave_type === 'vacation')
                 .map((leave: any) => (
                   <div key={leave.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-                    <span className="text-amber-300 font-medium">Vacation request:</span>{' '}
-                    <span className="text-zinc-200">{leave.employee_name || leave.employee_id}</span>{' '}
-                    <span className="text-zinc-400">({leave.start_date} to {leave.end_date})</span>
+                    <span className="text-amber-500 font-medium">Vacation request:</span>{' '}
+                    <span className="text-foreground">{leave.employee_name || leave.employee_id}</span>{' '}
+                    <span className="text-muted-foreground">({leave.start_date} to {leave.end_date})</span>
                   </div>
                 ))
             ) : (
-              <p className="text-zinc-500 text-sm">No pending vacation requests.</p>
+              <p className="text-muted-foreground text-sm">No pending vacation requests.</p>
             )}
           </CardContent>
         </Card>
@@ -556,13 +501,13 @@ export const ScheduleView = () => {
   );
 };
 
-const Stat = ({ label, value, tone }: { label: string; value: number; tone: 'zinc' | 'emerald' | 'amber' | 'rose' | 'blue' }) => {
+const Stat = ({ label, value, tone }: { label: string; value: number; tone: 'default' | 'emerald' | 'amber' | 'rose' | 'blue' }) => {
   const toneMap: Record<string, string> = {
-    zinc: 'text-zinc-200 bg-zinc-900/40 border-zinc-800/60',
-    emerald: 'text-emerald-300 bg-emerald-500/5 border-emerald-500/20',
-    amber: 'text-amber-300 bg-amber-500/5 border-amber-500/20',
-    rose: 'text-rose-300 bg-rose-500/5 border-rose-500/20',
-    blue: 'text-blue-300 bg-blue-500/5 border-blue-500/20',
+    default: 'text-foreground bg-muted/40 border-border',
+    emerald: 'text-emerald-500 bg-emerald-500/5 border-emerald-500/20',
+    amber: 'text-amber-500 bg-amber-500/5 border-amber-500/20',
+    rose: 'text-rose-500 bg-rose-500/5 border-rose-500/20',
+    blue: 'text-blue-500 bg-blue-500/5 border-blue-500/20',
   };
   return (
     <div className={`rounded-xl border px-3 py-2 ${toneMap[tone]}`}>
@@ -586,6 +531,8 @@ const ReplacementButton = ({
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState('');
 
+  const selectClass = "w-full h-9 px-2 rounded-md bg-background border border-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+
   const { data: replacements, isLoading } = useQuery({
     queryKey: ['replacements', date],
     queryFn: async () => {
@@ -597,50 +544,23 @@ const ReplacementButton = ({
 
   return (
     <div className="relative">
-      <Button
-        variant="outline"
-        size="sm"
-        className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-        onClick={() => { setOpen((v) => !v); setSelected(''); }}
-        disabled={disabled}
-      >
+      <Button variant="outline" size="sm" onClick={() => { setOpen((v) => !v); setSelected(''); }} disabled={disabled}>
         Replace
       </Button>
       {open && (
-        <div className="absolute right-0 mt-2 w-72 p-3 rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl z-20">
-          <div className="text-xs text-zinc-500 mb-2">Assign replacement for this shift</div>
-          <select
-            className="w-full h-9 px-2 rounded-md bg-zinc-900 border border-zinc-700 text-white text-sm"
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            disabled={isLoading}
-          >
+        <div className="absolute right-0 mt-2 w-72 p-3 rounded-xl bg-popover border border-border shadow-2xl z-20">
+          <div className="text-xs text-muted-foreground mb-2">Assign replacement for this shift</div>
+          <select className={selectClass} value={selected} onChange={(e) => setSelected(e.target.value)} disabled={isLoading}>
             <option value="">Select employee…</option>
             {replacements?.map((e: any) => (
-              <option key={e.id} value={e.id}>
-                {e.first_name} {e.last_name} — {e.employee_code}
-              </option>
+              <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>
             ))}
           </select>
           <div className="flex justify-end gap-2 mt-3">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-zinc-700 text-zinc-300"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
-              disabled={!selected || disabled}
-              onClick={() => { onAssign(selected); setOpen(false); }}
-            >
-              Assign
-            </Button>
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="sm" disabled={!selected || disabled} onClick={() => { onAssign(selected); setOpen(false); }}>Assign</Button>
           </div>
-          <div className="mt-2 text-[10px] text-zinc-600">Shift row: {employeeShiftId.slice(0, 8)}</div>
+          <div className="mt-2 text-[10px] text-muted-foreground/60">Shift row: {employeeShiftId.slice(0, 8)}</div>
         </div>
       )}
     </div>

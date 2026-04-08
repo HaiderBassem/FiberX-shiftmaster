@@ -2,123 +2,93 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bell, Check, BellRing, Clock } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string | null;
-  is_read: boolean;
-  created_at: string;
-}
+import { Bell, CheckCircle2, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 export const NotificationList = () => {
   const queryClient = useQueryClient();
 
-  const { data: notifications, isLoading } = useQuery<Notification[]>({
+  const { data: notifications, isLoading } = useQuery({
     queryKey: ['notifications'],
-    queryFn: async () => {
-      const response = await api.get('/notifications');
-      return response.data?.data || [];
-    },
+    queryFn: async () => { const res = await api.get('/notifications'); return res.data?.data || []; },
   });
 
-  const markReadMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.post(`/notifications/${id}/read`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
+  const markRead = useMutation({
+    mutationFn: async (id: string) => { await api.post(`/notifications/${id}/read`); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  const markAllReadMutation = useMutation({
-    mutationFn: async () => {
-      await api.post('/notifications/read-all');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    },
+  const markAllRead = useMutation({
+    mutationFn: async () => { await api.post('/notifications/read-all'); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 
-  const unreadCount = notifications?.filter(n => !n.is_read).length || 0;
+  const unreadCount = notifications?.filter((n: any) => !n.read_at).length || 0;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <Bell className="w-8 h-8 text-blue-400" />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
+            <Bell className="w-8 h-8 text-primary" />
             Notifications
-            {unreadCount > 0 && (
-              <span className="bg-blue-500 text-white text-sm px-2.5 py-0.5 rounded-full font-medium">
-                {unreadCount} new
-              </span>
-            )}
           </h2>
-          <p className="text-zinc-400 mt-2">Stay updated with important alerts and updates.</p>
+          <p className="text-muted-foreground">
+            {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}.` : 'All caught up!'}
+          </p>
         </div>
         {unreadCount > 0 && (
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending}
-            className="text-zinc-300 border-zinc-700"
-          >
-            Mark all as read
+          <Button variant="outline" className="gap-2" onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending}>
+            <CheckCircle2 className="w-4 h-4" /> Mark All Read
           </Button>
         )}
       </div>
 
       {isLoading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse bg-zinc-900/50 h-24" />
-          ))}
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {notifications?.map((notification) => (
-            <Card 
-              key={notification.id} 
-              className={`transition-all ${!notification.is_read ? 'bg-blue-950/20 border-blue-900/50 shadow-[0_0_15px_rgba(59,130,246,0.05)]' : 'bg-zinc-900/30 border-zinc-800/50 hover:bg-zinc-900/50'}`}
-            >
-              <CardContent className="p-4 sm:p-6 flex gap-4">
-                <div className={`mt-1 h-2 w-2 rounded-full shrink-0 ${!notification.is_read ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'bg-transparent'}`} />
-                <div className="flex-1 space-y-1">
-                  <p className={`text-sm sm:text-base ${!notification.is_read ? 'text-zinc-100 font-medium' : 'text-zinc-400'}`}>
-                    {notification.message ?? notification.title}
-                  </p>
-                  <p className="text-xs text-zinc-500 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                  </p>
+      ) : notifications?.length > 0 ? (
+        <div className="space-y-3">
+          {notifications.map((notification: any) => (
+            <Card key={notification.id} className={`transition-all ${!notification.read_at ? 'border-primary/20' : ''}`}>
+              <CardContent className="p-4 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className={`mt-1 h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
+                    !notification.read_at ? 'bg-primary/10' : 'bg-muted'
+                  }`}>
+                    <Bell className={`w-5 h-5 ${!notification.read_at ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className={`font-medium truncate ${!notification.read_at ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {notification.title || notification.type || 'Notification'}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{notification.message}</p>
+                    {notification.created_at && (
+                      <p className="text-xs text-muted-foreground/60 mt-1">
+                        {format(new Date(notification.created_at), 'MMM d, yyyy · h:mm a')}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                {!notification.is_read && (
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => markReadMutation.mutate(notification.id)}
-                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 shrink-0 self-center"
-                    title="Mark as read"
-                  >
-                    <Check className="w-5 h-5" />
+                {!notification.read_at && (
+                  <Button size="sm" variant="ghost" className="shrink-0 text-primary hover:text-primary"
+                    onClick={() => markRead.mutate(notification.id)} disabled={markRead.isPending}>
+                    Mark read
                   </Button>
                 )}
               </CardContent>
             </Card>
           ))}
-          {(!notifications || notifications.length === 0) && (
-            <Card className="bg-zinc-900/20 border-zinc-800/60 border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-12 text-zinc-500">
-                <BellRing className="w-12 h-12 mb-4 opacity-20" />
-                <p>You're all caught up!</p>
-              </CardContent>
-            </Card>
-          )}
         </div>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center p-16 text-muted-foreground">
+            <Bell className="w-16 h-16 mb-4 opacity-20" />
+            <h3 className="text-lg font-semibold mb-1">No notifications</h3>
+            <p className="text-sm">You're all caught up! Check back later.</p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

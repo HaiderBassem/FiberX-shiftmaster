@@ -71,14 +71,14 @@ export const EmployeeDetail = () => {
   }, [shifts]);
 
   if (isLoading) {
-    return <Card className="animate-pulse bg-zinc-900/40 border-zinc-800/60 h-44" />;
+    return <Card className="animate-pulse h-44" />;
   }
 
   if (!employee) {
     return (
       <div className="space-y-4">
-        <p className="text-zinc-400">Employee not found.</p>
-        <Link to="/employees"><Button variant="outline" className="border-zinc-700 text-zinc-300">Back</Button></Link>
+        <p className="text-muted-foreground">Employee not found.</p>
+        <Link to="/employees"><Button variant="outline">Back</Button></Link>
       </div>
     );
   }
@@ -91,78 +91,48 @@ export const EmployeeDetail = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/employees">
-            <Button variant="outline" className="border-zinc-700 text-zinc-300 gap-2">
+            <Button variant="outline" className="gap-2">
               <ArrowLeft className="w-4 h-4" /> Back
             </Button>
           </Link>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-              <Users className="w-8 h-8 text-emerald-400" />
+            <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+              <Users className="w-8 h-8 text-primary" />
               {employee.first_name} {employee.last_name}
             </h2>
-            <p className="text-zinc-400">{employee.employee_code} · {employee.role.replace('_', ' ')}</p>
+            <p className="text-muted-foreground">{employee.employee_code} · {employee.role.replace('_', ' ')}</p>
           </div>
         </div>
       </div>
 
-      <Card className="bg-zinc-900/40 border-zinc-800/60">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Employee Details</CardTitle>
+          <CardTitle>Employee Details</CardTitle>
           <CardDescription>Readable profile data (no raw IDs)</CardDescription>
         </CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-4 text-sm">
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><Mail className="w-4 h-4" /> Email</div>
-            <div className="text-zinc-100 font-medium">{employee.email}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><Phone className="w-4 h-4" /> Phone</div>
-            <div className="text-zinc-100 font-medium">{employee.phone || '—'}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><Building2 className="w-4 h-4" /> Department</div>
-            <div className="text-zinc-100 font-medium">{dept ? `${dept.name} (${dept.department_code})` : '—'}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><Briefcase className="w-4 h-4" /> Position</div>
-            <div className="text-zinc-100 font-medium">{employee.position || '—'}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><CalendarDays className="w-4 h-4" /> Hire Date</div>
-            <div className="text-zinc-100 font-medium">{employee.hire_date?.split('T')[0]}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="flex items-center gap-2 text-zinc-400 mb-2"><CalendarDays className="w-4 h-4" /> Shift</div>
-            <div className="text-zinc-100 font-medium">{shift ? `${shift.name} (${shift.shift_code})` : '—'}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="text-zinc-400 mb-2">Weekly Off Days</div>
-            <div className="text-zinc-100 font-medium">{employee.weekly_off_days}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="text-zinc-400 mb-2">Night Shift Coverage</div>
-            <div className="text-zinc-100 font-medium">{employee.can_cover_night_shift ? 'Yes' : 'No'}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="text-zinc-400 mb-2">Status</div>
-            <div className="text-zinc-100 font-medium capitalize">{employee.status}</div>
-          </div>
-
-          <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/30">
-            <div className="text-zinc-400 mb-2">Last Login</div>
-            <div className="text-zinc-100 font-medium">{employee.last_login ? employee.last_login : '—'}</div>
-          </div>
+          <DetailBlock icon={<Mail className="w-4 h-4" />} label="Email" value={employee.email} />
+          <DetailBlock icon={<Phone className="w-4 h-4" />} label="Phone" value={employee.phone || '—'} />
+          <DetailBlock icon={<Building2 className="w-4 h-4" />} label="Department" value={dept ? `${dept.name} (${dept.department_code})` : '—'} />
+          <DetailBlock icon={<Briefcase className="w-4 h-4" />} label="Position" value={employee.position || '—'} />
+          <DetailBlock icon={<CalendarDays className="w-4 h-4" />} label="Hire Date" value={employee.hire_date?.split('T')[0]} />
+          <DetailBlock icon={<CalendarDays className="w-4 h-4" />} label="Shift" value={shift ? `${shift.name} (${shift.shift_code})` : '—'} />
+          <DetailBlock label="Weekly Off Days" value={String(employee.weekly_off_days)} />
+          <DetailBlock label="Night Shift Coverage" value={employee.can_cover_night_shift ? 'Yes' : 'No'} />
+          <DetailBlock label="Status" value={employee.status} />
+          <DetailBlock label="Last Login" value={employee.last_login || '—'} />
         </CardContent>
       </Card>
     </div>
   );
 };
 
+const DetailBlock = ({ icon, label, value }: { icon?: React.ReactNode; label: string; value: string }) => (
+  <div className="p-4 rounded-xl bg-muted/30 border border-border">
+    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+      {icon}
+      {label}
+    </div>
+    <div className="text-foreground font-medium">{value}</div>
+  </div>
+);
