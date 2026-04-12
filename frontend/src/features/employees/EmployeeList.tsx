@@ -44,6 +44,14 @@ export const EmployeeList = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
+  const canCreate = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'team_leader';
+
+  // Role options based on current user's role
+  const availableRoles = user?.role === 'admin'
+    ? ['employee', 'team_leader', 'manager', 'admin']
+    : user?.role === 'manager'
+    ? ['employee', 'team_leader']
+    : ['employee'];
 
   // ── State ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -234,7 +242,7 @@ export const EmployeeList = () => {
           </h2>
           <p className="text-muted-foreground">Manage employee records, roles, and shift assignments.</p>
         </div>
-        {isAdmin && (
+        {canCreate && (
           <Button
             onClick={() => { setShowCreate((v) => !v); setError(null); }}
             className="gap-2"
@@ -289,7 +297,7 @@ export const EmployeeList = () => {
       </Card>
 
       {/* Create Form */}
-      {isAdmin && showCreate && (
+      {canCreate && showCreate && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -334,10 +342,9 @@ export const EmployeeList = () => {
               <div className="space-y-2">
                 <Label>Role</Label>
                 <select className={selectClass} value={createRole} onChange={(e) => setCreateRole(e.target.value)}>
-                  <option value="employee">Employee</option>
-                  <option value="team_leader">Team Leader</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
+                  {availableRoles.map((r) => (
+                    <option key={r} value={r}>{r.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-2">
@@ -454,7 +461,7 @@ export const EmployeeList = () => {
                       <p className="text-xs">Shift: <span className="text-foreground font-medium">{shiftMap[emp.default_shift_id].name}</span></p>
                     )}
                   </CardContent>
-                  {isAdmin && (
+                  {canCreate && (
                     <CardFooter className="pt-0 flex justify-end gap-2" onClick={(e) => e.preventDefault()}>
                       <Button size="sm" variant="outline" onClick={() => startEdit(emp)}>
                         <Edit3 className="w-4 h-4 mr-1" /> Edit

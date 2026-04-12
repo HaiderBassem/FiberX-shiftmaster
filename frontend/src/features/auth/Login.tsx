@@ -10,7 +10,7 @@ import { useTheme } from '@/components/ThemeProvider';
 import { Clock, LogIn, Loader2, Sun, Moon } from 'lucide-react';
 
 export const Login = () => {
-  const [employeeCode, setEmployeeCode] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -25,12 +25,12 @@ export const Login = () => {
 
     try {
       const response = await api.post('/auth/login', {
-        employee_code: employeeCode,
+        email,
         password,
       });
 
-      const { token, user } = response.data.data;
-      setAuth(token, user);
+      const { access_token, employee } = response.data.data;
+      setAuth(access_token, employee);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
@@ -87,11 +87,12 @@ export const Login = () => {
               )}
 
               <div className="space-y-2">
-                <Label>Employee Code</Label>
+                <Label>Email</Label>
                 <Input
-                  value={employeeCode}
-                  onChange={(e) => setEmployeeCode(e.target.value)}
-                  placeholder="e.g. EMP001"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
                   required
                   autoFocus
                   className="h-11"
@@ -114,7 +115,7 @@ export const Login = () => {
             <CardFooter>
               <Button
                 type="submit"
-                disabled={isLoading || !employeeCode || !password}
+                disabled={isLoading || !email || !password}
                 className="w-full h-11 gap-2 font-semibold text-base"
               >
                 {isLoading ? (

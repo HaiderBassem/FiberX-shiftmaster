@@ -45,10 +45,12 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 		}
 		employees, err = h.employeeService.GetByDepartment(ctx, *me.DepartmentID)
 		if err == nil {
-			// Team leaders/managers can only see employees in their department.
+			// Scope filtering: managers see employees + team_leaders; team_leaders see only employees.
 			filtered := make([]models.Employee, 0, len(employees))
 			for _, e := range employees {
-				if e.Role == "employee" {
+				if role == "manager" && (e.Role == "employee" || e.Role == "team_leader") {
+					filtered = append(filtered, e)
+				} else if role == "team_leader" && e.Role == "employee" {
 					filtered = append(filtered, e)
 				}
 			}
@@ -120,7 +122,12 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
 			return
 		}
-		if emp.Role != "employee" {
+		// Managers can view employees + team_leaders; team_leaders can only view employees.
+		if role == "manager" && emp.Role != "employee" && emp.Role != "team_leader" {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+			return
+		}
+		if role == "team_leader" && emp.Role != "employee" {
 			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
 			return
 		}
