@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface User {
-  id: number;
+  id: string;
   employee_code: string;
   first_name: string;
   last_name: string;
+  email: string;
   role: 'employee' | 'team_leader' | 'manager' | 'admin';
-  department_id: number;
+  department_id: string | null;
 }
 
 interface AuthState {
