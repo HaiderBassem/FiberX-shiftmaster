@@ -37,6 +37,8 @@ type Employee struct {
 	ProfileImage       *string   `json:"profile_image"`
 	RememberToken      *string   `json:"-"`
 	LastLogin          *time.Time `json:"last_login"`
+	SecondaryPhone     *string   `json:"secondary_phone"`
+	SecondaryEmail     *string   `json:"secondary_email"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	CreatedBy          *uuid.UUID `json:"created_by"`

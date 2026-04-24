@@ -153,6 +153,8 @@ type createEmployeeRequest struct {
 	CanCoverNightShift bool       `json:"can_cover_night_shift"`
 	Status             string     `json:"status"`
 	ProfileImage       *string    `json:"profile_image"`
+	SecondaryPhone     *string    `json:"secondary_phone"`
+	SecondaryEmail     *string    `json:"secondary_email"`
 }
 
 // Create creates a new employee.
@@ -234,6 +236,8 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 		CanCoverNightShift: req.CanCoverNightShift,
 		Status:             req.Status,
 		ProfileImage:       req.ProfileImage,
+		SecondaryPhone:     req.SecondaryPhone,
+		SecondaryEmail:     req.SecondaryEmail,
 		CreatedBy:          &createdBy,
 	}
 
@@ -259,6 +263,8 @@ type updateEmployeeRequest struct {
 	CanCoverNightShift bool       `json:"can_cover_night_shift"`
 	Status             string     `json:"status"`
 	ProfileImage       *string    `json:"profile_image"`
+	SecondaryPhone     *string    `json:"secondary_phone"`
+	SecondaryEmail     *string    `json:"secondary_email"`
 }
 
 // Update updates an employee.
@@ -329,6 +335,8 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		CanCoverNightShift: req.CanCoverNightShift,
 		Status:             req.Status,
 		ProfileImage:       req.ProfileImage,
+		SecondaryPhone:     req.SecondaryPhone,
+		SecondaryEmail:     req.SecondaryEmail,
 	}
 
 	if err := h.employeeService.UpdateEmployee(c.Request.Context(), emp); err != nil {

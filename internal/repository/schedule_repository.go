@@ -286,7 +286,7 @@ func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.T
 	rows, err := r.db.Query(ctx,
 		`SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
-				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login,
+				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
 				e.created_at, e.updated_at, e.created_by
 		 FROM employees e
 		 JOIN employee_shifts es ON e.id = es.employee_id
@@ -311,7 +311,7 @@ func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.T
 			&emp.Phone, &emp.Email, &emp.PasswordHash,
 			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin,
+			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail,
 			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 		); err != nil {
 			return nil, fmt.Errorf("scan replacement employee: %w", err)
@@ -326,7 +326,7 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 	rows, err := r.db.Query(ctx,
 		`SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
-				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login,
+				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
 				e.created_at, e.updated_at, e.created_by
 		 FROM employees e
 		 WHERE e.default_shift_id = $1
@@ -358,7 +358,7 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 			&emp.Phone, &emp.Email, &emp.PasswordHash,
 			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin,
+			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail,
 			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 		); err != nil {
 			return nil, fmt.Errorf("scan eligible assignee: %w", err)
@@ -373,7 +373,7 @@ func (r *scheduleRepo) GetSwapEligibleEmployees(ctx context.Context, departmentI
 	rows, err := r.db.Query(ctx,
 		`SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
-				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login,
+				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
 				e.created_at, e.updated_at, e.created_by,
 				CASE WHEN es.shift_status IN ('off', 'leave', 'vacation') THEN true ELSE false END as is_off
 		 FROM employees e
@@ -395,7 +395,7 @@ func (r *scheduleRepo) GetSwapEligibleEmployees(ctx context.Context, departmentI
 			&emp.Phone, &emp.Email, &emp.PasswordHash,
 			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin,
+			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail,
 			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy, &emp.IsOff,
 		); err != nil {
 			return nil, fmt.Errorf("scan swap eligible employee: %w", err)
