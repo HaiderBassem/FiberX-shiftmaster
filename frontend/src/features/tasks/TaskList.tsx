@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   CheckSquare, ChevronLeft, ChevronRight, Calendar, Play,
-  CheckCircle2, Clock, Loader2, ArrowRight, Timer
+  CheckCircle2, Clock, Loader2, ArrowRight, Timer, AlertTriangle, X
 } from 'lucide-react';
 import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-fns';
 
@@ -24,10 +24,81 @@ interface MyTask {
   shift_color: string | null;
   execution_id: string | null;
   status: 'pending' | 'in_progress' | 'completed';
+  completion_type: string | null;
   started_at: string | null;
   completed_at: string | null;
   notes: string | null;
 }
+
+// ───────────────────────────────────────────────────────────
+// Completion Dialog
+// ───────────────────────────────────────────────────────────
+
+const CompletionDialog = ({
+  task,
+  onClose,
+  onComplete,
+  isPending,
+}: {
+  task: MyTask;
+  onClose: () => void;
+  onComplete: (completionType: string, notes: string) => void;
+  isPending: boolean;
+}) => {
+  const [notes, setNotes] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Complete Task</h3>
+            <p className="text-sm text-muted-foreground">{task.task_title}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Notes */}
+        <div className="px-6 py-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any remarks or details..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-xl bg-background border border-input text-foreground text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+
+          {/* Completion Buttons */}
+          <div className="space-y-2.5">
+            <Button
+              onClick={() => onComplete('without_issue', notes)}
+              disabled={isPending}
+              className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-white gap-2.5 text-sm font-semibold rounded-xl"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              Complete — Without Issue
+            </Button>
+            <Button
+              onClick={() => onComplete('with_issue', notes)}
+              disabled={isPending}
+              variant="outline"
+              className="w-full h-12 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 gap-2.5 text-sm font-semibold rounded-xl"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              Complete — With Issue
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ───────────────────────────────────────────────────────────
 // Component
@@ -38,6 +109,7 @@ export const MyTasksWeekly = () => {
 
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [expandedDay, setExpandedDay] = useState<number | null>(() => new Date().getDay());
+  const [completingTask, setCompletingTask] = useState<MyTask | null>(null);
 
   const weekStartStr = format(weekStart, 'yyyy-MM-dd');
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -58,10 +130,16 @@ export const MyTasksWeekly = () => {
   });
 
   const completeTask = useMutation({
-    mutationFn: async ({ executionId, notes }: { executionId: string; notes?: string }) => {
-      await api.post(`/tasks/executions/${executionId}/complete`, { notes: notes || null });
+    mutationFn: async ({ executionId, completionType, notes }: { executionId: string; completionType: string; notes?: string }) => {
+      await api.post(`/tasks/executions/${executionId}/complete`, {
+        completion_type: completionType,
+        notes: notes || null,
+      });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] });
+      setCompletingTask(null);
+    },
   });
 
   // ── Group tasks by day ──
@@ -97,11 +175,25 @@ export const MyTasksWeekly = () => {
 
   return (
     <div className="space-y-6">
+      {/* ── Completion Dialog ── */}
+      {completingTask && (
+        <CompletionDialog
+          task={completingTask}
+          onClose={() => setCompletingTask(null)}
+          onComplete={(completionType, notes) => {
+            if (completingTask.execution_id) {
+              completeTask.mutate({ executionId: completingTask.execution_id, completionType, notes });
+            }
+          }}
+          isPending={completeTask.isPending}
+        />
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-3">
-            <CheckSquare className="w-8 h-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
+            <CheckSquare className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             My Tasks
           </h2>
           <p className="text-muted-foreground">Your weekly task assignments and progress</p>
@@ -188,7 +280,7 @@ export const MyTasksWeekly = () => {
                       <span className="text-xs text-muted-foreground">{format(date, 'MMMM d, yyyy')}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     {dayTotal > 0 ? (
                       <>
                         <div className="flex items-center gap-2">
@@ -227,7 +319,7 @@ export const MyTasksWeekly = () => {
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-3 text-xs">
+                              <div className="flex items-center gap-3 text-xs flex-wrap">
                                 {task.shift_name && (
                                   <span className="flex items-center gap-1">
                                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: task.shift_color || '#0CCCCC' }} />
@@ -245,7 +337,22 @@ export const MyTasksWeekly = () => {
                                     Done at {format(new Date(task.completed_at), 'hh:mm a')}
                                   </span>
                                 )}
+                                {/* Completion type badge */}
+                                {task.completion_type === 'without_issue' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                    ✓ No Issues
+                                  </span>
+                                )}
+                                {task.completion_type === 'with_issue' && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                                    ⚠ Has Issues
+                                  </span>
+                                )}
                               </div>
+                              {/* Notes display */}
+                              {task.notes && task.status === 'completed' && (
+                                <p className="text-xs text-muted-foreground mt-1 italic">📝 {task.notes}</p>
+                              )}
                             </div>
 
                             {/* Actions */}
@@ -257,8 +364,7 @@ export const MyTasksWeekly = () => {
                               </Button>
                             )}
                             {task.execution_id && task.status === 'in_progress' && (
-                              <Button size="sm" onClick={() => completeTask.mutate({ executionId: task.execution_id! })}
-                                disabled={completeTask.isPending}
+                              <Button size="sm" onClick={() => setCompletingTask(task)}
                                 className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-8">
                                 <CheckCircle2 className="w-3.5 h-3.5" /> Complete
                               </Button>
@@ -298,7 +404,7 @@ export const MyTasksWeekly = () => {
 
 const StatCard = ({ label, value, color, icon }: { label: string; value: string | number; color: string; icon: React.ReactNode }) => (
   <Card>
-    <CardContent className="p-4 flex items-center gap-3">
+    <CardContent className="p-4 flex items-center gap-2 sm:gap-3">
       <div className="p-2 rounded-xl bg-muted/60">{icon}</div>
       <div>
         <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>

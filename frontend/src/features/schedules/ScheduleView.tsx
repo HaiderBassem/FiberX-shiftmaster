@@ -16,6 +16,7 @@ export const ScheduleView = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const isSupervisor = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'team_leader';
+  const canEdit = user?.role === 'team_leader' || user?.role === 'admin'; // Manager is VIEW ONLY
 
   // Manual set form
   const [setEmployeeId, setSetEmployeeId] = useState('');
@@ -189,16 +190,16 @@ export const ScheduleView = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-          <CalendarIcon className="w-8 h-8 text-primary" />
+        <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-2 sm:gap-3">
+          <CalendarIcon className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
           Schedules
         </h2>
-        <p className="text-muted-foreground">Daily staffing view grouped by shift, with clear status and quick actions.</p>
+        <p className="text-sm sm:text-base text-muted-foreground">Daily staffing view grouped by shift, with clear status and quick actions.</p>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-5 flex flex-col md:flex-row md:items-end gap-4">
+        <CardContent className="p-3 sm:p-5 flex flex-col gap-3 sm:gap-4">
           <div className="space-y-2">
             <Label>View day</Label>
             <div className="relative">
@@ -220,7 +221,7 @@ export const ScheduleView = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:ml-auto w-full md:w-auto">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 w-full">
             <Stat label="Total" value={stats.total} tone="default" />
             <Stat label="Working" value={stats.working} tone="emerald" />
             <Stat label="Off" value={stats.off} tone="amber" />
@@ -230,8 +231,8 @@ export const ScheduleView = () => {
         </CardContent>
       </Card>
 
-      {/* Manual schedule creation / update */}
-      {isSupervisor && (
+      {/* Manual schedule creation / update — team_leader + admin only */}
+      {canEdit && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
@@ -244,7 +245,7 @@ export const ScheduleView = () => {
             {setError && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{setError}</div>
             )}
-            <div className="grid md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="space-y-2 md:col-span-2">
                 <Label>Employee</Label>
                 <select className={selectClass} value={setEmployeeId} onChange={(e) => setSetEmployeeId(e.target.value)}>
@@ -334,7 +335,7 @@ export const ScheduleView = () => {
 
                         return (
                           <div key={es.id} className="px-4 py-3 flex items-center justify-between gap-4 bg-card">
-                            <div className="min-w-0 flex items-center gap-3">
+                            <div className="min-w-0 flex items-center gap-2 sm:gap-3">
                               <div className="w-9 h-9 rounded-xl bg-muted/60 border border-border flex items-center justify-center text-foreground font-semibold">
                                 {name?.[0] || '?'}
                               </div>
@@ -390,7 +391,7 @@ export const ScheduleView = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px]">
+              <table className="w-full min-w-[700px]">
                 <thead>
                   <tr className="bg-muted/30 border-b border-border">
                     <th className="text-left p-3 text-xs uppercase tracking-wider text-muted-foreground">Employee</th>
@@ -423,7 +424,7 @@ export const ScheduleView = () => {
                             <div className={`rounded-lg border px-2 py-2 ${tone}`}>
                               <div className="text-xs font-semibold uppercase tracking-wider">{d.status}</div>
                               <div className="text-[11px] opacity-80 mt-1">{d.shiftName || '-'}</div>
-                              {isSupervisor && (
+                              {canEdit && (
                                 <Button
                                   size="sm"
                                   variant="outline"

@@ -256,6 +256,7 @@ CREATE TABLE task_executions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     assignment_id UUID NOT NULL REFERENCES task_assignments(id) ON DELETE CASCADE,
     status task_status DEFAULT 'pending',
+    started_at TIMESTAMP,
     completed_at TIMESTAMP,
     notes TEXT,
     attachments JSONB,

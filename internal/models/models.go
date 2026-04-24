@@ -135,16 +135,44 @@ type TaskAssignment struct {
 	CreatedAt    time.Time  `json:"created_at"`
 }
 
+type TaskRecurringAssignment struct {
+	ID         uuid.UUID  `json:"id"`
+	ScheduleID uuid.UUID  `json:"schedule_id"`
+	EmployeeID uuid.UUID  `json:"employee_id"`
+	DayOfWeek  int        `json:"day_of_week"` // 0=Sun..6=Sat
+	AssignedBy *uuid.UUID `json:"assigned_by"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
 type TaskExecution struct {
-	ID           uuid.UUID  `json:"id"`
-	AssignmentID uuid.UUID  `json:"assignment_id"`
-	Status       string     `json:"status"` // pending, in_progress, completed, cancelled
-	StartedAt    *time.Time `json:"started_at"`
-	CompletedAt  *time.Time `json:"completed_at"`
-	Notes        *string    `json:"notes"`
-	Attachments  *string    `json:"attachments"` // JSONB mapping to string usually, or custom type
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	ID             uuid.UUID  `json:"id"`
+	AssignmentID   uuid.UUID  `json:"assignment_id"`
+	Status         string     `json:"status"` // pending, in_progress, completed, cancelled
+	CompletionType *string    `json:"completion_type"` // without_issue, with_issue
+	StartedAt      *time.Time `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	Notes          *string    `json:"notes"`
+	Attachments    *string    `json:"attachments"` // JSONB mapping to string usually, or custom type
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// TaskHistoryRow — a completed task row for the supervisor history view.
+type TaskHistoryRow struct {
+	AssignmentID   uuid.UUID  `json:"assignment_id"`
+	ExecutionID    uuid.UUID  `json:"execution_id"`
+	AssignedDate   time.Time  `json:"assigned_date"`
+	TaskTitle      string     `json:"task_title"`
+	TaskDesc       *string    `json:"task_description"`
+	BoardName      *string    `json:"board_name"`
+	EmployeeID     uuid.UUID  `json:"employee_id"`
+	EmployeeName   string     `json:"employee_name"`
+	EmployeeCode   string     `json:"employee_code"`
+	Status         string     `json:"status"`
+	CompletionType *string    `json:"completion_type"`
+	StartedAt      *time.Time `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	Notes          *string    `json:"notes"`
 }
 
 type Leave struct {
@@ -163,6 +191,63 @@ type Leave struct {
 	Attachments          *string    `json:"attachments"` // JSONB
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
+}
+
+// LeaveApproval tracks individual approval/rejection actions on a leave request.
+type LeaveApproval struct {
+	ID           uuid.UUID  `json:"id"`
+	LeaveID      uuid.UUID  `json:"leave_id"`
+	ApproverID   uuid.UUID  `json:"approver_id"`
+	ApproverRole string     `json:"approver_role"`
+	Action       string     `json:"action"` // approved, rejected
+	Notes        *string    `json:"notes"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+// LeaveHistoryRow is a rich view for the leave history page.
+type LeaveHistoryRow struct {
+	LeaveID       uuid.UUID  `json:"leave_id"`
+	EmployeeName  string     `json:"employee_name"`
+	EmployeeCode  string     `json:"employee_code"`
+	LeaveType     string     `json:"leave_type"`
+	StartDate     time.Time  `json:"start_date"`
+	EndDate       time.Time  `json:"end_date"`
+	TotalDays     int        `json:"total_days"`
+	Reason        *string    `json:"reason"`
+	Status        string     `json:"status"`
+	AppliedDate   *time.Time `json:"applied_date"`
+	RejectionReason *string  `json:"rejection_reason"`
+	Approvals     []LeaveApprovalDetail `json:"approvals"`
+}
+
+// LeaveApprovalDetail is a single approval action with approver name.
+type LeaveApprovalDetail struct {
+	ApproverName string    `json:"approver_name"`
+	ApproverRole string    `json:"approver_role"`
+	Action       string    `json:"action"`
+	Notes        *string   `json:"notes"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// PendingLeaveRich is a pending leave with employee details for the approval dashboard.
+type PendingLeaveRich struct {
+	ID             uuid.UUID  `json:"id"`
+	EmployeeID     uuid.UUID  `json:"employee_id"`
+	LeaveType      string     `json:"leave_type"`
+	StartDate      time.Time  `json:"start_date"`
+	EndDate        time.Time  `json:"end_date"`
+	TotalDays      int        `json:"total_days"`
+	Reason         *string    `json:"reason"`
+	Status         string     `json:"status"`
+	AppliedDate    *time.Time `json:"applied_date"`
+	EmployeeName   string     `json:"employee_name"`
+	EmployeeCode   string     `json:"employee_code"`
+	DefaultShiftID string     `json:"default_shift_id"`
+	ShiftName      string     `json:"shift_name"`
+	ShiftCode      string     `json:"shift_code"`
+	DepartmentName string     `json:"department_name"`
+	TLApprovals    int        `json:"tl_approvals"`
+	TotalTLs       int        `json:"total_tls"`
 }
 
 type ShiftSwap struct {
@@ -255,7 +340,8 @@ type MyTaskRow struct {
 	ShiftCode      *string    `json:"shift_code"`
 	ShiftColor     *string    `json:"shift_color"`
 	ExecutionID    *uuid.UUID `json:"execution_id"`
-	Status         string     `json:"status"`    // pending, in_progress, completed
+	Status         string     `json:"status"`          // pending, in_progress, completed
+	CompletionType *string    `json:"completion_type"` // without_issue, with_issue
 	StartedAt      *time.Time `json:"started_at"`
 	CompletedAt    *time.Time `json:"completed_at"`
 	Notes          *string    `json:"notes"`

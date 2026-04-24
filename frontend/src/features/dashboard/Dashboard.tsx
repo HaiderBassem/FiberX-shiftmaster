@@ -65,14 +65,14 @@ const EmployeeDashboard = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground mb-1">
+        <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
           Welcome back, {user?.first_name} 👋
         </h2>
-        <p className="text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+        <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <StatCard icon={<CheckSquare className="w-5 h-5 text-primary" />} label="This Week" value={totalTasks} color="text-foreground" />
         <StatCard icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />} label="Completed" value={completedTasks} color="text-emerald-500" />
         <StatCard icon={<TrendingUp className="w-5 h-5 text-primary" />} label="Progress" value={`${completionPct}%`} color="text-primary" />
@@ -98,7 +98,7 @@ const EmployeeDashboard = () => {
           ) : (
             <div className="space-y-2">
               {todayTasks.map((task: any) => (
-                <div key={task.assignment_id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all ${
+                <div key={task.assignment_id} className={`flex items-start sm:items-center gap-3 px-3 sm:px-4 py-3 rounded-xl border transition-all ${
                   task.status === 'completed' ? 'bg-emerald-500/5 border-emerald-500/20' :
                   task.status === 'in_progress' ? 'bg-amber-500/5 border-amber-500/20' :
                   'bg-muted/30 border-border'
@@ -264,17 +264,17 @@ const LeaderDashboard = () => {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-3">
-          <Shield className="w-8 h-8 text-primary" />
+        <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
+          <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
           Dashboard
         </h2>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           {format(new Date(), 'EEEE, MMMM d, yyyy')} · Welcome, {user?.first_name}
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <StatCard icon={<Users className="w-5 h-5 text-primary" />} label="Active Employees" value={totalEmployees} color="text-primary" />
         <StatCard icon={<CheckSquare className="w-5 h-5 text-primary" />} label="Total Tasks" value={totalBoardTasks} color="text-primary" />
         <StatCard icon={<TrendingUp className="w-5 h-5 text-emerald-500" />} label="Overall Progress" value={`${overallPct}%`} color="text-emerald-500" />
@@ -294,7 +294,7 @@ const LeaderDashboard = () => {
           {Object.keys(employeesByShift).length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No shifts configured</p>
           ) : (
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {Object.entries(employeesByShift).map(([shiftId, shift]) => (
                 <div key={shiftId} className="p-4 rounded-xl bg-muted/30 border border-border flex items-center gap-4">
                   <div className="w-3 h-12 rounded-full" style={{ backgroundColor: shift.color }} />
@@ -334,7 +334,7 @@ const LeaderDashboard = () => {
                     <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
                       style={{ width: `${board.completion_pct}%` }} />
                   </div>
-                  <div className="flex items-center gap-4 text-xs">
+                  <div className="flex items-center gap-3 sm:gap-4 text-xs flex-wrap">
                     <span className="text-emerald-500">✓ {board.total_completed} done</span>
                     <span className="text-amber-500">▶ {board.total_in_progress} active</span>
                     <span className="text-muted-foreground">◌ {board.total_pending} pending</span>
@@ -390,11 +390,11 @@ const LeaderDashboard = () => {
 
 const StatCard = ({ label, value, color, icon }: { label: string; value: string | number; color: string; icon: React.ReactNode }) => (
   <Card>
-    <CardContent className="p-4 flex items-center gap-3">
-      <div className="p-2.5 rounded-xl bg-muted/60">{icon}</div>
+    <CardContent className="p-3 sm:p-4 flex items-center gap-2 sm:gap-3">
+      <div className="p-2 sm:p-2.5 rounded-xl bg-muted/60">{icon}</div>
       <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className={`text-xl font-bold ${color}`}>{value}</p>
+        <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className={`text-lg sm:text-xl font-bold ${color}`}>{value}</p>
       </div>
     </CardContent>
   </Card>

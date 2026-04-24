@@ -119,8 +119,8 @@ export const DepartmentList = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-          <Building2 className="w-8 h-8 text-primary" />
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
+          <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
           Departments
         </h2>
         <p className="text-muted-foreground">View and manage all company departments.</p>

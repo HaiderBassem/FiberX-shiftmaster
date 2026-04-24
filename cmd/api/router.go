@@ -107,6 +107,7 @@ func SetupRouter(
 			tasks.GET("/boards/stats", taskH.GetBoardStats)
 			tasks.GET("/boards/eligible-employees", taskH.GetBoardEligibleEmployees)
 			tasks.GET("/boards/:id/view", taskH.GetBoardView)
+			tasks.GET("/boards/:id/recurring", taskH.ListRecurringByBoard)
 			tasks.POST("/executions/:id/start", taskH.StartExecution)
 			tasks.PATCH("/executions/:id/status", taskH.UpdateExecutionStatus)
 			tasks.POST("/executions/:id/complete", taskH.CompleteExecution)
@@ -126,47 +127,63 @@ func SetupRouter(
 		protected.GET("/activity", auditH.ListActivity)
 
 		// --- Supervisor routes (manager + admin + team_leader) ---
-		// These are for approval workflows where team leaders also participate
+		// READ access and approval workflows
 		supervisor := protected.Group("")
 		supervisor.Use(middleware.RequireRole("manager", "admin", "team_leader"))
 		{
-			// Leave approvals
+			// Leave approvals (all supervisors can approve)
 			supervisor.GET("/leaves/coverage-preview", leaveH.CoveragePreview)
 			supervisor.POST("/leaves/:id/approve/team-leader", leaveH.ApproveByTeamLeader)
 			supervisor.POST("/leaves/:id/approve/manager", leaveH.ApproveByManager)
 			supervisor.POST("/leaves/:id/reject", leaveH.Reject)
 
-			// Swap approvals
-			// (Swap approvals are handled in a team_leader-only route group below.)
+			// Task history (read — all supervisors can view)
+			supervisor.GET("/tasks/history", taskH.TaskHistory)
 
+			// Leave history (read — all supervisors can view approval/rejection history)
+			supervisor.GET("/leaves/history", leaveH.LeaveHistory)
+
+			// Pending leaves with employee details for approval dashboard
+			supervisor.GET("/leaves/pending/rich", leaveH.PendingRich)
+		}
+
+		// --- Team Leader + Admin WRITE routes ---
+		// Only team_leader and admin can modify schedules, tasks, and employees
+		// Manager is VIEW ONLY
+		tlWrite := protected.Group("")
+		tlWrite.Use(middleware.RequireRole("team_leader", "admin"))
+		{
 			// Task management (create, assign, update, delete)
-			supervisor.POST("/tasks/schedules", taskH.CreateSchedule)
-			supervisor.PUT("/tasks/schedules/:id", taskH.UpdateSchedule)
-			supervisor.PATCH("/tasks/schedules/:id/toggle", taskH.ToggleActive)
-			supervisor.DELETE("/tasks/schedules/:id", taskH.DeleteSchedule)
-			supervisor.POST("/tasks/assign", taskH.Assign)
-			supervisor.DELETE("/tasks/assignments/:id", taskH.DeleteAssignment)
+			tlWrite.POST("/tasks/schedules", taskH.CreateSchedule)
+			tlWrite.PUT("/tasks/schedules/:id", taskH.UpdateSchedule)
+			tlWrite.PATCH("/tasks/schedules/:id/toggle", taskH.ToggleActive)
+			tlWrite.DELETE("/tasks/schedules/:id", taskH.DeleteSchedule)
+			tlWrite.POST("/tasks/assign", taskH.Assign)
+			tlWrite.DELETE("/tasks/assignments/:id", taskH.DeleteAssignment)
 
-			// Board management (create, update, delete) — team_leader, manager, admin
-			supervisor.POST("/tasks/boards", taskH.CreateBoard)
-			supervisor.PUT("/tasks/boards/:id", taskH.UpdateBoard)
-			supervisor.DELETE("/tasks/boards/:id", taskH.DeleteBoard)
+			// Recurring assignments (create/delete)
+			tlWrite.POST("/tasks/recurring-assign", taskH.RecurringAssign)
+			tlWrite.DELETE("/tasks/recurring-assignments/:id", taskH.DeleteRecurringAssignment)
+			tlWrite.POST("/tasks/recurring-assignments/remove", taskH.DeleteRecurringAssignmentByKey)
 
-			// Employee creation (team_leader, manager, admin can create)
-			supervisor.POST("/employees", empH.Create)
-			// Employee editing/deactivation/deletion (team_leader, manager, admin)
-			supervisor.PUT("/employees/:id", empH.Update)
-			// Employee deactivation/deletion (team_leader, manager, admin)
-			supervisor.PATCH("/employees/:id/status", empH.UpdateStatus)
-			supervisor.DELETE("/employees/:id", empH.Delete)
+			// Board management (create, update, delete)
+			tlWrite.POST("/tasks/boards", taskH.CreateBoard)
+			tlWrite.PUT("/tasks/boards/:id", taskH.UpdateBoard)
+			tlWrite.DELETE("/tasks/boards/:id", taskH.DeleteBoard)
+
+			// Employee creation/editing/deletion
+			tlWrite.POST("/employees", empH.Create)
+			tlWrite.PUT("/employees/:id", empH.Update)
+			tlWrite.PATCH("/employees/:id/status", empH.UpdateStatus)
+			tlWrite.DELETE("/employees/:id", empH.Delete)
 
 			// Schedule editing (manual create/update for a day)
-			supervisor.POST("/schedules/shifts/set", scheduleH.SetEmployeeShift)
+			tlWrite.POST("/schedules/shifts/set", scheduleH.SetEmployeeShift)
 
-			// Shift management (team_leader + manager + admin)
-			supervisor.POST("/shifts", shiftH.Create)
-			supervisor.PUT("/shifts/:id", shiftH.Update)
-			supervisor.DELETE("/shifts/:id", shiftH.Delete)
+			// Shift management
+			tlWrite.POST("/shifts", shiftH.Create)
+			tlWrite.PUT("/shifts/:id", shiftH.Update)
+			tlWrite.DELETE("/shifts/:id", shiftH.Delete)
 		}
 
 		// Phase 3: swap approvals are team_leader only (skip manager).

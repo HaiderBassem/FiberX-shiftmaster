@@ -61,6 +61,13 @@ func (s *TaskService) DeleteBoard(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *TaskService) GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID *uuid.UUID, fromDate *time.Time, toDate *time.Time) ([]models.BoardViewRow, error) {
+	// Auto-materialize recurring assignments for the requested date range
+	if fromDate != nil && toDate != nil {
+		if err := s.taskRepo.MaterializeRecurringForDateRange(ctx, boardID, *fromDate, *toDate); err != nil {
+			// Log but don't fail — the view can still return existing assignments
+			fmt.Printf("WARNING: failed to materialize recurring assignments for board %s: %v\n", boardID, err)
+		}
+	}
 	return s.taskRepo.GetBoardView(ctx, boardID, shiftID, fromDate, toDate)
 }
 
@@ -70,6 +77,46 @@ func (s *TaskService) GetBoardStats(ctx context.Context) ([]models.TaskBoardStat
 
 func (s *TaskService) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error) {
 	return s.taskRepo.GetBoardEligibleEmployees(ctx, shiftID, date)
+}
+
+// ═══════════════════════════════════════════
+// Recurring Assignments
+// ═══════════════════════════════════════════
+
+func (s *TaskService) CreateRecurringAssignment(ctx context.Context, ra *models.TaskRecurringAssignment) error {
+	// Validate employee
+	emp, err := s.employeeRepo.GetByID(ctx, ra.EmployeeID)
+	if err != nil {
+		return fmt.Errorf("employee not found: %w", err)
+	}
+	if emp.Status != "active" {
+		return fmt.Errorf("employee is not active")
+	}
+	if emp.Role != "employee" {
+		return fmt.Errorf("cannot assign tasks to role: %s", emp.Role)
+	}
+	// Validate schedule
+	_, err = s.taskRepo.GetScheduleByID(ctx, ra.ScheduleID)
+	if err != nil {
+		return fmt.Errorf("task schedule not found: %w", err)
+	}
+	// Validate day_of_week
+	if ra.DayOfWeek < 0 || ra.DayOfWeek > 6 {
+		return fmt.Errorf("invalid day_of_week: %d (must be 0-6)", ra.DayOfWeek)
+	}
+	return s.taskRepo.CreateRecurringAssignment(ctx, ra)
+}
+
+func (s *TaskService) DeleteRecurringAssignment(ctx context.Context, id uuid.UUID) error {
+	return s.taskRepo.DeleteRecurringAssignment(ctx, id)
+}
+
+func (s *TaskService) DeleteRecurringAssignmentByKey(ctx context.Context, scheduleID, employeeID uuid.UUID, dayOfWeek int) error {
+	return s.taskRepo.DeleteRecurringAssignmentByKey(ctx, scheduleID, employeeID, dayOfWeek)
+}
+
+func (s *TaskService) GetRecurringAssignmentsByBoard(ctx context.Context, boardID uuid.UUID) ([]models.TaskRecurringAssignment, error) {
+	return s.taskRepo.GetRecurringAssignmentsByBoard(ctx, boardID)
 }
 
 // ═══════════════════════════════════════════
@@ -221,8 +268,12 @@ func (s *TaskService) StartTask(ctx context.Context, executionID uuid.UUID) erro
 }
 
 // CompleteTask marks a task execution as completed with a timestamp.
-func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, notes *string) error {
-	return s.taskRepo.CompleteExecution(ctx, executionID, notes)
+func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, completionType string, notes *string) error {
+	validTypes := map[string]bool{"without_issue": true, "with_issue": true}
+	if !validTypes[completionType] {
+		return fmt.Errorf("invalid completion_type: %s (must be 'without_issue' or 'with_issue')", completionType)
+	}
+	return s.taskRepo.CompleteExecution(ctx, executionID, completionType, notes)
 }
 
 func (s *TaskService) UpdateTaskStatus(ctx context.Context, executionID uuid.UUID, status string, notes *string) error {
@@ -235,4 +286,8 @@ func (s *TaskService) UpdateTaskStatus(ctx context.Context, executionID uuid.UUI
 
 func (s *TaskService) GetTaskExecution(ctx context.Context, assignmentID uuid.UUID) (*models.TaskExecution, error) {
 	return s.taskRepo.GetExecutionByAssignment(ctx, assignmentID)
+}
+
+func (s *TaskService) GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID) ([]models.TaskHistoryRow, error) {
+	return s.taskRepo.GetTaskHistory(ctx, date, boardID)
 }

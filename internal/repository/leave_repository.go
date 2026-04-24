@@ -23,6 +23,13 @@ type LeaveRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, approverID uuid.UUID, approverRole string) error
 	Reject(ctx context.Context, id uuid.UUID, rejectedBy uuid.UUID, reason string) error
 	Delete(ctx context.Context, id uuid.UUID) error
+
+	// Approval tracking
+	RecordApproval(ctx context.Context, leaveID, approverID uuid.UUID, approverRole, action string, notes *string) error
+	CountTLApprovals(ctx context.Context, leaveID uuid.UUID) (int, error)
+	HasApproved(ctx context.Context, leaveID, approverID uuid.UUID) (bool, error)
+	GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error)
+	GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error)
 }
 
 type leaveRepo struct {
@@ -125,6 +132,59 @@ func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole stri
 	return r.scanLeaves(rows)
 }
 
+// GetPendingLeavesRich returns pending leaves with employee details for the approval dashboard.
+func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error) {
+	var statusFilter string
+	switch approverRole {
+	case "team_leader":
+		statusFilter = "pending"
+	case "manager":
+		statusFilter = "approved_by_team_leader"
+	case "admin":
+		statusFilter = "pending"
+	default:
+		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
+	}
+
+	rows, err := r.db.Query(ctx,
+		`SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days,
+		        l.reason, l.status, l.applied_date,
+		        e.first_name || ' ' || e.last_name as employee_name,
+		        e.employee_code,
+		        COALESCE(e.default_shift_id::text, '') as default_shift_id,
+		        COALESCE(s.name, '') as shift_name,
+		        COALESCE(s.shift_code, '') as shift_code,
+		        COALESCE(d.name, '') as department_name,
+		        (SELECT COUNT(*) FROM leave_approvals la
+		         WHERE la.leave_id = l.id AND la.approver_role = 'team_leader' AND la.action = 'approved') as tl_approvals,
+		        (SELECT COUNT(*) FROM employees WHERE role = 'team_leader' AND status = 'active') as total_tls
+		 FROM leaves l
+		 JOIN employees e ON e.id = l.employee_id
+		 LEFT JOIN shifts s ON s.id = e.default_shift_id
+		 LEFT JOIN departments d ON d.id = e.department_id
+		 WHERE l.status = $1
+		 ORDER BY l.applied_date`, statusFilter)
+	if err != nil {
+		return nil, fmt.Errorf("get pending leaves rich: %w", err)
+	}
+	defer rows.Close()
+
+	var result []models.PendingLeaveRich
+	for rows.Next() {
+		var p models.PendingLeaveRich
+		if err := rows.Scan(
+			&p.ID, &p.EmployeeID, &p.LeaveType, &p.StartDate, &p.EndDate, &p.TotalDays,
+			&p.Reason, &p.Status, &p.AppliedDate,
+			&p.EmployeeName, &p.EmployeeCode, &p.DefaultShiftID, &p.ShiftName, &p.ShiftCode,
+			&p.DepartmentName, &p.TLApprovals, &p.TotalTLs,
+		); err != nil {
+			return nil, fmt.Errorf("scan pending leave rich: %w", err)
+		}
+		result = append(result, p)
+	}
+	return result, rows.Err()
+}
+
 func (r *leaveRepo) Create(ctx context.Context, leave *models.Leave) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, attachments)
@@ -157,4 +217,83 @@ func (r *leaveRepo) Reject(ctx context.Context, id uuid.UUID, rejectedBy uuid.UU
 func (r *leaveRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM leaves WHERE id=$1`, id)
 	return err
+}
+
+// ── Approval tracking ──
+
+func (r *leaveRepo) RecordApproval(ctx context.Context, leaveID, approverID uuid.UUID, approverRole, action string, notes *string) error {
+	_, err := r.db.Exec(ctx,
+		`INSERT INTO leave_approvals (leave_id, approver_id, approver_role, action, notes)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		leaveID, approverID, approverRole, action, notes)
+	return err
+}
+
+func (r *leaveRepo) CountTLApprovals(ctx context.Context, leaveID uuid.UUID) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM leave_approvals WHERE leave_id=$1 AND approver_role='team_leader' AND action='approved'`,
+		leaveID).Scan(&count)
+	return count, err
+}
+
+func (r *leaveRepo) HasApproved(ctx context.Context, leaveID, approverID uuid.UUID) (bool, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM leave_approvals WHERE leave_id=$1 AND approver_id=$2`,
+		leaveID, approverID).Scan(&count)
+	return count > 0, err
+}
+
+func (r *leaveRepo) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error) {
+	// Get all leaves with employee info
+	rows, err := r.db.Query(ctx,
+		`SELECT l.id, e.first_name || ' ' || e.last_name, e.employee_code,
+		        l.leave_type, l.start_date, l.end_date, l.total_days, l.reason,
+		        l.status, l.applied_date, l.rejection_reason
+		 FROM leaves l
+		 JOIN employees e ON e.id = l.employee_id
+		 ORDER BY l.applied_date DESC NULLS LAST
+		 LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.LeaveHistoryRow
+	for rows.Next() {
+		var h models.LeaveHistoryRow
+		if err := rows.Scan(&h.LeaveID, &h.EmployeeName, &h.EmployeeCode,
+			&h.LeaveType, &h.StartDate, &h.EndDate, &h.TotalDays, &h.Reason,
+			&h.Status, &h.AppliedDate, &h.RejectionReason); err != nil {
+			return nil, err
+		}
+		result = append(result, h)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Fetch approvals for each leave
+	for i := range result {
+		apRows, err := r.db.Query(ctx,
+			`SELECT e.first_name || ' ' || e.last_name, la.approver_role, la.action, la.notes, la.created_at
+			 FROM leave_approvals la
+			 JOIN employees e ON e.id = la.approver_id
+			 WHERE la.leave_id = $1
+			 ORDER BY la.created_at`, result[i].LeaveID)
+		if err != nil {
+			continue
+		}
+		for apRows.Next() {
+			var d models.LeaveApprovalDetail
+			if err := apRows.Scan(&d.ApproverName, &d.ApproverRole, &d.Action, &d.Notes, &d.CreatedAt); err != nil {
+				break
+			}
+			result[i].Approvals = append(result[i].Approvals, d)
+		}
+		apRows.Close()
+	}
+
+	return result, nil
 }

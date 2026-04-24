@@ -108,8 +108,8 @@ export const ShiftList = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <Clock className="w-8 h-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             Shifts Configuration
           </h2>
           <p className="text-muted-foreground">

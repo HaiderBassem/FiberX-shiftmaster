@@ -71,8 +71,8 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	return nil
 }
 
-// ApproveByTeamLeader approves a leave request at the team leader level.
-// After approval, the request moves to pending manager approval.
+// ApproveByTeamLeader records one TL's approval. Only when ALL TLs approve
+// does the leave move to "approved_by_team_leader" status.
 func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUID, teamLeaderID uuid.UUID) error {
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
@@ -82,36 +82,76 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		return fmt.Errorf("leave is not pending, current status: %s", leave.Status)
 	}
 
-	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "approved_by_team_leader", teamLeaderID, "team_leader"); err != nil {
+	// Check if this TL already approved
+	already, _ := s.leaveRepo.HasApproved(ctx, leaveID, teamLeaderID)
+	if already {
+		return fmt.Errorf("you have already approved this leave request")
+	}
+
+	// Record the individual approval
+	if err := s.leaveRepo.RecordApproval(ctx, leaveID, teamLeaderID, "team_leader", "approved", nil); err != nil {
 		return err
 	}
 
-	// Notify managers for final approval
-	managers, _ := s.employeeRepo.GetByRole(ctx, "manager")
-	for _, mgr := range managers {
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
-			RecipientID:       mgr.ID,
-			SenderID:          &teamLeaderID,
-			Type:              "approval",
-			Title:             "Leave Request Awaiting Approval",
-			Message:           strPtr("A leave request has been approved by team leader and needs your final approval"),
-			RelatedEntityType: strPtr("leave"),
-			RelatedEntityID:   &leaveID,
-			Priority:          "high",
-		})
+	// Count how many TLs have now approved
+	approvedCount, _ := s.leaveRepo.CountTLApprovals(ctx, leaveID)
+
+	// Count total team leaders
+	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
+	totalTLs := len(teamLeaders)
+
+	// Get the TL's name for the notification
+	tlEmployee, _ := s.employeeRepo.GetByID(ctx, teamLeaderID)
+	tlName := "A team leader"
+	if tlEmployee != nil {
+		tlName = tlEmployee.FirstName + " " + tlEmployee.LastName
 	}
 
-	// Notify employee
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
-		RecipientID:       leave.EmployeeID,
-		SenderID:          &teamLeaderID,
-		Type:              "approval",
-		Title:             "Leave Approved by Team Leader",
-		Message:           strPtr("Your leave request has been approved by the team leader. Awaiting manager approval."),
-		RelatedEntityType: strPtr("leave"),
-		RelatedEntityID:   &leaveID,
-		Priority:          "medium",
-	})
+	if totalTLs > 0 && approvedCount >= totalTLs {
+		// ALL team leaders approved → move to next stage
+		if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "approved_by_team_leader", teamLeaderID, "team_leader"); err != nil {
+			return err
+		}
+
+		// Notify managers for final approval
+		managers, _ := s.employeeRepo.GetByRole(ctx, "manager")
+		for _, mgr := range managers {
+			_ = s.notifService.SendNotification(ctx, &models.Notification{
+				RecipientID:       mgr.ID,
+				SenderID:          &teamLeaderID,
+				Type:              "approval",
+				Title:             "Leave Request Awaiting Approval",
+				Message:           strPtr("A leave request has been approved by ALL team leaders and needs your final approval"),
+				RelatedEntityType: strPtr("leave"),
+				RelatedEntityID:   &leaveID,
+				Priority:          "high",
+			})
+		}
+
+		// Notify employee — all TLs approved
+		_ = s.notifService.SendNotification(ctx, &models.Notification{
+			RecipientID:       leave.EmployeeID,
+			SenderID:          &teamLeaderID,
+			Type:              "approval",
+			Title:             "Leave Approved by All Team Leaders",
+			Message:           strPtr(fmt.Sprintf("%s has approved your leave request. All team leaders have now approved — awaiting manager approval.", tlName)),
+			RelatedEntityType: strPtr("leave"),
+			RelatedEntityID:   &leaveID,
+			Priority:          "medium",
+		})
+	} else {
+		// Notify employee — partial approval with TL name
+		_ = s.notifService.SendNotification(ctx, &models.Notification{
+			RecipientID:       leave.EmployeeID,
+			SenderID:          &teamLeaderID,
+			Type:              "approval",
+			Title:             fmt.Sprintf("Leave Approved by %s", tlName),
+			Message:           strPtr(fmt.Sprintf("%s has approved your leave request (%d of %d team leaders approved).", tlName, approvedCount, totalTLs)),
+			RelatedEntityType: strPtr("leave"),
+			RelatedEntityID:   &leaveID,
+			Priority:          "low",
+		})
+	}
 
 	return nil
 }
@@ -123,7 +163,12 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		return fmt.Errorf("leave not found: %w", err)
 	}
 	if leave.Status != "approved_by_team_leader" {
-		return fmt.Errorf("leave must be approved by team leader first, current status: %s", leave.Status)
+		return fmt.Errorf("leave must be approved by all team leaders first, current status: %s", leave.Status)
+	}
+
+	// Record the manager approval
+	if err := s.leaveRepo.RecordApproval(ctx, leaveID, managerID, "manager", "approved", nil); err != nil {
+		return err
 	}
 
 	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "approved_by_manager", managerID, "manager"); err != nil {
@@ -146,10 +191,16 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 }
 
 // RejectLeave rejects a leave request with a reason.
-func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejectedBy uuid.UUID, reason string) error {
+func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejectedBy uuid.UUID, rejectorRole string, reason string) error {
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
 		return fmt.Errorf("leave not found: %w", err)
+	}
+
+	// Record the rejection
+	notesPtr := &reason
+	if err := s.leaveRepo.RecordApproval(ctx, leaveID, rejectedBy, rejectorRole, "rejected", notesPtr); err != nil {
+		return err
 	}
 
 	if err := s.leaveRepo.Reject(ctx, leaveID, rejectedBy, reason); err != nil {
@@ -185,3 +236,14 @@ func (s *LeaveService) GetPendingForApproval(ctx context.Context, approverRole s
 func (s *LeaveService) GetShiftCoveragePreview(ctx context.Context, shiftID uuid.UUID, date time.Time) (*models.ShiftCoverage, error) {
 	return s.scheduleRepo.GetShiftCoveragePreview(ctx, shiftID, date)
 }
+
+// GetPendingLeavesRich returns pending leaves with employee details.
+func (s *LeaveService) GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error) {
+	return s.leaveRepo.GetPendingLeavesRich(ctx, approverRole)
+}
+
+// GetLeaveHistory returns all leaves with their approval details.
+func (s *LeaveService) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error) {
+	return s.leaveRepo.GetLeaveHistory(ctx)
+}
+

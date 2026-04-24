@@ -29,8 +29,8 @@ export const NotificationList = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-            <Bell className="w-8 h-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-2 sm:gap-3">
+            <Bell className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             Notifications
           </h2>
           <p className="text-muted-foreground">

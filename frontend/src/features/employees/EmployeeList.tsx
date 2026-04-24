@@ -234,18 +234,18 @@ export const EmployeeList = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            <Users className="w-8 h-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
+            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             Employees
           </h2>
-          <p className="text-muted-foreground">Manage employee records, roles, and shift assignments.</p>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage employee records, roles, and shifts.</p>
         </div>
         {canCreate && (
           <Button
             onClick={() => { setShowCreate((v) => !v); setError(null); }}
-            className="gap-2"
+            className="gap-2 w-full sm:w-auto"
           >
             {showCreate ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             {showCreate ? 'Close' : 'New Employee'}
@@ -261,8 +261,8 @@ export const EmployeeList = () => {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid md:grid-cols-4 gap-4">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="space-y-2 md:col-span-2">
               <Label>Search</Label>
               <div className="relative">
@@ -307,7 +307,7 @@ export const EmployeeList = () => {
             <CardDescription>Add a new employee to the system</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label>Employee Code</Label>
                 <Input value={createCode} onChange={(e) => setCreateCode(e.target.value)} />
@@ -398,7 +398,7 @@ export const EmployeeList = () => {
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredEmployees.map((emp) => (
             <Card key={emp.id} className="group hover:shadow-md transition-all">
               {editId === emp.id ? (

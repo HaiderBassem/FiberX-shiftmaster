@@ -78,13 +78,13 @@ export const DepartmentDetail = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/departments">
             <Button variant="outline" className="gap-2"><ArrowLeft className="w-4 h-4" /> Back</Button>
           </Link>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <Building2 className="w-8 h-8 text-primary" />
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
+              <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               {dept.name}
             </h2>
             <p className="text-muted-foreground">

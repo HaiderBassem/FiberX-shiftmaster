@@ -58,6 +58,15 @@ interface TaskSchedule {
   is_active: boolean;
 }
 
+interface RecurringAssignment {
+  id: string;
+  schedule_id: string;
+  employee_id: string;
+  day_of_week: number;
+  assigned_by: string | null;
+  created_at: string;
+}
+
 interface BoardViewRow {
   employee_id: string;
   employee_name: string;
@@ -198,14 +207,14 @@ const BoardListView = ({
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-            <LayoutGrid className="w-8 h-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
+            <LayoutGrid className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             Task Boards
           </h2>
-          <p className="text-muted-foreground">
-            Create and manage task boards. Each board shows an employee×day grid with task completion tracking.
+          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">
+            Create and manage task boards. Each board shows an employee×day grid.
           </p>
         </div>
         {canEdit && (
@@ -434,6 +443,21 @@ const BoardDetailView = ({
     },
   });
 
+  // Fetch recurring assignments for this board
+  const { data: recurringAssignments } = useQuery({
+    queryKey: ['board-recurring', board.id],
+    queryFn: async () => {
+      const res = await api.get(`/tasks/boards/${board.id}/recurring`);
+      return (res.data?.data || []) as RecurringAssignment[];
+    },
+  });
+
+  // Build a set of recurring keys for quick lookup
+  const recurringSet = new Set<string>();
+  recurringAssignments?.forEach((ra) => {
+    recurringSet.add(`${ra.schedule_id}:${ra.employee_id}:${ra.day_of_week}`);
+  });
+
   // ── Mutations ──
   const createTask = useMutation({
     mutationFn: async () => {
@@ -461,22 +485,26 @@ const BoardDetailView = ({
   });
 
   const assignTask = useMutation({
-    mutationFn: async ({ scheduleId, employeeId, date }: { scheduleId: string; employeeId: string; date: string }) => {
-      await api.post('/tasks/assign', { schedule_id: scheduleId, employee_id: employeeId, assigned_date: date });
+    mutationFn: async ({ scheduleId, employeeId, dayOfWeek }: { scheduleId: string; employeeId: string; dayOfWeek: number }) => {
+      await api.post('/tasks/recurring-assign', { schedule_id: scheduleId, employee_id: employeeId, day_of_week: dayOfWeek });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board-view'] });
       queryClient.invalidateQueries({ queryKey: ['board-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['board-recurring', board.id] });
       setAssigningCell(null); setAssignTaskId(''); setError(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || 'Failed to assign task'),
+    onError: (err: any) => setError(err?.response?.data?.error || 'Failed to assign recurring task'),
   });
 
   const removeAssignment = useMutation({
-    mutationFn: async (assignmentId: string) => { await api.delete(`/tasks/assignments/${assignmentId}`); },
+    mutationFn: async ({ scheduleId, employeeId, dayOfWeek }: { scheduleId: string; employeeId: string; dayOfWeek: number }) => {
+      await api.post('/tasks/recurring-assignments/remove', { schedule_id: scheduleId, employee_id: employeeId, day_of_week: dayOfWeek });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board-view'] });
       queryClient.invalidateQueries({ queryKey: ['board-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['board-recurring', board.id] });
     },
   });
 
@@ -568,14 +596,14 @@ const BoardDetailView = ({
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
           <div>
-            <h2 className="text-2xl font-bold text-foreground flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
               <ClipboardList className="w-7 h-7 text-primary" />
               {board.name}
             </h2>
             <p className="text-sm text-muted-foreground">{board.description || 'No description'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {gridTotal > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/30 border border-border">
               <BarChart3 className="w-4 h-4 text-primary" />
@@ -770,26 +798,29 @@ const BoardDetailView = ({
                         return (
                           <td key={dayIdx} className="px-2 py-2 text-center align-top">
                             <div className="space-y-1 min-h-[40px]">
-                              {dayTasks.map((t, tIdx) => (
+                              {dayTasks.map((t, tIdx) => {
+                                const isRecurring = recurringSet.has(`${t.taskId}:${empId}:${dayIdx}`);
+                                return (
                                 <div key={tIdx}
                                   className={`relative group/tag px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 ${statusBadge(t.status)}`}>
                                   {statusIcon(t.status)}
                                   <span className="truncate font-medium">{t.taskTitle}</span>
-                                  {canEdit && (
-                                    <button onClick={() => removeAssignment.mutate(t.assignmentId)}
+                                  {isRecurring && <span title="Recurring every week" className="text-[9px] opacity-60">🔁</span>}
+                                  {canEdit && isRecurring && (
+                                    <button onClick={() => removeAssignment.mutate({ scheduleId: t.taskId, employeeId: empId, dayOfWeek: dayIdx })}
                                       className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-white text-[10px] hidden group-hover/tag:flex items-center justify-center shadow-lg">
                                       ×
                                     </button>
                                   )}
                                 </div>
-                              ))}
+                                );
+                              })}
                               {/* Quick Assign Button */}
                               {canEdit && boardTasks && boardTasks.length > 0 && (
                                 <button
                                   onClick={() => {
                                     const next = isAssigning ? null : { empId, day: dayIdx };
                                     setAssigningCell(next);
-                                    // Reset dropdown selection when toggling/opening a different cell.
                                     setAssignTaskId('');
                                   }}
                                   className="w-full py-1 rounded-md border border-dashed border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors text-[10px]"
@@ -814,12 +845,12 @@ const BoardDetailView = ({
                                         assignTask.mutate({
                                           scheduleId: assignTaskId,
                                           employeeId: empId,
-                                          date: format(weekDates[dayIdx], 'yyyy-MM-dd'),
+                                          dayOfWeek: dayIdx,
                                         });
                                       }
                                     }}
                                     className="w-full h-7 text-[11px]">
-                                    Assign
+                                    Assign (Recurring)
                                   </Button>
                                 </div>
                               )}

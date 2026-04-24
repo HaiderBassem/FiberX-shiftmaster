@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
   ArrowLeftRight, ShieldCheck, Bell, ClipboardList, Building2, Columns3,
-  Clock,
+  Clock, History, X,
 } from 'lucide-react';
 
 const navItems = [
@@ -16,11 +16,12 @@ const navItems = [
   { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/task-management', label: 'Task Mgmt', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/task-boards', label: 'Task Boards', icon: Columns3, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/task-history', label: 'Task History', icon: History, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
   { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
 ];
 
-export const Sidebar = () => {
+export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
 
@@ -31,18 +32,29 @@ export const Sidebar = () => {
   return (
     <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
       {/* ── Brand ── */}
-      <div className="px-5 py-6 flex items-center gap-3 border-b border-white/5">
-        <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center glow-teal-sm">
-          <Clock className="w-5 h-5 text-primary" />
+      <div className="px-5 py-6 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center glow-teal-sm">
+            <Clock className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-gradient-teal">
+              Shiftmaster
+            </h1>
+            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">
+              Shift Management
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-gradient-teal">
-            Shiftmaster
-          </h1>
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">
-            Shift Management
-          </p>
-        </div>
+        {/* Close button - mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        )}
       </div>
 
       {/* ── Nav ── */}
@@ -57,6 +69,7 @@ export const Sidebar = () => {
             <Link
               key={item.to}
               to={item.to}
+              onClick={onClose}
               className={`
                 flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
                 transition-all duration-200 group

@@ -420,6 +420,91 @@ func (h *TaskHandler) Assign(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": ta})
 }
 
+// ═══════════════════════════════════════════
+// Recurring Assignment Endpoints
+// ═══════════════════════════════════════════
+
+type recurringAssignRequest struct {
+	ScheduleID string `json:"schedule_id" binding:"required"`
+	EmployeeID string `json:"employee_id" binding:"required"`
+	DayOfWeek  int    `json:"day_of_week" binding:"required"`
+}
+
+func (h *TaskHandler) RecurringAssign(c *gin.Context) {
+	var req recurringAssignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+	scheduleID, _ := uuid.Parse(req.ScheduleID)
+	employeeID, _ := uuid.Parse(req.EmployeeID)
+	assignedByStr, _ := c.Get("employee_id")
+	assignedBy, _ := uuid.Parse(assignedByStr.(string))
+
+	ra := &models.TaskRecurringAssignment{
+		ScheduleID: scheduleID,
+		EmployeeID: employeeID,
+		DayOfWeek:  req.DayOfWeek,
+		AssignedBy: &assignedBy,
+	}
+	if err := h.taskSvc.CreateRecurringAssignment(c.Request.Context(), ra); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": ra})
+}
+
+func (h *TaskHandler) DeleteRecurringAssignment(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid recurring assignment ID"})
+		return
+	}
+	if err := h.taskSvc.DeleteRecurringAssignment(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "recurring assignment removed"}})
+}
+
+type deleteRecurringByKeyRequest struct {
+	ScheduleID string `json:"schedule_id" binding:"required"`
+	EmployeeID string `json:"employee_id" binding:"required"`
+	DayOfWeek  int    `json:"day_of_week"`
+}
+
+func (h *TaskHandler) DeleteRecurringAssignmentByKey(c *gin.Context) {
+	var req deleteRecurringByKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+	scheduleID, _ := uuid.Parse(req.ScheduleID)
+	employeeID, _ := uuid.Parse(req.EmployeeID)
+	if err := h.taskSvc.DeleteRecurringAssignmentByKey(c.Request.Context(), scheduleID, employeeID, req.DayOfWeek); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "recurring assignment removed"}})
+}
+
+func (h *TaskHandler) ListRecurringByBoard(c *gin.Context) {
+	boardID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid board ID"})
+		return
+	}
+	assignments, err := h.taskSvc.GetRecurringAssignmentsByBoard(c.Request.Context(), boardID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if assignments == nil {
+		assignments = []models.TaskRecurringAssignment{}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": assignments, "meta": gin.H{"count": len(assignments)}})
+}
+
 func (h *TaskHandler) DeleteAssignment(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -519,7 +604,8 @@ func (h *TaskHandler) UpdateExecutionStatus(c *gin.Context) {
 }
 
 type completeExecutionRequest struct {
-	Notes *string `json:"notes"`
+	CompletionType string  `json:"completion_type" binding:"required"`
+	Notes          *string `json:"notes"`
 }
 
 func (h *TaskHandler) CompleteExecution(c *gin.Context) {
@@ -530,11 +616,41 @@ func (h *TaskHandler) CompleteExecution(c *gin.Context) {
 	}
 	var req completeExecutionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		req = completeExecutionRequest{}
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "completion_type is required (without_issue or with_issue)"})
+		return
 	}
-	if err := h.taskSvc.CompleteTask(c.Request.Context(), id, req.Notes); err != nil {
+	if err := h.taskSvc.CompleteTask(c.Request.Context(), id, req.CompletionType, req.Notes); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "task completed", "completion_type": req.CompletionType}})
+}
+
+// TaskHistory returns all task executions for a given date (for supervisors).
+func (h *TaskHandler) TaskHistory(c *gin.Context) {
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		dateStr = time.Now().Format("2006-01-02")
+	}
+	date, err := parseTime(dateStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid date format"})
+		return
+	}
+	var boardID *uuid.UUID
+	if bid := c.Query("board_id"); bid != "" {
+		parsed, err := uuid.Parse(bid)
+		if err == nil {
+			boardID = &parsed
+		}
+	}
+	history, err := h.taskSvc.GetTaskHistory(c.Request.Context(), date, boardID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "task completed"}})
+	if history == nil {
+		history = []models.TaskHistoryRow{}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": history, "meta": gin.H{"count": len(history), "date": dateStr}})
 }

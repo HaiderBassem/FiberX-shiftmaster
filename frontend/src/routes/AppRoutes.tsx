@@ -9,6 +9,7 @@ import { ScheduleView } from '../features/schedules/ScheduleView';
 import { MyTasksWeekly } from '../features/tasks/TaskList';
 import { TaskManagement } from '../features/tasks/TaskManagement';
 import { TaskBoards } from '../features/tasks/TaskBoards';
+import { TaskHistory } from '../features/tasks/TaskHistory';
 import { LeaveList } from '../features/leaves/LeaveList';
 import { SwapList } from '../features/swaps/SwapList';
 import { ApprovalDashboard } from '../features/approvals/ApprovalDashboard';
@@ -105,6 +106,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
                 <TaskBoards />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="task-history" 
+            element={
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+                <TaskHistory />
               </ProtectedRoute>
             } 
           />

@@ -62,7 +62,7 @@ export const Login = () => {
         {/* Brand header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 glow-teal">
-            <Clock className="w-8 h-8 text-primary" />
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
           </div>
           <h1 className="text-4xl font-bold tracking-tight text-gradient-teal mb-2">
             Shiftmaster

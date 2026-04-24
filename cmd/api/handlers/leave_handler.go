@@ -100,6 +100,23 @@ func (h *LeaveHandler) PendingForApproval(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": leaves, "meta": gin.H{"count": len(leaves)}})
 }
 
+// PendingRich returns pending leaves with full employee details for the approval dashboard.
+func (h *LeaveHandler) PendingRich(c *gin.Context) {
+	role, _ := c.Get("role")
+	roleStr, _ := role.(string)
+
+	leaves, err := h.leaveSvc.GetPendingLeavesRich(c.Request.Context(), roleStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if leaves == nil {
+		leaves = []models.PendingLeaveRich{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": leaves, "meta": gin.H{"count": len(leaves)}})
+}
+
 // CoveragePreview returns the staffing coverage for a specific shift and date.
 func (h *LeaveHandler) CoveragePreview(c *gin.Context) {
 	shiftID, err := uuid.Parse(c.Query("shift_id"))
@@ -181,11 +198,26 @@ func (h *LeaveHandler) Reject(c *gin.Context) {
 
 	rejectedByStr, _ := c.Get("employee_id")
 	rejectedByID, _ := uuid.Parse(rejectedByStr.(string))
+	roleVal, _ := c.Get("role")
+	roleStr, _ := roleVal.(string)
 
-	if err := h.leaveSvc.RejectLeave(c.Request.Context(), leaveID, rejectedByID, req.Reason); err != nil {
+	if err := h.leaveSvc.RejectLeave(c.Request.Context(), leaveID, rejectedByID, roleStr, req.Reason); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "leave rejected"}})
+}
+
+// LeaveHistory returns all leaves with approval details for supervisors.
+func (h *LeaveHandler) LeaveHistory(c *gin.Context) {
+	history, err := h.leaveSvc.GetLeaveHistory(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if history == nil {
+		history = []models.LeaveHistoryRow{}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": history, "meta": gin.H{"count": len(history)}})
 }

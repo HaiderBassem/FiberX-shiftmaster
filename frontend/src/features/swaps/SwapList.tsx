@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,9 +11,11 @@ import { format } from 'date-fns';
 
 export const SwapList = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [targetEmployeeId, setTargetEmployeeId] = useState('');
   const [shiftDate, setShiftDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const { data: mySwaps, isLoading } = useQuery({
     queryKey: ['swaps', 'me'],
@@ -24,16 +27,29 @@ export const SwapList = () => {
     queryFn: async () => { const res = await api.get('/swaps/pending/for-me'); return res.data?.data || []; },
   });
 
+  // Fetch all employees, then filter client-side:
+  // - Same department as current user
+  // - Only role=employee (exclude team_leader, manager, admin)
+  // - Exclude self
   const { data: employees } = useQuery({
     queryKey: ['employees', 'active'],
     queryFn: async () => { const res = await api.get('/employees?active=true'); return res.data?.data || []; },
   });
 
+  const swapEligible = (employees || []).filter((emp: any) => {
+    if (emp.id === user?.id) return false; // exclude self
+    if (emp.role !== 'employee') return false; // only regular employees
+    if (user?.department_id && emp.department_id !== user.department_id) return false; // same department
+    return true;
+  });
+
   const createSwap = useMutation({
     mutationFn: async () => {
+      setError(null);
       await api.post('/swaps', { target_employee_id: targetEmployeeId, shift_date: shiftDate, reason });
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); setReason(''); setTargetEmployeeId(''); },
+    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to create swap'),
   });
 
   const respondSwap = useMutation({
@@ -52,21 +68,25 @@ export const SwapList = () => {
   const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-3">
-          <ArrowLeftRight className="w-8 h-8 text-primary" />
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
+          <ArrowLeftRight className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
           Shift Swaps
         </h2>
-        <p className="text-muted-foreground">Request shift swaps with colleagues and manage incoming requests.</p>
+        <p className="text-sm sm:text-base text-muted-foreground">Request shift swaps with teammates in your department.</p>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* ── Create Swap ── */}
         <div className="lg:col-span-1">
           <Card className="sticky top-24">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <ArrowLeftRight className="w-5 h-5 text-primary" />
                 New Swap Request
               </CardTitle>
@@ -75,11 +95,14 @@ export const SwapList = () => {
               <div className="space-y-2">
                 <Label>Swap With</Label>
                 <select className={selectClass} value={targetEmployeeId} onChange={(e) => setTargetEmployeeId(e.target.value)}>
-                  <option value="" disabled>Select an employee</option>
-                  {employees?.map((emp: any) => (
+                  <option value="" disabled>Select a teammate</option>
+                  {swapEligible.map((emp: any) => (
                     <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} — {emp.employee_code}</option>
                   ))}
                 </select>
+                {swapEligible.length === 0 && (
+                  <p className="text-xs text-muted-foreground">No eligible teammates found in your department.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Shift Date</Label>
@@ -116,7 +139,7 @@ export const SwapList = () => {
               {pendingForMe.map((swap: any) => (
                 <Card key={swap.id}>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div>
                         <p className="text-foreground font-medium">
                           {swap.requester_name || `Employee #${swap.requester_id?.slice(0, 8)}`}
@@ -151,9 +174,9 @@ export const SwapList = () => {
             ) : mySwaps?.length > 0 ? (
               mySwaps.map((swap: any) => (
                 <Card key={swap.id}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
                         {getStatusIcon(swap.status)}
                       </div>
                       <div>
