@@ -333,14 +333,29 @@ export const EmployeeList = () => {
                 <Label>Last Name</Label>
                 <Input value={createLast} onChange={(e) => setCreateLast(e.target.value)} />
               </div>
+            </div>
+
+            {/* Contact — each primary + secondary side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} />
+                <Label>Email *</Label>
+                <Input type="email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} placeholder="Primary email" />
+              </div>
+              <div className="space-y-2">
+                <Label>Secondary Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="email" value={createSecEmail} onChange={(e) => setCreateSecEmail(e.target.value)} placeholder="Second email" />
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
-                <Input value={createPhone} onChange={(e) => setCreatePhone(e.target.value)} />
+                <Input value={createPhone} onChange={(e) => setCreatePhone(e.target.value)} placeholder="Primary phone" />
               </div>
+              <div className="space-y-2">
+                <Label>Secondary Phone <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input value={createSecPhone} onChange={(e) => setCreateSecPhone(e.target.value)} placeholder="Second phone" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label>Gender</Label>
                 <select className={selectClass} value={createGender} onChange={(e) => setCreateGender(e.target.value)}>
@@ -391,16 +406,6 @@ export const EmployeeList = () => {
                 <Label htmlFor="create-night">Can cover night shifts</Label>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2 border-t border-border">
-              <div className="space-y-2">
-                <Label>Secondary Phone <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input value={createSecPhone} onChange={(e) => setCreateSecPhone(e.target.value)} placeholder="Second phone number" />
-              </div>
-              <div className="space-y-2">
-                <Label>Secondary Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input type="email" value={createSecEmail} onChange={(e) => setCreateSecEmail(e.target.value)} placeholder="Second email address" />
-              </div>
-            </div>
           </CardContent>
           <CardFooter>
             <Button
@@ -436,9 +441,10 @@ export const EmployeeList = () => {
                     </div>
                     <div className="space-y-1"><Label className="text-xs">First</Label><Input value={editFirst} onChange={(e) => setEditFirst(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1"><Label className="text-xs">Last</Label><Input value={editLast} onChange={(e) => setEditLast(e.target.value)} className="h-9" /></div>
-                    <div className="space-y-1 col-span-2"><Label className="text-xs">Email</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-9" /></div>
-                    <div className="space-y-1"><Label className="text-xs">Sec. Phone <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecPhone} onChange={(e) => setEditSecPhone(e.target.value)} className="h-9" placeholder="Secondary phone" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Email</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1"><Label className="text-xs">Sec. Email <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecEmail} onChange={(e) => setEditSecEmail(e.target.value)} className="h-9" placeholder="Secondary email" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Phone</Label><Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Sec. Phone <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecPhone} onChange={(e) => setEditSecPhone(e.target.value)} className="h-9" placeholder="Secondary phone" /></div>
                     <div className="space-y-1"><Label className="text-xs">Department</Label>
                       <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
                         <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
