@@ -25,6 +25,8 @@ interface Employee {
   weekly_off_days: number;
   can_cover_night_shift: boolean;
   status: string;
+  secondary_phone: string | null;
+  secondary_email: string | null;
   created_at: string;
 }
 
@@ -77,6 +79,8 @@ export const EmployeeList = () => {
   const [createOffDays, setCreateOffDays] = useState(1);
   const [createNight, setCreateNight] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
+  const [createSecPhone, setCreateSecPhone] = useState('');
+  const [createSecEmail, setCreateSecEmail] = useState('');
 
   // Edit form
   const [editCode, setEditCode] = useState('');
@@ -91,6 +95,8 @@ export const EmployeeList = () => {
   const [editPosition, setEditPosition] = useState('');
   const [editOffDays, setEditOffDays] = useState(1);
   const [editNight, setEditNight] = useState(false);
+  const [editSecPhone, setEditSecPhone] = useState('');
+  const [editSecEmail, setEditSecEmail] = useState('');
 
   // ── Queries ──
   const { data: employees, isLoading } = useQuery<Employee[]>({
@@ -148,6 +154,8 @@ export const EmployeeList = () => {
         weekly_off_days: createOffDays,
         can_cover_night_shift: createNight,
         password: createPassword,
+        secondary_phone: createSecPhone || null,
+        secondary_email: createSecEmail || null,
       });
     },
     onSuccess: () => {
@@ -156,6 +164,7 @@ export const EmployeeList = () => {
       setCreateCode(''); setCreateFirst(''); setCreateLast('');
       setCreateEmail(''); setCreatePhone(''); setCreatePassword('');
       setCreatePosition(''); setCreateDept(''); setCreateShift('');
+      setCreateSecPhone(''); setCreateSecEmail('');
     },
     onError: (err: any) => {
       setError(err?.response?.data?.error || err?.message || 'Failed to create employee');
@@ -179,6 +188,8 @@ export const EmployeeList = () => {
         position: editPosition || null,
         weekly_off_days: editOffDays,
         can_cover_night_shift: editNight,
+        secondary_phone: editSecPhone || null,
+        secondary_email: editSecEmail || null,
       });
     },
     onSuccess: () => {
@@ -211,6 +222,8 @@ export const EmployeeList = () => {
     setEditPosition(emp.position || '');
     setEditOffDays(emp.weekly_off_days);
     setEditNight(emp.can_cover_night_shift);
+    setEditSecPhone(emp.secondary_phone || '');
+    setEditSecEmail(emp.secondary_email || '');
   };
 
   // ── Filter ──
@@ -378,6 +391,16 @@ export const EmployeeList = () => {
                 <Label htmlFor="create-night">Can cover night shifts</Label>
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2 border-t border-border">
+              <div className="space-y-2">
+                <Label>Secondary Phone <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input value={createSecPhone} onChange={(e) => setCreateSecPhone(e.target.value)} placeholder="Second phone number" />
+              </div>
+              <div className="space-y-2">
+                <Label>Secondary Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="email" value={createSecEmail} onChange={(e) => setCreateSecEmail(e.target.value)} placeholder="Second email address" />
+              </div>
+            </div>
           </CardContent>
           <CardFooter>
             <Button
@@ -414,6 +437,8 @@ export const EmployeeList = () => {
                     <div className="space-y-1"><Label className="text-xs">First</Label><Input value={editFirst} onChange={(e) => setEditFirst(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1"><Label className="text-xs">Last</Label><Input value={editLast} onChange={(e) => setEditLast(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1 col-span-2"><Label className="text-xs">Email</Label><Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-9" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Sec. Phone <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecPhone} onChange={(e) => setEditSecPhone(e.target.value)} className="h-9" placeholder="Secondary phone" /></div>
+                    <div className="space-y-1"><Label className="text-xs">Sec. Email <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecEmail} onChange={(e) => setEditSecEmail(e.target.value)} className="h-9" placeholder="Secondary email" /></div>
                     <div className="space-y-1"><Label className="text-xs">Department</Label>
                       <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
                         <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
