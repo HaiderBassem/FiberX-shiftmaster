@@ -1,0 +1,25 @@
+[Unit]
+Description=ShiftMaster API Server
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=cpper
+Group=cpper
+WorkingDirectory=/opt/shiftmaster
+EnvironmentFile=/opt/shiftmaster/.env
+ExecStart=/opt/shiftmaster/shiftmaster-api
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/shiftmaster/api.log
+StandardError=append:/var/log/shiftmaster/api-error.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/shiftmaster/uploads /var/log/shiftmaster
+
+[Install]
+WantedBy=multi-user.target

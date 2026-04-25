@@ -1,18 +1,38 @@
-http://192.168.16.138:80 {
-	# Serve the built frontend
-	root * /opt/shiftmaster/frontend/dist
-	file_server
+# =============================================================================
+# ShiftMaster Caddy Configuration — Production
+# =============================================================================
+# Place at: /etc/caddy/Caddyfile  OR  run: caddy run --config /opt/shiftmaster/Caddyfile
 
-	# Proxy API requests to Go backend
+http://192.168.16.138:80 {
+	# ── Compression ──
+	encode gzip zstd
+
+	# ── API Reverse Proxy ──
 	handle /api/* {
 		reverse_proxy 127.0.0.1:8080
 	}
 
-	# Health check passthrough
 	handle /health {
 		reverse_proxy 127.0.0.1:8080
 	}
 
-	# SPA fallback — all non-file routes go to index.html
-	try_files {path} /index.html
+	# ── Serve Frontend Static Files ──
+	handle {
+		root * /opt/shiftmaster/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+
+	# ── Security Headers ──
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# ── Logging ──
+	log {
+		output file /var/log/caddy/shiftmaster.log
+		format json
+	}
 }
