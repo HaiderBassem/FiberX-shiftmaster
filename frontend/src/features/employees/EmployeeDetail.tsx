@@ -163,8 +163,8 @@ export const EmployeeDetail = () => {
           </CardHeader>
           <CardContent className="grid sm:grid-cols-2 gap-4 text-sm">
             <DetailBlock icon={<Mail className="w-4 h-4" />} label="Email" value={employee.email} />
-            <DetailBlock icon={<Phone className="w-4 h-4" />} label="Phone" value={employee.phone || '—'} />
             <DetailBlock icon={<AtSign className="w-4 h-4" />} label="Secondary Email" value={employee.secondary_email || '—'} />
+            <DetailBlock icon={<Phone className="w-4 h-4" />} label="Phone" value={employee.phone || '—'} />
             <DetailBlock icon={<PhoneCall className="w-4 h-4" />} label="Secondary Phone" value={employee.secondary_phone || '—'} />
             <DetailBlock icon={<Building2 className="w-4 h-4" />} label="Department" value={dept ? `${dept.name} (${dept.department_code})` : '—'} />
             <DetailBlock icon={<Briefcase className="w-4 h-4" />} label="Position" value={employee.position || '—'} />
@@ -205,15 +205,15 @@ export const EmployeeDetail = () => {
                 <Input type="email" value={editData.email || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, email: e.target.value})} />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input value={editData.phone || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, phone: e.target.value || null})} placeholder="Primary phone" />
+                <Label>Secondary Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                <Input type="email" value={editData.secondary_email || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, secondary_email: e.target.value || null})} placeholder="Secondary email" />
               </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Secondary Email <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                <Input type="email" value={editData.secondary_email || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, secondary_email: e.target.value || null})} placeholder="Secondary email" />
+                <Label>Phone</Label>
+                <Input value={editData.phone || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, phone: e.target.value || null})} placeholder="Primary phone" />
               </div>
               <div className="space-y-2">
                 <Label>Secondary Phone <span className="text-muted-foreground text-xs">(optional)</span></Label>
