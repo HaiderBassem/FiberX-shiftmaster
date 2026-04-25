@@ -1,0 +1,126 @@
+Clearing the database schema...
+NOTICE:  drop cascades to 37 other objects
+DETAIL:  drop cascades to extension uuid-ossp
+drop cascades to extension pgcrypto
+drop cascades to type employee_role
+drop cascades to type gender_type
+drop cascades to type employee_status
+drop cascades to type shift_status_type
+drop cascades to type leave_type
+drop cascades to type leave_status
+drop cascades to type task_priority
+drop cascades to type task_status
+drop cascades to type notification_type
+drop cascades to type notification_priority
+drop cascades to type swap_status
+drop cascades to table departments
+drop cascades to table employees
+drop cascades to table shifts
+drop cascades to table schedule_templates
+drop cascades to table weekly_schedule
+drop cascades to table employee_shifts
+drop cascades to table task_schedules
+drop cascades to table task_assignments
+drop cascades to table task_executions
+drop cascades to table leaves
+drop cascades to table shift_swaps
+drop cascades to table permissions
+drop cascades to table notifications
+drop cascades to table audit_logs
+drop cascades to view view_daily_tasks_by_shift
+drop cascades to view view_node_check_by_shift
+drop cascades to view view_mobile_ticket_by_shift
+drop cascades to view view_employee_today_tasks
+drop cascades to function get_employee_today_tasks(uuid,date)
+drop cascades to function swap_task_assignment(uuid,uuid)
+drop cascades to function should_task_run_on_date(uuid,date)
+drop cascades to function update_updated_at_column()
+drop cascades to function generate_weekly_schedule(date,uuid)
+drop cascades to function generate_daily_assignments(date)
+DROP SCHEMA
+CREATE SCHEMA
+GRANT
+GRANT
+Running complete database migration and seed...
+CREATE EXTENSION
+CREATE EXTENSION
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+CREATE TABLE
+COMMENT
+INSERT 0 6
+CREATE TABLE
+COMMENT
+COMMENT
+ALTER TABLE
+CREATE TABLE
+COMMENT
+INSERT 0 3
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+INSERT 0 24
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+ALTER TABLE
+INSERT 0 8
+UPDATE 7
+UPDATE 0
+UPDATE 1
+DO
+DO
+psql:internal/database/database.sql:543: ERROR:  function generate_weekly_schedule(date, uuid) does not exist
+LINE 1: SELECT generate_weekly_schedule(
+               ^
+HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+QUERY:  SELECT generate_weekly_schedule(
+        DATE_TRUNC('week', CURRENT_DATE + interval '1 week')::DATE, 
+        (SELECT id FROM employees WHERE employee_code = 'EMP001')
+    )
+CONTEXT:  PL/pgSQL function inline_code_block line 5 at SQL statement
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE VIEW
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+Database seeded successfully!
