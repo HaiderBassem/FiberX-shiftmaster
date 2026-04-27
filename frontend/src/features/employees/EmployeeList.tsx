@@ -45,7 +45,6 @@ interface Shift {
 export const EmployeeList = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
   const canCreate = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'team_leader';
 
   // Role options based on current user's role

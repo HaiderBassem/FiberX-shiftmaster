@@ -8,3 +8,6 @@
 [GIN] 2026/04/25 - 18:17:39 | 200 |     644.415µs |             ::1 | GET      "/api/departments"
 [GIN] 2026/04/25 - 18:17:39 | 200 |     728.416µs |             ::1 | GET      "/api/shifts"
 [GIN] 2026/04/25 - 18:17:39 | 200 |    4.210275ms |             ::1 | GET      "/api/leaves/pending/rich"
+2026/04/25 18:31:13 Shutting down gracefully...
+2026/04/25 18:31:13 Server stopped
+2026/04/25 18:31:13 Database connections closed
