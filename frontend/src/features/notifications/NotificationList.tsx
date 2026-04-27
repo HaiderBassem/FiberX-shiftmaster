@@ -4,9 +4,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, CheckCircle2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 export const NotificationList = () => {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -71,12 +73,26 @@ export const NotificationList = () => {
                     )}
                   </div>
                 </div>
-                {!notification.read_at && (
-                  <Button size="sm" variant="ghost" className="shrink-0 text-primary hover:text-primary"
-                    onClick={() => markRead.mutate(notification.id)} disabled={markRead.isPending}>
-                    Mark read
-                  </Button>
-                )}
+                <div className="flex flex-col gap-2 shrink-0 items-end">
+                  {(notification.type === 'shift_change' && notification.related_entity_type === 'swap') && (
+                    <Button size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 h-8"
+                      onClick={() => navigate('/swaps')}>
+                      Review Swap
+                    </Button>
+                  )}
+                  {(notification.type === 'leave_request' || notification.type === 'approval') && (
+                    <Button size="sm" variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 h-8"
+                      onClick={() => navigate('/approvals')}>
+                      Review Approval
+                    </Button>
+                  )}
+                  {!notification.read_at && (
+                    <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-foreground h-8 px-2"
+                      onClick={() => markRead.mutate(notification.id)} disabled={markRead.isPending}>
+                      Mark read
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

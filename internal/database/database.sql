@@ -111,6 +111,10 @@ CREATE TABLE employees (
     remember_token VARCHAR(100),
     last_login TIMESTAMP,
 
+    -- Secondary contact info
+    secondary_phone VARCHAR(20),
+    secondary_email VARCHAR(255),
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by UUID REFERENCES employees(id)
