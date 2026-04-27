@@ -25,17 +25,6 @@ let isRedirecting = false;
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-<<<<<<< HEAD
-    // Only redirect on 401 if it's NOT the login endpoint itself.
-    // A 401 on /auth/login means wrong credentials — let the Login
-    // component handle it and show the error message.
-    if (
-      error.response?.status === 401 &&
-      !error.config?.url?.includes('/auth/login')
-    ) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
-=======
     if (error.response?.status === 401) {
       // Don't redirect if we're already on the login page or already redirecting
       const isLoginRequest = error.config?.url?.includes('/auth/login');
@@ -46,7 +35,6 @@ api.interceptors.response.use(
         // Reset after a short delay so future 401s can still trigger
         setTimeout(() => { isRedirecting = false; }, 2000);
       }
->>>>>>> f1859212aff21226df2bebcd3380dc27de2a6a4e
     }
     return Promise.reject(error);
   }
