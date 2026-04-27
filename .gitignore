@@ -1,3 +1,6 @@
+# ==============================
+# Go Backend
+# ==============================
 # Binaries
 *.exe
 *.exe~
@@ -6,6 +9,12 @@
 *.dylib
 *.test
 shiftmaster-api
+cmd/api/shiftmaster-api
+
+# Go workspace and build
+go.work
+go.work.sum
+vendor/
 
 # Coverage & test artifacts
 *.out
@@ -13,28 +22,68 @@ coverage.*
 *.coverprofile
 profile.cov
 
-# Go workspace
-go.work
-go.work.sum
+# ==============================
+# Frontend (Node/React/Vite)
+# ==============================
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.eslintcache
+frontend/coverage/
 
-# Environment (keep templates, ignore actual secrets)
+# npm/yarn/pnpm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==============================
+# Environment & Secrets
+# ==============================
 .env
-!.env.production
-!.env.development
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
 
-# Runtime
+# ==============================
+# Runtime & Logs
+# ==============================
+logs/
+*.log
 api.log
 api.pid
 seed_out.log
 uploads/
 
-# Frontend build output
-frontend/dist/
-frontend/node_modules/
+# ==============================
+# Databases
+# ==============================
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+*.sql.gz
 
-# IDE
+# ==============================
+# OS & IDE
+# ==============================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln

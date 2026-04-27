@@ -5,12 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 
 export const NotificationList = () => {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -140,7 +138,7 @@ export const NotificationList = () => {
                 
                 <div className="flex flex-row sm:flex-col gap-2 shrink-0 items-end mt-2 sm:mt-0">
                   {/* 1. Employee Swap Request */}
-                  {isUnread && isEmployeeSwapReq && (
+                  {isEmployeeSwapReq && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleEmployeeSwapRespond(notification.id, notification.related_entity_id, false)}
@@ -156,7 +154,7 @@ export const NotificationList = () => {
                   )}
 
                   {/* 2. Manager/TL Swap Approval */}
-                  {isUnread && isManagerSwapReq && (
+                  {isManagerSwapReq && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleManagerSwapRespond(notification.id, notification.related_entity_id, false)}
@@ -172,7 +170,7 @@ export const NotificationList = () => {
                   )}
 
                   {/* 3. Leave Approval */}
-                  {isUnread && isLeaveReq && (
+                  {isLeaveReq && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleLeaveRespond(notification.id, notification.related_entity_id, false)}
