@@ -138,8 +138,8 @@ export const NotificationList = () => {
         <div className="space-y-3">
           {notifications.map((notification: any) => {
             const isUnread = !notification.read_at;
-            const isEmployeeSwapReq = (notification.type === 'swap_request' || notification.title === 'Shift Swap Request') && notification.related_entity_type === 'swap';
-            const isManagerSwapReq = (notification.type === 'swap_approval' || notification.title === 'Shift Swap Awaiting Your Approval' || notification.title === 'Shift Swap Approval Required') && notification.related_entity_type === 'swap';
+            const isEmployeeSwapReq = (notification.type === 'swap_request' || notification.type === 'shift_change' || notification.title === 'Shift Swap Request') && notification.related_entity_type === 'swap';
+            const isManagerSwapReq = (notification.type === 'swap_approval' || notification.type === 'approval' || notification.title === 'Shift Swap Awaiting Your Approval' || notification.title === 'Shift Swap Approval Required') && notification.related_entity_type === 'swap';
             const isLeaveReq = (notification.type === 'leave_request' || notification.title === 'New Leave Request' || notification.title === 'Leave Request Awaiting Approval') && notification.related_entity_type === 'leave';
             
             const showActionButtons = isUnread && (isEmployeeSwapReq || isManagerSwapReq || isLeaveReq);

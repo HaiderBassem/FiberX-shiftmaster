@@ -120,7 +120,7 @@ func (s *SwapService) RequestSwap(ctx context.Context, swap *models.ShiftSwap) e
 	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       swap.TargetEmployeeID,
 		SenderID:          &swap.RequesterID,
-		Type:              "swap_request",
+		Type:              "shift_change",
 		Title:             "Shift Swap Request",
 		Message:           strPtr(fmt.Sprintf("%s %s wants to swap shifts with you on %s. Do you accept?", requester.FirstName, requester.LastName, swap.ShiftDate.Format("2006-01-02"))),
 		RelatedEntityType: strPtr("swap"),
@@ -178,7 +178,7 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       tl.ID,
 			SenderID:          &employeeID,
-			Type:              "swap_approval",
+			Type:              "approval",
 			Title:             "Shift Swap Approval Required",
 			Message:           strPtr("A shift swap has been agreed upon by both employees and needs your approval"),
 			RelatedEntityType: strPtr("swap"),
