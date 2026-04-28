@@ -146,7 +146,7 @@ export const NotificationList = () => {
             const isManagerSwapReq = (nType === 'swap_approval' || nType === 'approval' || title.includes('swap awaiting') || title.includes('swap approval')) && (entityType === 'swap' || !entityType);
             const isLeaveReq = (nType === 'leave_request' || title.includes('leave request') || title.includes('leave awaiting')) && (entityType === 'leave' || !entityType);
             
-            const showActionButtons = isUnread && (isEmployeeSwapReq || isManagerSwapReq || isLeaveReq);
+            const showActionButtons = isEmployeeSwapReq || isManagerSwapReq || isLeaveReq;
 
             return (
             <Card key={notification.id} className={`transition-all ${isUnread ? 'border-primary/20' : ''}`}>
