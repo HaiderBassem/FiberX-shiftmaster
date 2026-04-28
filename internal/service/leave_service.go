@@ -56,16 +56,18 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	// Notify team leaders to review
 	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
 	for _, tl := range teamLeaders {
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
-			RecipientID:       tl.ID,
-			SenderID:          &leave.EmployeeID,
-			Type:              "leave_request",
-			Title:             "New Leave Request",
-			Message:           strPtr(fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))),
-			RelatedEntityType: strPtr("leave"),
-			RelatedEntityID:   &leave.ID,
-			Priority:          "high",
-		})
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       tl.ID,
+		SenderID:          &leave.EmployeeID,
+		Type:              "leave_request",
+		Title:             "New Leave Request",
+		Message:           strPtr(fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))),
+		RelatedEntityType: strPtr("leave"),
+		RelatedEntityID:   &leave.ID,
+		Priority:          "high",
+	}); err != nil {
+		fmt.Printf("Failed to send new leave notification: %v\n", err)
+	}
 	}
 
 	return nil
@@ -116,7 +118,7 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		// Notify managers for final approval
 		managers, _ := s.employeeRepo.GetByRole(ctx, "manager")
 		for _, mgr := range managers {
-			_ = s.notifService.SendNotification(ctx, &models.Notification{
+			if err := s.notifService.SendNotification(ctx, &models.Notification{
 				RecipientID:       mgr.ID,
 				SenderID:          &teamLeaderID,
 				Type:              "approval",
@@ -125,11 +127,13 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 				RelatedEntityType: strPtr("leave"),
 				RelatedEntityID:   &leaveID,
 				Priority:          "high",
-			})
+			}); err != nil {
+				fmt.Printf("Failed to send manager notification: %v\n", err)
+			}
 		}
 
 		// Notify employee — all TLs approved
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       leave.EmployeeID,
 			SenderID:          &teamLeaderID,
 			Type:              "approval",
@@ -138,10 +142,12 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 			RelatedEntityType: strPtr("leave"),
 			RelatedEntityID:   &leaveID,
 			Priority:          "medium",
-		})
+		}); err != nil {
+			fmt.Printf("Failed to send employee notification (all TLs): %v\n", err)
+		}
 	} else {
 		// Notify employee — partial approval with TL name
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       leave.EmployeeID,
 			SenderID:          &teamLeaderID,
 			Type:              "approval",
@@ -150,7 +156,9 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 			RelatedEntityType: strPtr("leave"),
 			RelatedEntityID:   &leaveID,
 			Priority:          "low",
-		})
+		}); err != nil {
+			fmt.Printf("Failed to send employee notification (partial TL): %v\n", err)
+		}
 	}
 
 	return nil
@@ -176,7 +184,7 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 	}
 
 	// Notify employee about final approval
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       leave.EmployeeID,
 		SenderID:          &managerID,
 		Type:              "approval",
@@ -185,7 +193,9 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		RelatedEntityType: strPtr("leave"),
 		RelatedEntityID:   &leaveID,
 		Priority:          "high",
-	})
+	}); err != nil {
+		fmt.Printf("Failed to send manager approval notification: %v\n", err)
+	}
 
 	return nil
 }
@@ -208,7 +218,7 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 	}
 
 	// Notify employee
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       leave.EmployeeID,
 		SenderID:          &rejectedBy,
 		Type:              "approval",
@@ -217,7 +227,9 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		RelatedEntityType: strPtr("leave"),
 		RelatedEntityID:   &leaveID,
 		Priority:          "high",
-	})
+	}); err != nil {
+		fmt.Printf("Failed to send rejection notification: %v\n", err)
+	}
 
 	return nil
 }

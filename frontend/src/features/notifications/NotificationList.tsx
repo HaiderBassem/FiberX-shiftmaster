@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bell, CheckCircle2, Loader2, XCircle } from 'lucide-react';
+import { Bell, CheckCircle2, Loader2, XCircle, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
 
@@ -11,6 +11,12 @@ export const NotificationList = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showMessage = (type: 'success' | 'error', text: string) => {
+    setActionMessage({ type, text });
+    setTimeout(() => setActionMessage(null), 5000);
+  };
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -35,8 +41,11 @@ export const NotificationList = () => {
       await api.post(`/notifications/${notifId}/read`);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['swaps'] });
-    } catch (err) {
-      console.error(err);
+      showMessage('success', accept ? 'Swap accepted successfully!' : 'Swap declined.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Action failed';
+      showMessage('error', `Failed: ${msg}`);
+      console.error('[SwapRespond]', err);
     } finally {
       setProcessingId(null);
     }
@@ -53,8 +62,11 @@ export const NotificationList = () => {
       await api.post(`/notifications/${notifId}/read`);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['swaps'] });
-    } catch (err) {
-      console.error(err);
+      showMessage('success', approve ? 'Swap approved! Employees notified.' : 'Swap rejected. Employees notified.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Action failed';
+      showMessage('error', `Failed: ${msg}`);
+      console.error('[ManagerSwap]', err);
     } finally {
       setProcessingId(null);
     }
@@ -72,8 +84,11 @@ export const NotificationList = () => {
       await api.post(`/notifications/${notifId}/read`);
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['leaves'] });
-    } catch (err) {
-      console.error(err);
+      showMessage('success', approve ? 'Leave approved! Employee notified.' : 'Leave rejected. Employee notified.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || 'Action failed';
+      showMessage('error', `Failed: ${msg}`);
+      console.error('[LeaveRespond]', err);
     } finally {
       setProcessingId(null);
     }
@@ -99,6 +114,21 @@ export const NotificationList = () => {
           </Button>
         )}
       </div>
+
+      {/* Action feedback message */}
+      {actionMessage && (
+        <div className={`flex items-center gap-2 p-3 rounded-lg text-sm font-medium ${
+          actionMessage.type === 'success'
+            ? 'bg-green-500/10 text-green-600 border border-green-500/20'
+            : 'bg-destructive/10 text-destructive border border-destructive/20'
+        }`}>
+          {actionMessage.type === 'success'
+            ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+            : <AlertTriangle className="w-4 h-4 shrink-0" />
+          }
+          {actionMessage.text}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-16">

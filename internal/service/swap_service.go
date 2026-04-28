@@ -117,7 +117,7 @@ func (s *SwapService) RequestSwap(ctx context.Context, swap *models.ShiftSwap) e
 	}
 
 	// Notify target employee: "Do you accept this swap?"
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       swap.TargetEmployeeID,
 		SenderID:          &swap.RequesterID,
 		Type:              "shift_change",
@@ -126,7 +126,9 @@ func (s *SwapService) RequestSwap(ctx context.Context, swap *models.ShiftSwap) e
 		RelatedEntityType: strPtr("swap"),
 		RelatedEntityID:   &swap.ID,
 		Priority:          "high",
-	})
+	}); err != nil {
+		fmt.Printf("[SWAP] Failed to notify target employee %s about swap request: %v\n", swap.TargetEmployeeID, err)
+	}
 
 	return nil
 }
@@ -154,7 +156,7 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 
 	if !accepted {
 		// Notify requester about rejection
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       swap.RequesterID,
 			SenderID:          &employeeID,
 			Type:              "shift_change",
@@ -163,7 +165,9 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 			RelatedEntityType: strPtr("swap"),
 			RelatedEntityID:   &swapID,
 			Priority:          "medium",
-		})
+		}); err != nil {
+			fmt.Printf("[SWAP] Failed to notify requester %s about employee rejection: %v\n", swap.RequesterID, err)
+		}
 		return nil
 	}
 
@@ -171,7 +175,7 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
 
 	for _, tl := range teamLeaders {
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       tl.ID,
 			SenderID:          &employeeID,
 			Type:              "approval",
@@ -180,11 +184,13 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 			RelatedEntityType: strPtr("swap"),
 			RelatedEntityID:   &swapID,
 			Priority:          "high",
-		})
+		}); err != nil {
+			fmt.Printf("[SWAP] Failed to notify team leader %s about swap approval needed: %v\n", tl.ID, err)
+		}
 	}
 
 	// Notify requester that target accepted
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       swap.RequesterID,
 		SenderID:          &employeeID,
 		Type:              "shift_change",
@@ -193,7 +199,9 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 		RelatedEntityType: strPtr("swap"),
 		RelatedEntityID:   &swapID,
 		Priority:          "medium",
-	})
+	}); err != nil {
+		fmt.Printf("[SWAP] Failed to notify requester %s about employee acceptance: %v\n", swap.RequesterID, err)
+	}
 
 	return nil
 }
@@ -272,7 +280,7 @@ func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approve
 
 	if approverRole == "team_leader" {
 		// Notify both employees
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       swap.RequesterID,
 			SenderID:          &approverID,
 			Type:              "shift_change",
@@ -281,8 +289,10 @@ func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approve
 			RelatedEntityType: strPtr("swap"),
 			RelatedEntityID:   &swapID,
 			Priority:          "high",
-		})
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		}); err != nil {
+			fmt.Printf("[SWAP] Failed to notify requester %s about approval: %v\n", swap.RequesterID, err)
+		}
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       swap.TargetEmployeeID,
 			SenderID:          &approverID,
 			Type:              "shift_change",
@@ -291,7 +301,9 @@ func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approve
 			RelatedEntityType: strPtr("swap"),
 			RelatedEntityID:   &swapID,
 			Priority:          "high",
-		})
+		}); err != nil {
+			fmt.Printf("[SWAP] Failed to notify target %s about approval: %v\n", swap.TargetEmployeeID, err)
+		}
 	}
 
 	return nil
@@ -314,7 +326,7 @@ func (s *SwapService) RejectSwap(ctx context.Context, swapID uuid.UUID, approver
 
 	// Notify both employees
 	for _, empID := range []uuid.UUID{swap.RequesterID, swap.TargetEmployeeID} {
-		_ = s.notifService.SendNotification(ctx, &models.Notification{
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       empID,
 			SenderID:          &approverID,
 			Type:              "shift_change",
@@ -323,7 +335,9 @@ func (s *SwapService) RejectSwap(ctx context.Context, swapID uuid.UUID, approver
 			RelatedEntityType: strPtr("swap"),
 			RelatedEntityID:   &swapID,
 			Priority:          "medium",
-		})
+		}); err != nil {
+			fmt.Printf("[SWAP] Failed to notify employee %s about rejection: %v\n", empID, err)
+		}
 	}
 
 	return nil
