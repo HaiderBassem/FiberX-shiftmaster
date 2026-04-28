@@ -139,12 +139,12 @@ export const NotificationList = () => {
           {notifications.map((notification: any) => {
             const isUnread = !notification.read_at;
             const title = (notification.title || '').toLowerCase();
+            const message = (notification.message || '').toLowerCase();
             const nType = (notification.type || '').toLowerCase();
-            const entityType = (notification.related_entity_type || '').toLowerCase();
 
-            const isEmployeeSwapReq = (nType === 'swap_request' || nType === 'shift_change' || title.includes('swap request')) && (entityType === 'swap' || !entityType);
-            const isManagerSwapReq = (nType === 'swap_approval' || nType === 'approval' || title.includes('swap awaiting') || title.includes('swap approval')) && (entityType === 'swap' || !entityType);
-            const isLeaveReq = (nType === 'leave_request' || title.includes('leave request') || title.includes('leave awaiting')) && (entityType === 'leave' || !entityType);
+            const isEmployeeSwapReq = nType === 'swap_request' || nType === 'shift_change' || title.includes('swap request') || (message.includes('wants to swap') && message.includes('accept'));
+            const isManagerSwapReq = nType === 'swap_approval' || nType === 'approval' || title.includes('swap awaiting') || title.includes('swap approval');
+            const isLeaveReq = nType === 'leave_request' || title.includes('leave request') || title.includes('leave awaiting');
             
             const showActionButtons = isEmployeeSwapReq || isManagerSwapReq || isLeaveReq;
 
