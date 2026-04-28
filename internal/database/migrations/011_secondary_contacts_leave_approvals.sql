@@ -11,9 +11,8 @@ CREATE TABLE IF NOT EXISTS leave_approvals (
     leave_id UUID NOT NULL REFERENCES leaves(id) ON DELETE CASCADE,
     approver_id UUID NOT NULL REFERENCES employees(id),
     approver_role VARCHAR(20) NOT NULL DEFAULT 'team_leader',
-    status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending, approved, rejected
-    comment TEXT,
-    decided_at TIMESTAMPTZ,
+    action VARCHAR(20) NOT NULL, -- approved, rejected
+    notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
