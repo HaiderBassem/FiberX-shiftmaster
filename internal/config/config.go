@@ -120,8 +120,8 @@ func LoadDatabaseConfig() DatabaseConfig {
 	return DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "5432"),
-		User:     getEnv("DB_USER", "cpper"),
-		Password: getEnv("DB_PASSWORD", "0770"),
+		User:     getEnv("DB_USER", "shift_admin"),
+		Password: getEnv("DB_PASSWORD", ""),
 		DBName:   getEnv("DB_NAME", "shiftmaster"),
 		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 
