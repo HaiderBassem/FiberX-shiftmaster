@@ -41,7 +41,7 @@ lerna-debug.log*
 # ==============================
 # Environment & Secrets
 # ==============================
-.env
+
 .env.*
 !.env.example
 *.pem
