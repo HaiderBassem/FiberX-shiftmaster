@@ -179,6 +179,7 @@ func SetupRouter(
 
 			// Schedule editing (manual create/update for a day)
 			tlWrite.POST("/schedules/shifts/set", scheduleH.SetEmployeeShift)
+			tlWrite.DELETE("/schedules/shifts/:id", scheduleH.DeleteEmployeeShift)
 
 			// Shift management
 			tlWrite.POST("/shifts", shiftH.Create)

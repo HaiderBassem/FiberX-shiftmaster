@@ -37,6 +37,7 @@ type ScheduleRepository interface {
 	CheckIn(ctx context.Context, id uuid.UUID) error
 	CheckOut(ctx context.Context, id uuid.UUID) error
 	UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
+	DeleteEmployeeShift(ctx context.Context, id uuid.UUID) error
 
 	// Smart Replacement: employees who were off/on-leave the previous day
 	GetAvailableReplacements(ctx context.Context, date time.Time) ([]models.Employee, error)
@@ -277,6 +278,11 @@ func (r *scheduleRepo) UpsertEmployeeShift(ctx context.Context, es *models.Emplo
 	`,
 		es.ScheduleID, es.EmployeeID, es.ShiftID, es.ShiftDate, es.ShiftStatus, es.LeaveReason, es.CreatedBy,
 	).Scan(&es.ID, &es.CreatedAt, &es.UpdatedAt)
+}
+
+func (r *scheduleRepo) DeleteEmployeeShift(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM employee_shifts WHERE id=$1`, id)
+	return err
 }
 
 // GetAvailableReplacements returns employees who were OFF or on LEAVE the previous day.

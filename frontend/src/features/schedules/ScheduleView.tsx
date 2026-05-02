@@ -187,6 +187,13 @@ export const ScheduleView = () => {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
   });
 
+  const deleteShift = useMutation({
+    mutationFn: async (shiftId: string) => {
+      await api.delete(`/schedules/shifts/${shiftId}`);
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
+  });
+
   return (
     <div className="space-y-8">
       <div>
@@ -430,7 +437,13 @@ export const ScheduleView = () => {
                                   variant="outline"
                                   className="mt-2 h-7 text-[11px]"
                                   onClick={() => {
+                                    if (d.status === 'off' && d.row?.id) {
+                                      // Delete the off-day record entirely
+                                      deleteShift.mutate(d.row.id);
+                                      return;
+                                    }
                                     if (d.status === 'off') {
+                                      // Fallback: set back to working if we have a shift ID
                                       const fallbackShiftId = d.row?.shift_id || row.employee?.default_shift_id || '';
                                       if (!fallbackShiftId) return;
                                       setWorkingQuick.mutate({
@@ -445,7 +458,7 @@ export const ScheduleView = () => {
                                   disabled={
                                     setOffQuick.isPending ||
                                     setWorkingQuick.isPending ||
-                                    (d.status === 'off' && !(d.row?.shift_id || row.employee?.default_shift_id))
+                                    deleteShift.isPending
                                   }
                                 >
                                   {d.status === 'off' ? 'Remove Off' : 'Set Off'}

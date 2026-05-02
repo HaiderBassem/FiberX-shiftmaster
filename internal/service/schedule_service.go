@@ -256,6 +256,11 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 	return es, nil
 }
 
+// DeleteEmployeeShift removes an employee shift record (e.g. removing an off-day assignment).
+func (s *ScheduleService) DeleteEmployeeShift(ctx context.Context, shiftID uuid.UUID) error {
+	return s.scheduleRepo.DeleteEmployeeShift(ctx, shiftID)
+}
+
 func strPtr(s string) *string {
 	return &s
 }

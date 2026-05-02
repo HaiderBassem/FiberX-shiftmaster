@@ -13,6 +13,9 @@ export const LeaveList = () => {
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reason, setReason] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [error, setError] = useState<string | null>(null);
   
   const queryClient = useQueryClient();
 
@@ -23,16 +26,37 @@ export const LeaveList = () => {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      await api.post('/leaves', { leave_type: leaveType, start_date: startDate, end_date: endDate, reason });
+      setError(null);
+      const payload: any = { leave_type: leaveType, start_date: startDate, end_date: endDate, reason };
+      if (leaveType === 'hourly') {
+        payload.start_time = startTime;
+        payload.end_time = endTime;
+      }
+      await api.post('/leaves', payload);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); setReason(''); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); setReason(''); setStartTime(''); setEndTime(''); },
+    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to submit leave'),
   });
+
+  const isHourly = leaveType === 'hourly';
+  const canSubmit = reason && (isHourly ? (startTime && endTime) : true);
 
   const getStatusIcon = (status: string) => {
     switch(status) {
-      case 'approved': return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
+      case 'approved_by_manager': return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
+      case 'approved_by_team_leader': return <CheckCircle2 className="w-5 h-5 text-blue-500" />;
       case 'rejected': return <XCircle className="w-5 h-5 text-destructive" />;
       default: return <Clock className="w-5 h-5 text-amber-500" />;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch(status) {
+      case 'approved_by_manager': return 'Approved';
+      case 'approved_by_team_leader': return 'TL Approved';
+      case 'rejected': return 'Rejected';
+      case 'pending': return 'Pending';
+      default: return status || 'Pending';
     }
   };
 
@@ -47,6 +71,10 @@ export const LeaveList = () => {
         </h2>
         <p className="text-muted-foreground">Request time off and track your leave balances.</p>
       </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
@@ -64,18 +92,36 @@ export const LeaveList = () => {
                   <option value="annual">Annual Leave</option>
                   <option value="sick">Sick Leave</option>
                   <option value="unpaid">Unpaid Leave</option>
+                  <option value="hourly">Hourly Leave</option>
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input type="date" value={startDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartDate(e.target.value)} />
+                  <Label>{isHourly ? 'Date' : 'Start Date'}</Label>
+                  <Input type="date" value={startDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    setStartDate(e.target.value);
+                    if (isHourly) setEndDate(e.target.value);
+                  }} />
                 </div>
-                <div className="space-y-2">
-                  <Label>End Date</Label>
-                  <Input type="date" value={endDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)} />
-                </div>
+                {!isHourly && (
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input type="date" value={endDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)} />
+                  </div>
+                )}
               </div>
+              {isHourly && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>From Time</Label>
+                    <Input type="time" value={startTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>To Time</Label>
+                    <Input type="time" value={endTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)} />
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Reason</Label>
                 <textarea 
@@ -87,7 +133,7 @@ export const LeaveList = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="w-full gap-2" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || !reason}>
+              <Button className="w-full gap-2" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || !canSubmit}>
                 <Send className="w-4 h-4" /> Submit Request
               </Button>
             </CardFooter>
@@ -113,17 +159,29 @@ export const LeaveList = () => {
                       <div>
                         <div className="font-medium text-foreground capitalize">{leave.leave_type} Leave</div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {format(new Date(leave.start_date), 'MMM d, yyyy')} - {format(new Date(leave.end_date), 'MMM d, yyyy')}
+                          {leave.leave_type === 'hourly' ? (
+                            <>
+                              {format(new Date(leave.start_date), 'MMM d, yyyy')}
+                              {leave.start_time && leave.end_time && (
+                                <span className="ml-1">· {leave.start_time} → {leave.end_time}</span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {format(new Date(leave.start_date), 'MMM d, yyyy')} - {format(new Date(leave.end_date), 'MMM d, yyyy')}
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
                     <div className="text-right flex flex-col items-end">
                       <span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${
-                        leave.status === 'approved' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                        leave.status === 'approved_by_manager' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
+                        leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
                         leave.status === 'rejected' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
                         'bg-amber-500/10 text-amber-500 border border-amber-500/20'
                       }`}>
-                        {leave.status || 'Pending'}
+                        {getStatusLabel(leave.status)}
                       </span>
                     </div>
                   </CardContent>

@@ -25,6 +25,8 @@ type createLeaveRequest struct {
 	EndDate     string  `json:"end_date" binding:"required"`
 	Reason      *string `json:"reason"`
 	Attachments *string `json:"attachments"`
+	StartTime   *string `json:"start_time"` // For hourly leaves (HH:MM)
+	EndTime     *string `json:"end_time"`   // For hourly leaves (HH:MM)
 }
 
 // Request creates a new leave request.
@@ -46,6 +48,14 @@ func (h *LeaveHandler) Request(c *gin.Context) {
 		return
 	}
 
+	// Validate hourly leave requires start_time and end_time
+	if req.LeaveType == "hourly" {
+		if req.StartTime == nil || req.EndTime == nil || *req.StartTime == "" || *req.EndTime == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "start_time and end_time are required for hourly leave"})
+			return
+		}
+	}
+
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
@@ -56,6 +66,8 @@ func (h *LeaveHandler) Request(c *gin.Context) {
 		EndDate:     endDate,
 		Reason:      req.Reason,
 		Attachments: req.Attachments,
+		StartTime:   req.StartTime,
+		EndTime:     req.EndTime,
 	}
 
 	if err := h.leaveSvc.RequestLeave(c.Request.Context(), leave); err != nil {

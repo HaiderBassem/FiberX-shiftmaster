@@ -53,21 +53,35 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		return fmt.Errorf("create leave request: %w", err)
 	}
 
+	// Build notification message
+	var msg string
+	if leave.LeaveType == "hourly" {
+		timeInfo := ""
+		if leave.StartTime != nil && leave.EndTime != nil {
+			timeInfo = fmt.Sprintf(" from %s to %s", *leave.StartTime, *leave.EndTime)
+		}
+		msg = fmt.Sprintf("%s %s requested hourly leave on %s%s", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"), timeInfo)
+	} else {
+		msg = fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
+	}
+
 	// Notify team leaders to review
 	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
+	actionUrl := "/approvals"
 	for _, tl := range teamLeaders {
-	if err := s.notifService.SendNotification(ctx, &models.Notification{
-		RecipientID:       tl.ID,
-		SenderID:          &leave.EmployeeID,
-		Type:              "leave_request",
-		Title:             "New Leave Request",
-		Message:           strPtr(fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))),
-		RelatedEntityType: strPtr("leave"),
-		RelatedEntityID:   &leave.ID,
-		Priority:          "high",
-	}); err != nil {
-		fmt.Printf("Failed to send new leave notification: %v\n", err)
-	}
+		if err := s.notifService.SendNotification(ctx, &models.Notification{
+			RecipientID:       tl.ID,
+			SenderID:          &leave.EmployeeID,
+			Type:              "leave_request",
+			Title:             "New Leave Request",
+			Message:           strPtr(msg),
+			RelatedEntityType: strPtr("leave"),
+			RelatedEntityID:   &leave.ID,
+			Priority:          "high",
+			ActionUrl:         &actionUrl,
+		}); err != nil {
+			fmt.Printf("Failed to send new leave notification: %v\n", err)
+		}
 	}
 
 	return nil

@@ -191,6 +191,8 @@ type Leave struct {
 	ApprovedByManager    *uuid.UUID `json:"approved_by_manager"`
 	RejectionReason      *string    `json:"rejection_reason"`
 	Attachments          *string    `json:"attachments"` // JSONB
+	StartTime            *string    `json:"start_time"`  // For hourly leaves (HH:MM)
+	EndTime              *string    `json:"end_time"`    // For hourly leaves (HH:MM)
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }
@@ -250,6 +252,8 @@ type PendingLeaveRich struct {
 	DepartmentName string     `json:"department_name"`
 	TLApprovals    int        `json:"tl_approvals"`
 	TotalTLs       int        `json:"total_tls"`
+	StartTime      *string    `json:"start_time"`
+	EndTime        *string    `json:"end_time"`
 }
 
 type ShiftSwap struct {

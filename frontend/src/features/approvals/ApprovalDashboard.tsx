@@ -340,8 +340,19 @@ export const ApprovalDashboard = () => {
                         </CardTitle>
                         <CardDescription className="mt-1">
                           {leave.leave_type?.charAt(0).toUpperCase() + leave.leave_type?.slice(1)} Leave ·{' '}
-                          {format(new Date(leave.start_date), 'MMM d')} → {format(new Date(leave.end_date), 'MMM d, yyyy')} ·{' '}
-                          {leave.total_days} day{leave.total_days > 1 ? 's' : ''}
+                          {leave.leave_type === 'hourly' ? (
+                            <>
+                              {format(new Date(leave.start_date), 'MMM d, yyyy')}
+                              {leave.start_time && leave.end_time && (
+                                <> · {leave.start_time} → {leave.end_time}</>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              {format(new Date(leave.start_date), 'MMM d')} → {format(new Date(leave.end_date), 'MMM d, yyyy')} ·{' '}
+                              {leave.total_days} day{leave.total_days > 1 ? 's' : ''}
+                            </>
+                          )}
                         </CardDescription>
                       </div>
                       {/* Multi-TL progress */}

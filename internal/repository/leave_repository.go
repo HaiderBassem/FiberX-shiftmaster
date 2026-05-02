@@ -42,14 +42,14 @@ func NewLeaveRepository(db *database.DB) LeaveRepository {
 
 const leaveColumns = `id, employee_id, leave_type, start_date, end_date, total_days, reason, status,
 	applied_date, approved_by_team_leader, approved_by_manager, rejection_reason, attachments,
-	created_at, updated_at`
+	start_time, end_time, created_at, updated_at`
 
 func (r *leaveRepo) scanLeave(row pgx.Row) (*models.Leave, error) {
 	var l models.Leave
 	err := row.Scan(
 		&l.ID, &l.EmployeeID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.TotalDays,
 		&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
-		&l.RejectionReason, &l.Attachments, &l.CreatedAt, &l.UpdatedAt,
+		&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 	)
 	return &l, err
 }
@@ -61,7 +61,7 @@ func (r *leaveRepo) scanLeaves(rows pgx.Rows) ([]models.Leave, error) {
 		if err := rows.Scan(
 			&l.ID, &l.EmployeeID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.TotalDays,
 			&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
-			&l.RejectionReason, &l.Attachments, &l.CreatedAt, &l.UpdatedAt,
+			&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan leave: %w", err)
 		}
@@ -157,7 +157,8 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		        COALESCE(d.name, '') as department_name,
 		        (SELECT COUNT(*) FROM leave_approvals la
 		         WHERE la.leave_id = l.id AND la.approver_role = 'team_leader' AND la.action = 'approved') as tl_approvals,
-		        (SELECT COUNT(*) FROM employees WHERE role = 'team_leader' AND status = 'active') as total_tls
+		        (SELECT COUNT(*) FROM employees WHERE role = 'team_leader' AND status = 'active') as total_tls,
+		        l.start_time, l.end_time
 		 FROM leaves l
 		 JOIN employees e ON e.id = l.employee_id
 		 LEFT JOIN shifts s ON s.id = e.default_shift_id
@@ -176,7 +177,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 			&p.ID, &p.EmployeeID, &p.LeaveType, &p.StartDate, &p.EndDate, &p.TotalDays,
 			&p.Reason, &p.Status, &p.AppliedDate,
 			&p.EmployeeName, &p.EmployeeCode, &p.DefaultShiftID, &p.ShiftName, &p.ShiftCode,
-			&p.DepartmentName, &p.TLApprovals, &p.TotalTLs,
+			&p.DepartmentName, &p.TLApprovals, &p.TotalTLs, &p.StartTime, &p.EndTime,
 		); err != nil {
 			return nil, fmt.Errorf("scan pending leave rich: %w", err)
 		}
@@ -187,9 +188,9 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 
 func (r *leaveRepo) Create(ctx context.Context, leave *models.Leave) error {
 	return r.db.QueryRow(ctx,
-		`INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, attachments)
-		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, total_days, status, applied_date, created_at, updated_at`,
-		leave.EmployeeID, leave.LeaveType, leave.StartDate, leave.EndDate, leave.Reason, leave.Attachments,
+		`INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, attachments, start_time, end_time)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, total_days, status, applied_date, created_at, updated_at`,
+		leave.EmployeeID, leave.LeaveType, leave.StartDate, leave.EndDate, leave.Reason, leave.Attachments, leave.StartTime, leave.EndTime,
 	).Scan(&leave.ID, &leave.TotalDays, &leave.Status, &leave.AppliedDate, &leave.CreatedAt, &leave.UpdatedAt)
 }
 

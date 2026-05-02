@@ -261,3 +261,19 @@ func (h *ScheduleHandler) AssignReplacement(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "replacement assigned"}})
 }
+
+// DeleteEmployeeShift deletes an employee shift record (e.g. removing an off-day).
+func (h *ScheduleHandler) DeleteEmployeeShift(c *gin.Context) {
+	shiftID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid shift ID"})
+		return
+	}
+
+	if err := h.scheduleSvc.DeleteEmployeeShift(c.Request.Context(), shiftID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "employee shift deleted"}})
+}

@@ -94,7 +94,49 @@ export const NotificationList = () => {
     }
   };
 
-  const unreadCount = notifications?.filter((n: any) => !n.read_at).length || 0;
+  const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
+
+  // --- Smart notification classification ---
+  // Uses related_entity_type + title/message to determine the exact action needed.
+  // Only unread notifications show action buttons.
+  const classifyNotification = (n: any) => {
+    const title = (n.title || '').toLowerCase();
+    const message = (n.message || '').toLowerCase();
+    const entityType = (n.related_entity_type || '').toLowerCase();
+    const isUnread = !n.is_read;
+    const isTLOrManager = user?.role === 'team_leader' || user?.role === 'manager' || user?.role === 'admin';
+
+    // Only show action buttons for unread notifications with a related entity
+    if (!isUnread || !n.related_entity_id) {
+      return { type: 'info' as const };
+    }
+
+    // --- SWAP notifications ---
+    if (entityType === 'swap') {
+      // Swap request to target employee: "wants to swap" + "accept"
+      if (title.includes('swap request') || (message.includes('wants to swap') && message.includes('accept'))) {
+        return { type: 'employee_swap_request' as const };
+      }
+      // Swap approval needed by team leader
+      if (isTLOrManager && (title.includes('swap approval') || title.includes('approval required'))) {
+        return { type: 'manager_swap_approval' as const };
+      }
+      // Informational swap notifications (approved, rejected, accepted)
+      return { type: 'info' as const };
+    }
+
+    // --- LEAVE notifications ---
+    if (entityType === 'leave') {
+      // New leave request needing TL/Manager approval
+      if (isTLOrManager && (title.includes('new leave request') || title.includes('leave request awaiting'))) {
+        return { type: 'leave_approval' as const };
+      }
+      // Informational leave notifications (approved, rejected, partial approval)
+      return { type: 'info' as const };
+    }
+
+    return { type: 'info' as const };
+  };
 
   return (
     <div className="space-y-6">
@@ -137,16 +179,10 @@ export const NotificationList = () => {
       ) : notifications?.length > 0 ? (
         <div className="space-y-3">
           {notifications.map((notification: any) => {
-            const isUnread = !notification.read_at;
-            const title = (notification.title || '').toLowerCase();
-            const message = (notification.message || '').toLowerCase();
-            const nType = (notification.type || '').toLowerCase();
+            const isUnread = !notification.is_read;
+            const classification = classifyNotification(notification);
 
-            const isEmployeeSwapReq = nType === 'swap_request' || nType === 'shift_change' || title.includes('swap request') || (message.includes('wants to swap') && message.includes('accept'));
-            const isManagerSwapReq = nType === 'swap_approval' || nType === 'approval' || title.includes('swap awaiting') || title.includes('swap approval');
-            const isLeaveReq = nType === 'leave_request' || title.includes('leave request') || title.includes('leave awaiting');
-            
-            const showActionButtons = isEmployeeSwapReq || isManagerSwapReq || isLeaveReq;
+            const showActionButtons = classification.type !== 'info';
 
             return (
             <Card key={notification.id} className={`transition-all ${isUnread ? 'border-primary/20' : ''}`}>
@@ -171,8 +207,8 @@ export const NotificationList = () => {
                 </div>
                 
                 <div className="flex flex-row sm:flex-col gap-2 shrink-0 items-end mt-2 sm:mt-0">
-                  {/* 1. Employee Swap Request */}
-                  {isEmployeeSwapReq && (
+                  {/* 1. Employee Swap Request — Accept/Decline */}
+                  {classification.type === 'employee_swap_request' && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleEmployeeSwapRespond(notification.id, notification.related_entity_id, false)}
@@ -187,8 +223,8 @@ export const NotificationList = () => {
                     </div>
                   )}
 
-                  {/* 2. Manager/TL Swap Approval */}
-                  {isManagerSwapReq && (
+                  {/* 2. Manager/TL Swap Approval — Approve/Reject */}
+                  {classification.type === 'manager_swap_approval' && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleManagerSwapRespond(notification.id, notification.related_entity_id, false)}
@@ -203,8 +239,8 @@ export const NotificationList = () => {
                     </div>
                   )}
 
-                  {/* 3. Leave Approval */}
-                  {isLeaveReq && (
+                  {/* 3. Leave Approval — Approve/Reject */}
+                  {classification.type === 'leave_approval' && (
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 px-2"
                         onClick={() => handleLeaveRespond(notification.id, notification.related_entity_id, false)}
