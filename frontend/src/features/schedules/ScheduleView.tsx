@@ -437,15 +437,13 @@ export const ScheduleView = () => {
                                   variant="outline"
                                   className="mt-2 h-7 text-[11px]"
                                   onClick={() => {
-                                    if (d.status === 'off' && d.row?.id) {
-                                      // Delete the off-day record entirely
-                                      deleteShift.mutate(d.row.id);
-                                      return;
-                                    }
                                     if (d.status === 'off') {
-                                      // Fallback: set back to working if we have a shift ID
+                                      // Set back to working using their default shift
                                       const fallbackShiftId = d.row?.shift_id || row.employee?.default_shift_id || '';
-                                      if (!fallbackShiftId) return;
+                                      if (!fallbackShiftId) {
+                                        alert("Cannot remove off: Employee has no default shift assigned. Please edit the employee and assign a default shift first.");
+                                        return;
+                                      }
                                       setWorkingQuick.mutate({
                                         employeeId: row.employee.id,
                                         date: d.date,
