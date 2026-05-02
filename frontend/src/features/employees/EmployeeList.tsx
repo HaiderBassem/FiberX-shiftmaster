@@ -398,7 +398,16 @@ export const EmployeeList = () => {
               </div>
               <div className="space-y-2">
                 <Label>Weekly Off Days</Label>
-                <Input type="number" min={0} value={createOffDays} onChange={(e) => setCreateOffDays(parseInt(e.target.value) || 0)} />
+                <select className={selectClass} value={createOffDays} onChange={(e) => setCreateOffDays(parseInt(e.target.value))}>
+                  <option value="-1">None</option>
+                  <option value="0">Sunday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                </select>
               </div>
               <div className="flex items-center gap-2 pt-6">
                 <input id="create-night" type="checkbox" checked={createNight} onChange={(e) => setCreateNight(e.target.checked)} />

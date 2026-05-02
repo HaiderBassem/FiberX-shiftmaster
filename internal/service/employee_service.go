@@ -89,9 +89,6 @@ func (s *EmployeeService) CreateEmployee(ctx context.Context, emp *models.Employ
 	if emp.Status == "" {
 		emp.Status = "active"
 	}
-	if emp.WeeklyOffDays == 0 {
-		emp.WeeklyOffDays = 1
-	}
 
 	return s.employeeRepo.Create(ctx, emp)
 }

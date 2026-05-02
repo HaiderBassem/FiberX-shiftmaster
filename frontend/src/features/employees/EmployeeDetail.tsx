@@ -170,7 +170,7 @@ export const EmployeeDetail = () => {
             <DetailBlock icon={<Briefcase className="w-4 h-4" />} label="Position" value={employee.position || '—'} />
             <DetailBlock icon={<CalendarDays className="w-4 h-4" />} label="Hire Date" value={employee.hire_date?.split('T')[0]} />
             <DetailBlock icon={<CalendarDays className="w-4 h-4" />} label="Shift" value={shift ? `${shift.name} (${shift.shift_code})` : '—'} />
-            <DetailBlock label="Weekly Off Days" value={String(employee.weekly_off_days)} />
+            <DetailBlock label="Weekly Off Days" value={employee.weekly_off_days === -1 ? 'None' : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][employee.weekly_off_days] || String(employee.weekly_off_days)} />
             <DetailBlock label="Night Shift Coverage" value={employee.can_cover_night_shift ? 'Yes' : 'No'} />
             <DetailBlock label="Status" value={employee.status} />
             <DetailBlock label="Last Login" value={employee.last_login?.split('T')[0] || '—'} />
@@ -263,7 +263,16 @@ export const EmployeeDetail = () => {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Weekly Off Days</Label>
-                <Input type="number" min={0} max={7} value={editData.weekly_off_days ?? 0} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditData({...editData, weekly_off_days: parseInt(e.target.value) || 0})} />
+                <select className={selectClass} value={editData.weekly_off_days ?? -1} onChange={(e) => setEditData({...editData, weekly_off_days: parseInt(e.target.value)})}>
+                  <option value="-1">None</option>
+                  <option value="0">Sunday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                </select>
               </div>
               <div className="flex items-center gap-3 pt-6">
                 <input type="checkbox" id="nightShift" checked={editData.can_cover_night_shift || false}
