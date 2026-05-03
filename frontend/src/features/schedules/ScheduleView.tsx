@@ -192,6 +192,9 @@ export const ScheduleView = () => {
       await api.delete(`/schedules/shifts/${shiftId}`);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
+    onError: (err: any) => {
+      alert("Error deleting shift: " + (err?.response?.data?.error || err.message));
+    }
   });
 
   return (
@@ -440,6 +443,8 @@ export const ScheduleView = () => {
                                     if (d.status === 'off') {
                                       if (d.row?.id) {
                                         deleteShift.mutate(d.row.id);
+                                      } else {
+                                        alert("Cannot remove off: Shift record ID is missing. Please refresh.");
                                       }
                                       return;
                                     }
