@@ -79,7 +79,7 @@ export const ScheduleView = () => {
           return {
             date: d,
             row,
-            status: row?.shift_status || 'working',
+            status: row?.shift_status || 'none',
             shiftName: row?.shift_id ? (shiftMap[row.shift_id]?.name || 'Shift') : null,
           };
         });
@@ -438,17 +438,9 @@ export const ScheduleView = () => {
                                   className="mt-2 h-7 text-[11px]"
                                   onClick={() => {
                                     if (d.status === 'off') {
-                                      // Set back to working using their default shift
-                                      const fallbackShiftId = d.row?.shift_id || row.employee?.default_shift_id || '';
-                                      if (!fallbackShiftId) {
-                                        alert("Cannot remove off: Employee has no default shift assigned. Please edit the employee and assign a default shift first.");
-                                        return;
+                                      if (d.row?.id) {
+                                        deleteShift.mutate(d.row.id);
                                       }
-                                      setWorkingQuick.mutate({
-                                        employeeId: row.employee.id,
-                                        date: d.date,
-                                        shiftId: fallbackShiftId,
-                                      });
                                       return;
                                     }
                                     setOffQuick.mutate({ employeeId: row.employee.id, date: d.date });
