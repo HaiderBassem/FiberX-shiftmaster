@@ -3,30 +3,37 @@
 -- =====================================================
 
 -- Auto-update updated_at on important tables
+DROP TRIGGER IF EXISTS trigger_update_employees_updated_at ON employees;
 CREATE TRIGGER trigger_update_employees_updated_at
     BEFORE UPDATE ON employees
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_departments_updated_at ON departments;
 CREATE TRIGGER trigger_update_departments_updated_at
     BEFORE UPDATE ON departments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_employee_shifts_updated_at ON employee_shifts;
 CREATE TRIGGER trigger_update_employee_shifts_updated_at
     BEFORE UPDATE ON employee_shifts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_leaves_updated_at ON leaves;
 CREATE TRIGGER trigger_update_leaves_updated_at
     BEFORE UPDATE ON leaves
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_task_schedules_updated_at ON task_schedules;
 CREATE TRIGGER trigger_update_task_schedules_updated_at
     BEFORE UPDATE ON task_schedules
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_task_executions_updated_at ON task_executions;
 CREATE TRIGGER trigger_update_task_executions_updated_at
     BEFORE UPDATE ON task_executions
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_update_shift_swaps_updated_at ON shift_swaps;
 CREATE TRIGGER trigger_update_shift_swaps_updated_at
     BEFORE UPDATE ON shift_swaps
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -49,6 +56,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_audit_employee_shifts
+DROP TRIGGER IF EXISTS trigger_audit_employee_shifts ON employee_shifts;
+DROP TRIGGER IF EXISTS trg_audit_employee_shifts ON employee_shifts;
+
+CREATE TRIGGER trg_audit_employee_shifts
     AFTER INSERT OR UPDATE OR DELETE ON employee_shifts
     FOR EACH ROW EXECUTE FUNCTION audit_employee_shifts();

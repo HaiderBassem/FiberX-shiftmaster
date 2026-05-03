@@ -18,7 +18,7 @@ type LeaveRepository interface {
 	GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error)
 	GetByStatus(ctx context.Context, status string) ([]models.Leave, error)
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
-	GetPendingForApproval(ctx context.Context, approverRole string) ([]models.Leave, error)
+	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, approverID uuid.UUID, approverRole string) error
 	Reject(ctx context.Context, id uuid.UUID, rejectedBy uuid.UUID, reason string) error
@@ -29,7 +29,7 @@ type LeaveRepository interface {
 	CountTLApprovals(ctx context.Context, leaveID uuid.UUID) (int, error)
 	HasApproved(ctx context.Context, leaveID, approverID uuid.UUID) (bool, error)
 	GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error)
-	GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error)
+	GetPendingLeavesRich(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.PendingLeaveRich, error)
 }
 
 type leaveRepo struct {
@@ -112,19 +112,37 @@ func (r *leaveRepo) GetByDateRange(ctx context.Context, from, to time.Time) ([]m
 	return r.scanLeaves(rows)
 }
 
-func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole string) ([]models.Leave, error) {
+func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error) {
 	var statusFilter string
 	switch approverRole {
 	case "team_leader":
 		statusFilter = "pending"
 	case "manager":
 		statusFilter = "approved_by_team_leader"
+	case "admin":
+		statusFilter = "pending" // Admin can see all pending leaves initially (or maybe all statuses, but let's stick to pending for approval queues)
 	default:
 		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
 	}
 
-	rows, err := r.db.Query(ctx,
-		`SELECT `+leaveColumns+` FROM leaves WHERE status = $1 ORDER BY applied_date`, statusFilter)
+	query := `SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days, l.reason, l.status,
+	          l.applied_date, l.approved_by_team_leader, l.approved_by_manager, l.rejection_reason, l.attachments,
+	          l.start_time, l.end_time, l.created_at, l.updated_at
+	          FROM leaves l
+	          JOIN employees e ON e.id = l.employee_id
+	          WHERE l.status = $1`
+	args := []interface{}{statusFilter}
+
+	if approverRole != "admin" {
+		if approverDeptID == nil {
+			return []models.Leave{}, nil // non-admin without a department sees nothing
+		}
+		query += ` AND e.department_id = $2`
+		args = append(args, *approverDeptID)
+	}
+	query += ` ORDER BY l.applied_date`
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get pending leaves: %w", err)
 	}
@@ -133,7 +151,7 @@ func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole stri
 }
 
 // GetPendingLeavesRich returns pending leaves with employee details for the approval dashboard.
-func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error) {
+func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.PendingLeaveRich, error) {
 	var statusFilter string
 	switch approverRole {
 	case "team_leader":
@@ -146,8 +164,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
 	}
 
-	rows, err := r.db.Query(ctx,
-		`SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days,
+	query := `SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days,
 		        l.reason, l.status, l.applied_date,
 		        e.first_name || ' ' || e.last_name as employee_name,
 		        e.employee_code,
@@ -157,14 +174,25 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		        COALESCE(d.name, '') as department_name,
 		        (SELECT COUNT(*) FROM leave_approvals la
 		         WHERE la.leave_id = l.id AND la.approver_role = 'team_leader' AND la.action = 'approved') as tl_approvals,
-		        (SELECT COUNT(*) FROM employees WHERE role = 'team_leader' AND status = 'active') as total_tls,
+		        (SELECT COUNT(*) FROM employees WHERE role = 'team_leader' AND status = 'active' AND (department_id = e.department_id OR role = 'admin')) as total_tls,
 		        l.start_time, l.end_time
 		 FROM leaves l
 		 JOIN employees e ON e.id = l.employee_id
 		 LEFT JOIN shifts s ON s.id = e.default_shift_id
 		 LEFT JOIN departments d ON d.id = e.department_id
-		 WHERE l.status = $1
-		 ORDER BY l.applied_date`, statusFilter)
+		 WHERE l.status = $1`
+	args := []interface{}{statusFilter}
+
+	if approverRole != "admin" {
+		if approverDeptID == nil {
+			return []models.PendingLeaveRich{}, nil
+		}
+		query += ` AND e.department_id = $2`
+		args = append(args, *approverDeptID)
+	}
+	query += ` ORDER BY l.applied_date`
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get pending leaves rich: %w", err)
 	}

@@ -17,7 +17,7 @@ type SwapRepository interface {
 	GetByRequester(ctx context.Context, requesterID uuid.UUID) ([]models.ShiftSwap, error)
 	GetByTarget(ctx context.Context, targetID uuid.UUID) ([]models.ShiftSwap, error)
 	GetPendingForEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.ShiftSwap, error)
-	GetPendingForManager(ctx context.Context) ([]models.ShiftSwap, error)
+	GetPendingForManager(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.ShiftSwap, error)
 	Create(ctx context.Context, swap *models.ShiftSwap) error
 	EmployeeRespond(ctx context.Context, id uuid.UUID, accepted bool) error
 	ManagerApprove(ctx context.Context, id uuid.UUID, approverID uuid.UUID, approverRole string) error
@@ -127,16 +127,26 @@ func (r *swapRepo) GetPendingForEmployee(ctx context.Context, employeeID uuid.UU
 }
 
 // GetPendingForManager returns swap requests accepted by both employees, awaiting manager/team_leader approval.
-func (r *swapRepo) GetPendingForManager(ctx context.Context) ([]models.ShiftSwap, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT `+swapColumnsWithNames+`
+func (r *swapRepo) GetPendingForManager(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.ShiftSwap, error) {
+	query := `SELECT ` + swapColumnsWithNames + `
 		 FROM shift_swaps ss
 		 JOIN employees r ON r.id = ss.requester_id
 		 JOIN employees t ON t.id = ss.target_employee_id
 		 WHERE ss.status::text = 'employee_accepted'
 		   AND ss.approved_by_team_leader IS NULL
-		   AND ss.approved_by_manager IS NULL
-		 ORDER BY ss.created_at`)
+		   AND ss.approved_by_manager IS NULL`
+	args := []interface{}{}
+
+	if approverRole != "admin" {
+		if approverDeptID == nil {
+			return []models.ShiftSwap{}, nil
+		}
+		query += ` AND r.department_id = $1`
+		args = append(args, *approverDeptID)
+	}
+	query += ` ORDER BY ss.created_at`
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get pending swaps for manager: %w", err)
 	}

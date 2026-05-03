@@ -31,8 +31,8 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 	requesterStr, _ := c.Get("employee_id")
 	requesterID, _ := uuid.Parse(requesterStr.(string))
 
-	// Scope: team_leader/manager can only see their own department employees.
-	if role == "team_leader" || role == "manager" {
+	// Scope: strictly isolate non-admins to their own department.
+	if role != "admin" {
 		me, meErr := h.employeeService.GetByID(ctx, requesterID)
 		if meErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
@@ -43,21 +43,26 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": 0}})
 			return
 		}
-		employees, err = h.employeeService.GetByDepartment(ctx, *me.DepartmentID)
+
+		// Employees can only ever see people in their own department.
+		deptEmployees, err := h.employeeService.GetByDepartment(ctx, *me.DepartmentID)
 		if err == nil {
-			// Scope filtering: managers see employees + team_leaders; team_leaders see only employees.
-			filtered := make([]models.Employee, 0, len(employees))
-			for _, e := range employees {
+			// Role-based visibility filtering within the department:
+			filtered := make([]models.Employee, 0, len(deptEmployees))
+			for _, e := range deptEmployees {
 				if role == "manager" && (e.Role == "employee" || e.Role == "team_leader") {
 					filtered = append(filtered, e)
 				} else if role == "team_leader" && e.Role == "employee" {
+					filtered = append(filtered, e)
+				} else if role == "employee" {
+					// Employees can see other employees/TLs in their department (e.g., for swaps)
 					filtered = append(filtered, e)
 				}
 			}
 			employees = filtered
 		}
 	} else {
-		// Admin (and other elevated roles) keep existing filter behavior.
+		// Admin keeps existing unrestricted filter behavior.
 		switch {
 		case c.Query("active") == "true":
 			employees, err = h.employeeService.GetActive(ctx)
@@ -107,29 +112,34 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	// Scope enforcement: team_leader/manager can only view employees in their department.
+	// Scope enforcement: strictly isolate non-admins to their own department.
 	roleAny, _ := c.Get("role")
 	role, _ := roleAny.(string)
-	if role == "team_leader" || role == "manager" {
+	if role != "admin" {
 		requesterStr, _ := c.Get("employee_id")
 		requesterID, _ := uuid.Parse(requesterStr.(string))
-		me, meErr := h.employeeService.GetByID(c.Request.Context(), requesterID)
-		if meErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
-			return
-		}
-		if me.DepartmentID == nil || emp.DepartmentID == nil || *me.DepartmentID != *emp.DepartmentID {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
-			return
-		}
-		// Managers can view employees + team_leaders; team_leaders can only view employees.
-		if role == "manager" && emp.Role != "employee" && emp.Role != "team_leader" {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
-			return
-		}
-		if role == "team_leader" && emp.Role != "employee" {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
-			return
+
+		// allow an employee to always view their own profile
+		if requesterID != id {
+			me, meErr := h.employeeService.GetByID(c.Request.Context(), requesterID)
+			if meErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
+				return
+			}
+			if me.DepartmentID == nil || emp.DepartmentID == nil || *me.DepartmentID != *emp.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+				return
+			}
+			// Managers can view employees + team_leaders; team_leaders can only view employees.
+			if role == "manager" && emp.Role != "employee" && emp.Role != "team_leader" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+				return
+			}
+			if role == "team_leader" && emp.Role != "employee" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+				return
+			}
+			// employees can view anyone in their own department (e.g., for swaps)
 		}
 	}
 

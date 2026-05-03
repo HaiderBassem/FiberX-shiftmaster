@@ -171,8 +171,17 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 		return nil
 	}
 
-	// Employee accepted → Notify ONLY Team Leaders for approval (skip managers)
-	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
+	// Employee accepted → Notify ONLY Team Leaders of the SAME department for approval
+	var teamLeaders []models.Employee
+	target, _ := s.employeeRepo.GetByID(ctx, swap.TargetEmployeeID)
+	if target != nil && target.DepartmentID != nil {
+		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *target.DepartmentID)
+		for _, e := range deptEmps {
+			if e.Role == "team_leader" {
+				teamLeaders = append(teamLeaders, e)
+			}
+		}
+	}
 
 	for _, tl := range teamLeaders {
 		if err := s.notifService.SendNotification(ctx, &models.Notification{
@@ -369,8 +378,12 @@ func (s *SwapService) GetPendingSwapsForMe(ctx context.Context, employeeID uuid.
 }
 
 // GetPendingSwapsForManager returns swaps waiting for manager/leader approval.
-func (s *SwapService) GetPendingSwapsForManager(ctx context.Context) ([]models.ShiftSwap, error) {
-	return s.swapRepo.GetPendingForManager(ctx)
+func (s *SwapService) GetPendingSwapsForManager(ctx context.Context, approverID uuid.UUID) ([]models.ShiftSwap, error) {
+	approver, err := s.employeeRepo.GetByID(ctx, approverID)
+	if err != nil {
+		return nil, fmt.Errorf("approver not found: %w", err)
+	}
+	return s.swapRepo.GetPendingForManager(ctx, approver.Role, approver.DepartmentID)
 }
 
 // GetEligibleSwapTargets returns eligible employees in the same department across all shifts, indicating their 'off' status.

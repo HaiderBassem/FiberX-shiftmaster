@@ -109,9 +109,12 @@ func (h *SwapHandler) PendingForMe(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": swaps, "meta": gin.H{"count": len(swaps)}})
 }
 
-// PendingForManager returns swaps waiting for manager approval.
+// PendingForManager returns swaps waiting for manager approval for the approver's department.
 func (h *SwapHandler) PendingForManager(c *gin.Context) {
-	swaps, err := h.swapSvc.GetPendingSwapsForManager(c.Request.Context())
+	approverStr, _ := c.Get("employee_id")
+	approverID, _ := uuid.Parse(approverStr.(string))
+
+	swaps, err := h.swapSvc.GetPendingSwapsForManager(c.Request.Context(), approverID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

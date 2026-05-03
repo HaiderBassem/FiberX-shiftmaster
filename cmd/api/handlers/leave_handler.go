@@ -95,12 +95,12 @@ func (h *LeaveHandler) MyLeaves(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": leaves, "meta": gin.H{"count": len(leaves)}})
 }
 
-// PendingForApproval returns leaves pending for the approver's role.
+// PendingForApproval returns leaves pending for the approver's role and department.
 func (h *LeaveHandler) PendingForApproval(c *gin.Context) {
-	role, _ := c.Get("role")
-	roleStr, _ := role.(string)
+	approverStr, _ := c.Get("employee_id")
+	approverID, _ := uuid.Parse(approverStr.(string))
 
-	leaves, err := h.leaveSvc.GetPendingForApproval(c.Request.Context(), roleStr)
+	leaves, err := h.leaveSvc.GetPendingForApproval(c.Request.Context(), approverID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -114,10 +114,10 @@ func (h *LeaveHandler) PendingForApproval(c *gin.Context) {
 
 // PendingRich returns pending leaves with full employee details for the approval dashboard.
 func (h *LeaveHandler) PendingRich(c *gin.Context) {
-	role, _ := c.Get("role")
-	roleStr, _ := role.(string)
+	approverStr, _ := c.Get("employee_id")
+	approverID, _ := uuid.Parse(approverStr.(string))
 
-	leaves, err := h.leaveSvc.GetPendingLeavesRich(c.Request.Context(), roleStr)
+	leaves, err := h.leaveSvc.GetPendingLeavesRich(c.Request.Context(), approverID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return

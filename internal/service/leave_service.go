@@ -65,8 +65,17 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		msg = fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
 	}
 
-	// Notify team leaders to review
-	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
+	// Notify team leaders of the SAME department to review
+	var teamLeaders []models.Employee
+	if emp.DepartmentID != nil {
+		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
+		for _, e := range deptEmps {
+			if e.Role == "team_leader" {
+				teamLeaders = append(teamLeaders, e)
+			}
+		}
+	}
+
 	actionUrl := "/approvals"
 	for _, tl := range teamLeaders {
 		if err := s.notifService.SendNotification(ctx, &models.Notification{
@@ -112,8 +121,22 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 	// Count how many TLs have now approved
 	approvedCount, _ := s.leaveRepo.CountTLApprovals(ctx, leaveID)
 
-	// Count total team leaders
-	teamLeaders, _ := s.employeeRepo.GetByRole(ctx, "team_leader")
+	// Count total team leaders in the employee's department
+	var teamLeaders []models.Employee
+	var deptErr error
+	if leave.EmployeeID != uuid.Nil {
+		leaveEmp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+		if leaveEmp != nil && leaveEmp.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *leaveEmp.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "team_leader" {
+					teamLeaders = append(teamLeaders, e)
+				}
+			}
+		} else {
+			teamLeaders, deptErr = s.employeeRepo.GetByRole(ctx, "team_leader")
+		}
+	}
 	totalTLs := len(teamLeaders)
 
 	// Get the TL's name for the notification
@@ -129,8 +152,20 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 			return err
 		}
 
-		// Notify managers for final approval
-		managers, _ := s.employeeRepo.GetByRole(ctx, "manager")
+		// Notify managers of the SAME department for final approval
+		var managers []models.Employee
+		if leave.EmployeeID != uuid.Nil {
+			leaveEmp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+			if leaveEmp != nil && leaveEmp.DepartmentID != nil {
+				deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *leaveEmp.DepartmentID)
+				for _, e := range deptEmps {
+					if e.Role == "manager" {
+						managers = append(managers, e)
+					}
+				}
+			}
+		}
+
 		for _, mgr := range managers {
 			if err := s.notifService.SendNotification(ctx, &models.Notification{
 				RecipientID:       mgr.ID,
@@ -253,9 +288,13 @@ func (s *LeaveService) GetEmployeeLeaves(ctx context.Context, employeeID uuid.UU
 	return s.leaveRepo.GetByEmployee(ctx, employeeID)
 }
 
-// GetPendingForApproval returns leaves awaiting approval based on approver's role.
-func (s *LeaveService) GetPendingForApproval(ctx context.Context, approverRole string) ([]models.Leave, error) {
-	return s.leaveRepo.GetPendingForApproval(ctx, approverRole)
+// GetPendingForApproval returns leaves awaiting approval based on approver's role and department.
+func (s *LeaveService) GetPendingForApproval(ctx context.Context, approverID uuid.UUID) ([]models.Leave, error) {
+	approver, err := s.employeeRepo.GetByID(ctx, approverID)
+	if err != nil {
+		return nil, fmt.Errorf("approver not found: %w", err)
+	}
+	return s.leaveRepo.GetPendingForApproval(ctx, approver.Role, approver.DepartmentID)
 }
 
 // GetShiftCoveragePreview helps managers visualize staffing levels before approving a leave.
@@ -263,9 +302,13 @@ func (s *LeaveService) GetShiftCoveragePreview(ctx context.Context, shiftID uuid
 	return s.scheduleRepo.GetShiftCoveragePreview(ctx, shiftID, date)
 }
 
-// GetPendingLeavesRich returns pending leaves with employee details.
-func (s *LeaveService) GetPendingLeavesRich(ctx context.Context, approverRole string) ([]models.PendingLeaveRich, error) {
-	return s.leaveRepo.GetPendingLeavesRich(ctx, approverRole)
+// GetPendingLeavesRich returns pending leaves with employee details, strictly for the approver's department.
+func (s *LeaveService) GetPendingLeavesRich(ctx context.Context, approverID uuid.UUID) ([]models.PendingLeaveRich, error) {
+	approver, err := s.employeeRepo.GetByID(ctx, approverID)
+	if err != nil {
+		return nil, fmt.Errorf("approver not found: %w", err)
+	}
+	return s.leaveRepo.GetPendingLeavesRich(ctx, approver.Role, approver.DepartmentID)
 }
 
 // GetLeaveHistory returns all leaves with their approval details.
