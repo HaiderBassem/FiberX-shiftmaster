@@ -675,13 +675,13 @@ func (r *taskRepo) DeleteRecurringAssignment(ctx context.Context, id uuid.UUID) 
 
 		// Delete future materialized pending task_assignments
 		_, err = tx.Exec(ctx,
-			`DELETE FROM task_assignments ta
+			`DELETE FROM task_assignments
 			 USING task_executions te
-			 WHERE ta.id = te.assignment_id
-			   AND ta.schedule_id=$1
-			   AND ta.employee_id=$2
-			   AND EXTRACT(DOW FROM ta.assigned_date) = $3
-			   AND ta.assigned_date >= CURRENT_DATE
+			 WHERE task_assignments.id = te.assignment_id
+			   AND task_assignments.schedule_id=$1
+			   AND task_assignments.employee_id=$2
+			   AND EXTRACT(DOW FROM task_assignments.assigned_date) = $3
+			   AND task_assignments.assigned_date >= CURRENT_DATE
 			   AND te.status = 'pending'`,
 			scheduleID, employeeID, float64(dayOfWeek))
 		return err
@@ -700,13 +700,13 @@ func (r *taskRepo) DeleteRecurringAssignmentByKey(ctx context.Context, scheduleI
 
 		// Delete future materialized pending task_assignments
 		_, err = tx.Exec(ctx,
-			`DELETE FROM task_assignments ta
+			`DELETE FROM task_assignments
 			 USING task_executions te
-			 WHERE ta.id = te.assignment_id
-			   AND ta.schedule_id=$1
-			   AND ta.employee_id=$2
-			   AND EXTRACT(DOW FROM ta.assigned_date) = $3
-			   AND ta.assigned_date >= CURRENT_DATE
+			 WHERE task_assignments.id = te.assignment_id
+			   AND task_assignments.schedule_id=$1
+			   AND task_assignments.employee_id=$2
+			   AND EXTRACT(DOW FROM task_assignments.assigned_date) = $3
+			   AND task_assignments.assigned_date >= CURRENT_DATE
 			   AND te.status = 'pending'`,
 			scheduleID, employeeID, float64(dayOfWeek))
 		return err
