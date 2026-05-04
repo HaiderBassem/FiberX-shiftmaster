@@ -427,7 +427,7 @@ func (h *TaskHandler) Assign(c *gin.Context) {
 type recurringAssignRequest struct {
 	ScheduleID string `json:"schedule_id" binding:"required"`
 	EmployeeID string `json:"employee_id" binding:"required"`
-	DayOfWeek  int    `json:"day_of_week" binding:"required"`
+	DayOfWeek  *int   `json:"day_of_week" binding:"required"`
 }
 
 func (h *TaskHandler) RecurringAssign(c *gin.Context) {
@@ -444,7 +444,7 @@ func (h *TaskHandler) RecurringAssign(c *gin.Context) {
 	ra := &models.TaskRecurringAssignment{
 		ScheduleID: scheduleID,
 		EmployeeID: employeeID,
-		DayOfWeek:  req.DayOfWeek,
+		DayOfWeek:  *req.DayOfWeek,
 		AssignedBy: &assignedBy,
 	}
 	if err := h.taskSvc.CreateRecurringAssignment(c.Request.Context(), ra); err != nil {
@@ -470,7 +470,7 @@ func (h *TaskHandler) DeleteRecurringAssignment(c *gin.Context) {
 type deleteRecurringByKeyRequest struct {
 	ScheduleID string `json:"schedule_id" binding:"required"`
 	EmployeeID string `json:"employee_id" binding:"required"`
-	DayOfWeek  int    `json:"day_of_week"`
+	DayOfWeek  *int   `json:"day_of_week" binding:"required"`
 }
 
 func (h *TaskHandler) DeleteRecurringAssignmentByKey(c *gin.Context) {
@@ -481,7 +481,7 @@ func (h *TaskHandler) DeleteRecurringAssignmentByKey(c *gin.Context) {
 	}
 	scheduleID, _ := uuid.Parse(req.ScheduleID)
 	employeeID, _ := uuid.Parse(req.EmployeeID)
-	if err := h.taskSvc.DeleteRecurringAssignmentByKey(c.Request.Context(), scheduleID, employeeID, req.DayOfWeek); err != nil {
+	if err := h.taskSvc.DeleteRecurringAssignmentByKey(c.Request.Context(), scheduleID, employeeID, *req.DayOfWeek); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
