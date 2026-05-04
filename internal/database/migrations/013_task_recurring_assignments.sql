@@ -13,3 +13,4 @@ CREATE TABLE task_recurring_assignments (
 );
 
 COMMENT ON TABLE task_recurring_assignments IS 'Recurring task assignments (which day of week an employee performs a schedule)';
+              
