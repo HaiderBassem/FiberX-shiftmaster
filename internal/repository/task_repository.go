@@ -673,16 +673,18 @@ func (r *taskRepo) DeleteRecurringAssignment(ctx context.Context, id uuid.UUID) 
 			return err
 		}
 
-		// Delete future materialized pending task_assignments
+		// Delete future non-completed task_assignments (cascades to task_executions)
 		_, err = tx.Exec(ctx,
 			`DELETE FROM task_assignments
-			 USING task_executions te
-			 WHERE task_assignments.id = te.assignment_id
-			   AND task_assignments.schedule_id=$1
-			   AND task_assignments.employee_id=$2
-			   AND EXTRACT(DOW FROM task_assignments.assigned_date) = $3
-			   AND task_assignments.assigned_date >= CURRENT_DATE
-			   AND te.status = 'pending'`,
+			 WHERE schedule_id=$1
+			   AND employee_id=$2
+			   AND EXTRACT(DOW FROM assigned_date) = $3
+			   AND assigned_date >= CURRENT_DATE
+			   AND NOT EXISTS (
+			       SELECT 1 FROM task_executions te
+			       WHERE te.assignment_id = task_assignments.id
+			         AND te.status IN ('in_progress', 'completed')
+			   )`,
 			scheduleID, employeeID, float64(dayOfWeek))
 		return err
 	})
@@ -698,16 +700,18 @@ func (r *taskRepo) DeleteRecurringAssignmentByKey(ctx context.Context, scheduleI
 			return err
 		}
 
-		// Delete future materialized pending task_assignments
+		// Delete future non-completed task_assignments (cascades to task_executions)
 		_, err = tx.Exec(ctx,
 			`DELETE FROM task_assignments
-			 USING task_executions te
-			 WHERE task_assignments.id = te.assignment_id
-			   AND task_assignments.schedule_id=$1
-			   AND task_assignments.employee_id=$2
-			   AND EXTRACT(DOW FROM task_assignments.assigned_date) = $3
-			   AND task_assignments.assigned_date >= CURRENT_DATE
-			   AND te.status = 'pending'`,
+			 WHERE schedule_id=$1
+			   AND employee_id=$2
+			   AND EXTRACT(DOW FROM assigned_date) = $3
+			   AND assigned_date >= CURRENT_DATE
+			   AND NOT EXISTS (
+			       SELECT 1 FROM task_executions te
+			       WHERE te.assignment_id = task_assignments.id
+			         AND te.status IN ('in_progress', 'completed')
+			   )`,
 			scheduleID, employeeID, float64(dayOfWeek))
 		return err
 	})
@@ -740,9 +744,6 @@ func (r *taskRepo) GetRecurringAssignmentsByBoard(ctx context.Context, boardID u
 // for all recurring assignments of a board within the given date range,
 // skipping any that already exist (idempotent).
 func (r *taskRepo) MaterializeRecurringForDateRange(ctx context.Context, boardID uuid.UUID, fromDate, toDate time.Time) error {
-	// This query inserts task_assignments for each recurring assignment
-	// where the date falls within the range and matches the day_of_week,
-	// and the assignment doesn't already exist.
 	_, err := r.db.Exec(ctx, `
 		WITH date_series AS (
 			SELECT d::date AS assigned_date, EXTRACT(DOW FROM d)::int AS dow
@@ -759,9 +760,23 @@ func (r *taskRepo) MaterializeRecurringForDateRange(ctx context.Context, boardID
 			  AND ds.dow = ra.day_of_week
 			ON CONFLICT (schedule_id, employee_id, assigned_date) DO NOTHING
 			RETURNING id
+		),
+		ensure_new AS (
+			INSERT INTO task_executions (assignment_id, status)
+			SELECT id, 'pending' FROM new_assignments
+			ON CONFLICT (assignment_id) DO NOTHING
+			RETURNING assignment_id
 		)
+		-- Also backfill executions for existing assignments in range that have none
 		INSERT INTO task_executions (assignment_id, status)
-		SELECT id, 'pending' FROM new_assignments
+		SELECT ta.id, 'pending'
+		FROM task_assignments ta
+		JOIN task_schedules ts ON ts.id = ta.schedule_id
+		WHERE ts.board_id = $1
+		  AND ta.assigned_date >= $2
+		  AND ta.assigned_date <= $3
+		  AND NOT EXISTS (SELECT 1 FROM task_executions te WHERE te.assignment_id = ta.id)
+		ON CONFLICT (assignment_id) DO NOTHING
 	`, boardID, fromDate, toDate)
 	if err != nil {
 		return fmt.Errorf("materialize recurring assignments: %w", err)
@@ -786,9 +801,22 @@ func (r *taskRepo) MaterializeAllRecurringForEmployee(ctx context.Context, emplo
 			  AND ds.dow = ra.day_of_week
 			ON CONFLICT (schedule_id, employee_id, assigned_date) DO NOTHING
 			RETURNING id
+		),
+		ensure_new AS (
+			INSERT INTO task_executions (assignment_id, status)
+			SELECT id, 'pending' FROM new_assignments
+			ON CONFLICT (assignment_id) DO NOTHING
+			RETURNING assignment_id
 		)
+		-- Backfill executions for existing assignments in range that have none
 		INSERT INTO task_executions (assignment_id, status)
-		SELECT id, 'pending' FROM new_assignments
+		SELECT ta.id, 'pending'
+		FROM task_assignments ta
+		WHERE ta.employee_id = $1
+		  AND ta.assigned_date >= $2
+		  AND ta.assigned_date <= $3
+		  AND NOT EXISTS (SELECT 1 FROM task_executions te WHERE te.assignment_id = ta.id)
+		ON CONFLICT (assignment_id) DO NOTHING
 	`, employeeID, fromDate, toDate)
 	if err != nil {
 		return fmt.Errorf("materialize all recurring for employee: %w", err)
