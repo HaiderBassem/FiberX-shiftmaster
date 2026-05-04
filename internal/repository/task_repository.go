@@ -656,15 +656,61 @@ func (r *taskRepo) CreateRecurringAssignment(ctx context.Context, ra *models.Tas
 }
 
 func (r *taskRepo) DeleteRecurringAssignment(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM task_recurring_assignments WHERE id=$1`, id)
-	return err
+	return r.db.ExecTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		// Get details before deleting
+		var scheduleID, employeeID uuid.UUID
+		var dayOfWeek int
+		err := tx.QueryRow(ctx, `SELECT schedule_id, employee_id, day_of_week FROM task_recurring_assignments WHERE id=$1`, id).Scan(&scheduleID, &employeeID, &dayOfWeek)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return nil // Already deleted
+			}
+			return err
+		}
+
+		_, err = tx.Exec(ctx, `DELETE FROM task_recurring_assignments WHERE id=$1`, id)
+		if err != nil {
+			return err
+		}
+
+		// Delete future materialized pending task_assignments
+		_, err = tx.Exec(ctx,
+			`DELETE FROM task_assignments ta
+			 USING task_executions te
+			 WHERE ta.id = te.assignment_id
+			   AND ta.schedule_id=$1
+			   AND ta.employee_id=$2
+			   AND EXTRACT(DOW FROM ta.assigned_date) = $3
+			   AND ta.assigned_date >= CURRENT_DATE
+			   AND te.status = 'pending'`,
+			scheduleID, employeeID, float64(dayOfWeek))
+		return err
+	})
 }
 
 func (r *taskRepo) DeleteRecurringAssignmentByKey(ctx context.Context, scheduleID, employeeID uuid.UUID, dayOfWeek int) error {
-	_, err := r.db.Exec(ctx,
-		`DELETE FROM task_recurring_assignments WHERE schedule_id=$1 AND employee_id=$2 AND day_of_week=$3`,
-		scheduleID, employeeID, dayOfWeek)
-	return err
+	return r.db.ExecTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		// Delete from recurring
+		_, err := tx.Exec(ctx,
+			`DELETE FROM task_recurring_assignments WHERE schedule_id=$1 AND employee_id=$2 AND day_of_week=$3`,
+			scheduleID, employeeID, dayOfWeek)
+		if err != nil {
+			return err
+		}
+
+		// Delete future materialized pending task_assignments
+		_, err = tx.Exec(ctx,
+			`DELETE FROM task_assignments ta
+			 USING task_executions te
+			 WHERE ta.id = te.assignment_id
+			   AND ta.schedule_id=$1
+			   AND ta.employee_id=$2
+			   AND EXTRACT(DOW FROM ta.assigned_date) = $3
+			   AND ta.assigned_date >= CURRENT_DATE
+			   AND te.status = 'pending'`,
+			scheduleID, employeeID, float64(dayOfWeek))
+		return err
+	})
 }
 
 func (r *taskRepo) GetRecurringAssignmentsByBoard(ctx context.Context, boardID uuid.UUID) ([]models.TaskRecurringAssignment, error) {
