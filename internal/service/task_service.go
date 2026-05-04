@@ -124,6 +124,10 @@ func (s *TaskService) GetRecurringAssignmentsByBoard(ctx context.Context, boardI
 // ═══════════════════════════════════════════
 
 func (s *TaskService) GetMyWeeklyTasks(ctx context.Context, employeeID uuid.UUID, weekStart, weekEnd time.Time) ([]models.MyTaskRow, error) {
+	// Auto-materialize recurring tasks for the employee in the week
+	if err := s.taskRepo.MaterializeAllRecurringForEmployee(ctx, employeeID, weekStart, weekEnd); err != nil {
+		fmt.Printf("WARNING: failed to materialize recurring assignments for employee %s: %v\n", employeeID, err)
+	}
 	return s.taskRepo.GetMyWeeklyTasks(ctx, employeeID, weekStart, weekEnd)
 }
 
@@ -247,6 +251,10 @@ func (s *TaskService) AssignTask(ctx context.Context, ta *models.TaskAssignment)
 }
 
 func (s *TaskService) GetEmployeeTasks(ctx context.Context, employeeID uuid.UUID, date time.Time) ([]models.TaskAssignment, error) {
+	// Auto-materialize recurring tasks for the employee on this date
+	if err := s.taskRepo.MaterializeAllRecurringForEmployee(ctx, employeeID, date, date); err != nil {
+		fmt.Printf("WARNING: failed to materialize recurring assignments for employee %s: %v\n", employeeID, err)
+	}
 	return s.taskRepo.GetAssignmentsByEmployee(ctx, employeeID, date)
 }
 

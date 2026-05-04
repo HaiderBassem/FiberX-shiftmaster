@@ -40,6 +40,7 @@ type TaskRepository interface {
 	DeleteRecurringAssignmentByKey(ctx context.Context, scheduleID, employeeID uuid.UUID, dayOfWeek int) error
 	GetRecurringAssignmentsByBoard(ctx context.Context, boardID uuid.UUID) ([]models.TaskRecurringAssignment, error)
 	MaterializeRecurringForDateRange(ctx context.Context, boardID uuid.UUID, fromDate, toDate time.Time) error
+	MaterializeAllRecurringForEmployee(ctx context.Context, employeeID uuid.UUID, fromDate, toDate time.Time) error
 
 	// Task Assignments
 	GetAssignmentsByDate(ctx context.Context, date time.Time) ([]models.TaskAssignment, error)
@@ -718,6 +719,33 @@ func (r *taskRepo) MaterializeRecurringForDateRange(ctx context.Context, boardID
 	`, boardID, fromDate, toDate)
 	if err != nil {
 		return fmt.Errorf("materialize recurring assignments: %w", err)
+	}
+	return nil
+}
+
+func (r *taskRepo) MaterializeAllRecurringForEmployee(ctx context.Context, employeeID uuid.UUID, fromDate, toDate time.Time) error {
+	_, err := r.db.Exec(ctx, `
+		WITH date_series AS (
+			SELECT d::date AS assigned_date, EXTRACT(DOW FROM d)::int AS dow
+			FROM generate_series($2::date, $3::date, '1 day'::interval) AS d
+		),
+		new_assignments AS (
+			INSERT INTO task_assignments (schedule_id, employee_id, assigned_date, assigned_by)
+			SELECT ra.schedule_id, ra.employee_id, ds.assigned_date, ra.assigned_by
+			FROM task_recurring_assignments ra
+			JOIN task_schedules ts ON ts.id = ra.schedule_id
+			CROSS JOIN date_series ds
+			WHERE ra.employee_id = $1
+			  AND ts.is_active = true
+			  AND ds.dow = ra.day_of_week
+			ON CONFLICT (schedule_id, employee_id, assigned_date) DO NOTHING
+			RETURNING id
+		)
+		INSERT INTO task_executions (assignment_id, status)
+		SELECT id, 'pending' FROM new_assignments
+	`, employeeID, fromDate, toDate)
+	if err != nil {
+		return fmt.Errorf("materialize all recurring for employee: %w", err)
 	}
 	return nil
 }
