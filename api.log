@@ -1,13 +1,7 @@
-2026/04/25 18:16:37 Database connected:  pool=10-50 timeout=30s
-2026/04/25 18:16:37 task_boards migration applied successfully
-2026/04/25 18:16:37 swap_status enum migration applied successfully
-2026/04/25 18:16:37 ShiftMaster API running in production mode on 0.0.0.0:8080
-[GIN] 2026/04/25 - 18:17:39 | 200 |    1.335327ms |             ::1 | GET      "/health"
-[GIN] 2026/04/25 - 18:17:39 | 200 |  226.757264ms |             ::1 | POST     "/api/auth/login"
-[GIN] 2026/04/25 - 18:17:39 | 200 |    1.023445ms |             ::1 | GET      "/api/employees"
-[GIN] 2026/04/25 - 18:17:39 | 200 |     644.415µs |             ::1 | GET      "/api/departments"
-[GIN] 2026/04/25 - 18:17:39 | 200 |     728.416µs |             ::1 | GET      "/api/shifts"
-[GIN] 2026/04/25 - 18:17:39 | 200 |    4.210275ms |             ::1 | GET      "/api/leaves/pending/rich"
-2026/04/25 18:31:13 Shutting down gracefully...
-2026/04/25 18:31:13 Server stopped
-2026/04/25 18:31:13 Database connections closed
+2026/05/04 11:17:15 Database connected:  pool=10-50 timeout=30s
+2026/05/04 11:17:15 task_boards migration applied successfully
+2026/05/04 11:17:15 swap_status enum migration applied successfully
+2026/05/04 11:17:15 ShiftMaster API running in production mode on 0.0.0.0:8080
+2026/05/04 11:18:09 Shutting down gracefully...
+2026/05/04 11:18:09 Server stopped
+2026/05/04 11:18:09 Database connections closed

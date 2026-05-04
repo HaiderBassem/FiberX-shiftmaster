@@ -123,7 +123,7 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 
 	// Count total team leaders in the employee's department
 	var teamLeaders []models.Employee
-	var deptErr error
+	// Removed unused deptErr
 	if leave.EmployeeID != uuid.Nil {
 		leaveEmp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
 		if leaveEmp != nil && leaveEmp.DepartmentID != nil {
@@ -134,7 +134,7 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 				}
 			}
 		} else {
-			teamLeaders, deptErr = s.employeeRepo.GetByRole(ctx, "team_leader")
+			teamLeaders, _ = s.employeeRepo.GetByRole(ctx, "team_leader")
 		}
 	}
 	totalTLs := len(teamLeaders)
