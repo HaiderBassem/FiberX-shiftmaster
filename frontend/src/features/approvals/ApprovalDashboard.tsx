@@ -246,7 +246,6 @@ export const ApprovalDashboard = () => {
   const { data: pendingSwaps, isLoading: swapsLoading } = useQuery({
     queryKey: ['swaps', 'pending', 'manager'],
     queryFn: async () => { const res = await api.get('/swaps/pending/manager'); return res.data?.data || []; },
-    enabled: user?.role === 'team_leader',
   });
 
   const approveLeave = useMutation({

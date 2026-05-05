@@ -137,6 +137,11 @@ func SetupRouter(
 			supervisor.POST("/leaves/:id/approve/manager", leaveH.ApproveByManager)
 			supervisor.POST("/leaves/:id/reject", leaveH.Reject)
 
+			// Swap approvals (all supervisors can approve/reject)
+			supervisor.GET("/swaps/pending/manager", swapH.PendingForManager)
+			supervisor.POST("/swaps/:id/approve", swapH.Approve)
+			supervisor.POST("/swaps/:id/reject", swapH.Reject)
+
 			// Task history (read — all supervisors can view)
 			supervisor.GET("/tasks/history", taskH.TaskHistory)
 
@@ -187,14 +192,7 @@ func SetupRouter(
 			tlWrite.DELETE("/shifts/:id", shiftH.Delete)
 		}
 
-		// Phase 3: swap approvals are team_leader only (skip manager).
-		tlOnly := protected.Group("")
-		tlOnly.Use(middleware.RequireRole("team_leader"))
-		{
-			tlOnly.GET("/swaps/pending/manager", swapH.PendingForManager)
-			tlOnly.POST("/swaps/:id/approve", swapH.Approve)
-			tlOnly.POST("/swaps/:id/reject", swapH.Reject)
-		}
+
 
 		// --- Admin only routes (manager + admin) ---
 		// These are for CRUD and system management
