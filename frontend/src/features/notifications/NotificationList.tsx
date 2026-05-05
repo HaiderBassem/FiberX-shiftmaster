@@ -3,7 +3,7 @@ import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, CheckCircle2, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { fmtDateTime } from '@/lib/dateUtils';
 
 export const NotificationList = () => {
   const queryClient = useQueryClient();
@@ -84,7 +84,7 @@ export const NotificationList = () => {
                       </p>
                       {notification.created_at && (
                         <p className="text-xs text-muted-foreground/60 mt-1.5">
-                          {format(new Date(notification.created_at), 'MMM d, yyyy · h:mm a')}
+                          {fmtDateTime(notification.created_at)}
                         </p>
                       )}
                     </div>

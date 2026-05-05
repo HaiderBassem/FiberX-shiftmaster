@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { ShieldCheck, CalendarOff, ArrowLeftRight, Users, AlertTriangle, CheckCircle2, XCircle,
   UserPlus, History, Clock, ChevronDown, ChevronUp, Moon, Info } from 'lucide-react';
 import { format } from 'date-fns';
+import { fmtDate, fmtDateTime, parseDate } from '@/lib/dateUtils';
 
 // ─── Coverage Preview Widget ───────────────────────────────────────────────────
 const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) => {
@@ -50,7 +51,7 @@ const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) =
 const NightShiftPrevDayInfo = ({ shiftId, date }: { shiftId: string; date: string }) => {
   // Check coverage for the day BEFORE the leave
   const prevDate = (() => {
-    const d = new Date(date);
+    const d = parseDate(date);
     d.setDate(d.getDate() - 1);
     return format(d, 'yyyy-MM-dd');
   })();
@@ -162,7 +163,7 @@ const LeaveHistory = () => {
                   </CardTitle>
                   <CardDescription className="mt-1">
                     {item.leave_type?.charAt(0).toUpperCase() + item.leave_type?.slice(1)} Leave ·{' '}
-                    {format(new Date(item.start_date), 'MMM d')} → {format(new Date(item.end_date), 'MMM d, yyyy')} ·{' '}
+                    {fmtDate(item.start_date, 'MMM d')} → {fmtDate(item.end_date, 'MMM d, yyyy')} ·{' '}
                     {item.total_days} day{item.total_days > 1 ? 's' : ''}
                   </CardDescription>
                 </div>
@@ -187,7 +188,7 @@ const LeaveHistory = () => {
                   </div>
                 )}
                 {item.applied_date && (
-                  <p className="text-xs text-muted-foreground">Applied: {format(new Date(item.applied_date), 'MMM d, yyyy')}</p>
+                  <p className="text-xs text-muted-foreground">Applied: {fmtDate(item.applied_date)}</p>
                 )}
                 <div className="border-t border-border pt-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
@@ -208,7 +209,7 @@ const LeaveHistory = () => {
                               </span>
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {ap.action === 'approved' ? 'Approved' : 'Rejected'} · {format(new Date(ap.created_at), 'MMM d, yyyy h:mm a')}
+                              {ap.action === 'approved' ? 'Approved' : 'Rejected'} · {fmtDateTime(ap.created_at, 'MMM d, yyyy · h:mm a')}
                             </p>
                             {ap.notes && <p className="text-xs text-muted-foreground italic mt-1">"{ap.notes}"</p>}
                           </div>
@@ -341,14 +342,14 @@ export const ApprovalDashboard = () => {
                           {leave.leave_type?.charAt(0).toUpperCase() + leave.leave_type?.slice(1)} Leave ·{' '}
                           {leave.leave_type === 'hourly' ? (
                             <>
-                              {format(new Date(leave.start_date), 'MMM d, yyyy')}
+                              {fmtDate(leave.start_date, 'MMM d, yyyy')}
                               {leave.start_time && leave.end_time && (
                                 <> · {leave.start_time} → {leave.end_time}</>
                               )}
                             </>
                           ) : (
                             <>
-                              {format(new Date(leave.start_date), 'MMM d')} → {format(new Date(leave.end_date), 'MMM d, yyyy')} ·{' '}
+                              {fmtDate(leave.start_date, 'MMM d')} → {fmtDate(leave.end_date, 'MMM d, yyyy')} ·{' '}
                               {leave.total_days} day{leave.total_days > 1 ? 's' : ''}
                             </>
                           )}
@@ -445,7 +446,7 @@ export const ApprovalDashboard = () => {
               pendingSwaps.map((swap: any) => (
                 <Card key={swap.id}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Shift Swap · {format(new Date(swap.shift_date), 'MMM d, yyyy')}</CardTitle>
+                    <CardTitle className="text-base">Shift Swap · {fmtDate(swap.shift_date)}</CardTitle>
                     <CardDescription>
                       Requester {swap.requester_name || `#${swap.requester_id?.slice(0, 8)}`} ↔ Target {swap.target_employee_name || `#${swap.target_employee_id?.slice(0, 8)}`}
                     </CardDescription>

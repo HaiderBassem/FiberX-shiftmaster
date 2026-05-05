@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CalendarOff, Send, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { fmtDate } from '@/lib/dateUtils';
 
 export const LeaveList = () => {
   const [leaveType, setLeaveType] = useState('annual');
@@ -161,14 +162,14 @@ export const LeaveList = () => {
                         <div className="text-sm text-muted-foreground mt-1">
                           {leave.leave_type === 'hourly' ? (
                             <>
-                              {format(new Date(leave.start_date), 'MMM d, yyyy')}
+                              {fmtDate(leave.start_date)}
                               {leave.start_time && leave.end_time && (
                                 <span className="ml-1">· {leave.start_time} → {leave.end_time}</span>
                               )}
                             </>
                           ) : (
                             <>
-                              {format(new Date(leave.start_date), 'MMM d, yyyy')} - {format(new Date(leave.end_date), 'MMM d, yyyy')}
+                              {fmtDate(leave.start_date)} - {fmtDate(leave.end_date)}
                             </>
                           )}
                         </div>

@@ -7,6 +7,7 @@ import {
   CheckSquare, TrendingUp, Briefcase, AlertCircle
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
+import { fmtDateTime } from '@/lib/dateUtils';
 
 // ───────────────────────────────────────────────────────────
 // Dashboard
@@ -185,7 +186,7 @@ const EmployeeDashboard = () => {
                       {log.action} <span className="text-muted-foreground font-normal">({log.table_name})</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}
+                      {log.created_at ? fmtDateTime(log.created_at, 'MMM d, HH:mm') : ''}
                     </p>
                   </div>
                 </div>
@@ -369,7 +370,7 @@ const LeaderDashboard = () => {
                       {log.action} <span className="text-muted-foreground font-normal">({log.table_name})</span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm') : ''}
+                      {log.created_at ? fmtDateTime(log.created_at, 'MMM d, HH:mm') : ''}
                     </p>
                   </div>
                 </div>

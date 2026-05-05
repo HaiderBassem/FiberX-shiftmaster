@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeftRight, Send, Clock, CheckCircle2, XCircle, UserCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { fmtDate } from '@/lib/dateUtils';
 
 export const SwapList = () => {
   const queryClient = useQueryClient();
@@ -145,7 +146,7 @@ export const SwapList = () => {
                           {swap.requester_name || `Employee #${swap.requester_id?.slice(0, 8)}`}
                         </p>
                         <p className="text-sm text-muted-foreground mt-0.5">
-                          {format(new Date(swap.shift_date), 'MMM d, yyyy')}
+                          {fmtDate(swap.shift_date)}
                           {swap.reason && ` · "${swap.reason}"`}
                         </p>
                       </div>
@@ -184,7 +185,7 @@ export const SwapList = () => {
                           Swap with {swap.target_employee_name || `#${swap.target_employee_id?.slice(0, 8)}`}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(swap.shift_date), 'MMM d, yyyy')}
+                          {fmtDate(swap.shift_date)}
                         </p>
                       </div>
                     </div>
