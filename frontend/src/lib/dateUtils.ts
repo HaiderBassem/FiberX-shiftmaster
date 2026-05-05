@@ -1,27 +1,27 @@
 import { format } from 'date-fns';
 
+// ─── Baghdad timezone (UTC+3) ──────────────────────────────────────────────
+// The Go/pgx backend returns timestamps in Baghdad local time WITHOUT a
+// timezone suffix, e.g. "2026-05-05T23:26:00". Adding "Z" incorrectly
+// treats them as UTC and shifts them +3 hours. We therefore parse them
+// as-is (JavaScript treats no-suffix strings as local time) and then
+// format them using Intl with the Baghdad timezone hardcoded so the
+// display is always correct regardless of the OS/browser timezone.
+const BAGHDAD_TZ = 'Asia/Baghdad';
+
 /**
- * Parse a timestamp from the Go backend.
- *
- * pgx returns timestamptz as Go time.Time, which JSON-serializes as UTC with 'Z'.
- * Example: "2026-05-05T19:21:00Z" → should display as 22:21 (UTC+3/Baghdad)
- *
- * However, some fields may come without 'Z' (plain timestamps).
- * We always ensure UTC interpretation by appending 'Z' when missing.
+ * Parse a timestamp string from the backend.
+ * Returns a JS Date. Works for both "2026-05-05T23:26:00" (no suffix)
+ * and "2026-05-05T20:26:00Z" / "2026-05-05T23:26:00+03:00".
  */
 export function parseTimestamp(dateStr: string | null | undefined): Date {
   if (!dateStr) return new Date();
-  // Already has explicit timezone info → parse as-is
-  if (dateStr.includes('Z') || dateStr.includes('+') || dateStr.includes('-', 10)) {
-    return new Date(dateStr);
-  }
-  // No timezone suffix → append Z to treat as UTC (Go pgx behavior)
-  return new Date(dateStr + 'Z');
+  return new Date(dateStr);
 }
 
 /**
  * Parse a date-only string (YYYY-MM-DD).
- * Uses local noon to avoid day-boundary shifts in UTC+3.
+ * Appends T12:00:00 to avoid midnight UTC→local day-boundary shifts.
  */
 export function parseDate(dateStr: string | null | undefined): Date {
   if (!dateStr) return new Date();
@@ -29,20 +29,35 @@ export function parseDate(dateStr: string | null | undefined): Date {
   return new Date(datePart + 'T12:00:00');
 }
 
-/** Format a DB timestamp (date + time) — displays in browser local timezone */
+/**
+ * Format a DB timestamp, always displayed in Baghdad time (UTC+3).
+ * This is correct regardless of the user's browser/OS timezone.
+ */
 export function fmtDateTime(
   dateStr: string | null | undefined,
-  fmt = 'MMM d, yyyy · h:mm a'
+  _fmt?: string          // kept for API compat; Intl is used internally
 ): string {
   if (!dateStr) return '—';
   try {
-    return format(parseTimestamp(dateStr), fmt);
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('en-US', {
+      timeZone: BAGHDAD_TZ,
+      year:    'numeric',
+      month:   'short',
+      day:     'numeric',
+      hour:    'numeric',
+      minute:  '2-digit',
+      hour12:  true,
+    }).format(date);
   } catch {
     return '—';
   }
 }
 
-/** Format a DB date-only field */
+/**
+ * Format a DB date-only field (no time component shown).
+ */
 export function fmtDate(
   dateStr: string | null | undefined,
   fmt = 'MMM d, yyyy'
