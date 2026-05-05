@@ -36,9 +36,9 @@ export const ScheduleView = () => {
   });
 
   const { data: employees } = useQuery({
-    queryKey: ['employees', 'active'],
+    queryKey: ['employees', 'all'],
     queryFn: async () => {
-      const res = await api.get('/employees?active=true');
+      const res = await api.get('/employees');
       return res.data?.data || [];
     },
   });
@@ -72,7 +72,7 @@ export const ScheduleView = () => {
         dayMap[d] = dayResponses[idx]?.data?.data || [];
       });
 
-      const emps = employees || [];
+      const emps = (employees || []).filter((e: any) => e.status === 'active');
       return emps.map((emp: any) => {
         const days = dates.map((d) => {
           const row = (dayMap[d] || []).find((r: any) => r.employee_id === emp.id);
@@ -123,14 +123,16 @@ export const ScheduleView = () => {
     const coveredEmployeeIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
       coveredEmployeeIds.add(String(es.employee_id));
-      const key = es.shift_id || 'off_no_shift';
+      const emp = employeeMap[es.employee_id];
+      const key = es.shift_id || (emp?.default_shift_id) || 'off_no_shift';
       if (filterShiftId && key !== filterShiftId) return;
       if (!groups[key]) groups[key] = [];
       groups[key].push(es);
     });
 
-    // Add virtual rows for employees with no record today
+    // Add virtual rows for active employees with no record today
     (employees || []).forEach((emp: any) => {
+      if (emp.status !== 'active') return;
       if (coveredEmployeeIds.has(String(emp.id))) return; // already has a real row
       const key = emp.default_shift_id || 'off_no_shift';
       if (filterShiftId && key !== filterShiftId) return;
@@ -164,7 +166,7 @@ export const ScheduleView = () => {
     });
     // Count virtual rows (employees with no record = assumed working)
     (employees || []).forEach((emp: any) => {
-      if (!coveredIds.has(String(emp.id))) {
+      if (emp.status === 'active' && !coveredIds.has(String(emp.id))) {
         base.total++;
         base.working++;
       }
@@ -290,7 +292,7 @@ export const ScheduleView = () => {
                 <Label>Employee</Label>
                 <select className={selectClass} value={setEmployeeId} onChange={(e) => setSetEmployeeId(e.target.value)}>
                   <option value="">Select employee…</option>
-                  {employees?.map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
+                  {(employees || []).filter((e: any) => e.status === 'active').map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
