@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,8 +54,8 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-0">
       <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={handleClose} />
       <Card className="relative w-full max-w-md shadow-lg border-border animate-in fade-in zoom-in-95 duration-200">
         <CardHeader>
@@ -122,6 +123,7 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </div>,
+    document.body
   );
 };
