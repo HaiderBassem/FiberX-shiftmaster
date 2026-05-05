@@ -435,29 +435,58 @@ export const ScheduleView = () => {
                               <div className="text-xs font-semibold uppercase tracking-wider">{d.status}</div>
                               <div className="text-[11px] opacity-80 mt-1">{d.shiftName || '-'}</div>
                               {canEdit && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="mt-2 h-7 text-[11px]"
-                                  onClick={() => {
-                                    if (d.status === 'off') {
-                                      if (d.row?.id) {
-                                        deleteShift.mutate(d.row.id);
-                                      } else {
-                                        alert("Cannot remove off: Shift record ID is missing. Please refresh.");
+                                <div className="flex flex-col gap-1 mt-2">
+                                  {/* Set Off */}
+                                  {d.status !== 'off' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[11px] text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
+                                      onClick={() => setOffQuick.mutate({ employeeId: row.employee.id, date: d.date })}
+                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
+                                    >
+                                      Set Off
+                                    </Button>
+                                  )}
+
+                                  {/* Remove Off */}
+                                  {d.status === 'off' && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[11px] text-rose-500 border-rose-500/30 hover:bg-rose-500/10"
+                                      onClick={() => {
+                                        if (d.row?.id) {
+                                          deleteShift.mutate(d.row.id);
+                                        } else {
+                                          alert('Cannot remove off: record missing. Please refresh.');
+                                        }
+                                      }}
+                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
+                                    >
+                                      Remove Off
+                                    </Button>
+                                  )}
+
+                                  {/* Set Working — only when not already working */}
+                                  {d.status !== 'working' && row.employee.default_shift_id && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-[11px] text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
+                                      onClick={() =>
+                                        setWorkingQuick.mutate({
+                                          employeeId: row.employee.id,
+                                          date: d.date,
+                                          shiftId: row.employee.default_shift_id,
+                                        })
                                       }
-                                      return;
-                                    }
-                                    setOffQuick.mutate({ employeeId: row.employee.id, date: d.date });
-                                  }}
-                                  disabled={
-                                    setOffQuick.isPending ||
-                                    setWorkingQuick.isPending ||
-                                    deleteShift.isPending
-                                  }
-                                >
-                                  {d.status === 'off' ? 'Remove Off' : 'Set Off'}
-                                </Button>
+                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
+                                    >
+                                      Set Working
+                                    </Button>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </td>
@@ -496,8 +525,13 @@ export const ScheduleView = () => {
                 .map((leave: any) => (
                   <div key={leave.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
                     <span className="text-amber-500 font-medium">Vacation request:</span>{' '}
-                    <span className="text-foreground">{leave.employee_name || leave.employee_id}</span>{' '}
-                    <span className="text-muted-foreground">({leave.start_date} to {leave.end_date})</span>
+                    <span className="text-foreground font-semibold">
+                      {leave.employee_name ||
+                        (employeeMap[leave.employee_id]
+                          ? `${employeeMap[leave.employee_id].first_name} ${employeeMap[leave.employee_id].last_name}`
+                          : `Employee #${String(leave.employee_id).slice(0, 8)}`)}
+                    </span>{' '}
+                    <span className="text-muted-foreground">({leave.start_date?.split('T')[0]} → {leave.end_date?.split('T')[0]})</span>
                   </div>
                 ))
             ) : (
