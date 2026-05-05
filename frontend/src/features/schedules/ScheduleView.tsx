@@ -122,8 +122,10 @@ export const ScheduleView = () => {
     // Track which employees already have a real DB record for this day
     const coveredEmployeeIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
-      coveredEmployeeIds.add(String(es.employee_id));
       const emp = employeeMap[es.employee_id];
+      if (!emp) return; // Ignore shifts for employees outside of our allowed scope/department
+      
+      coveredEmployeeIds.add(String(es.employee_id));
       const key = es.shift_id || (emp?.default_shift_id) || 'off_no_shift';
       if (filterShiftId && key !== filterShiftId) return;
       if (!groups[key]) groups[key] = [];
@@ -155,6 +157,7 @@ export const ScheduleView = () => {
     // Count real DB rows
     const coveredIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
+      if (!employeeMap[es.employee_id]) return; // Skip out-of-scope employees
       coveredIds.add(String(es.employee_id));
       base.total++;
       const st = (es.shift_status || '').toLowerCase();
