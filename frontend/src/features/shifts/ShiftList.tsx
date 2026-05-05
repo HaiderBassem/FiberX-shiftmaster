@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Clock, Edit3, Plus, Save, Trash2, X } from 'lucide-react';
-import { format } from 'date-fns';
+
 
 interface Shift {
   id: string;
@@ -242,9 +242,13 @@ export const ShiftList = () => {
 
 function toHHMM(raw: string): string {
   if (!raw) return '';
+  // Avoid converting to local timezone with new Date()
+  // Database returns something like "2000-01-01T15:30:00Z"
   if (raw.includes('T')) {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return format(d, 'HH:mm');
+    const timePart = raw.split('T')[1];
+    if (timePart && timePart.length >= 5) {
+      return timePart.substring(0, 5);
+    }
   }
   if (raw.length >= 5 && raw[2] === ':') return raw.slice(0, 5);
   return raw;

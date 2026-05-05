@@ -97,9 +97,9 @@ func (r *shiftRepo) Create(ctx context.Context, shift *models.Shift) error {
 
 func (r *shiftRepo) Update(ctx context.Context, shift *models.Shift) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE shifts SET name=$1, name_en=$2, start_time=$3, end_time=$4, color_code=$5,
-			requires_vehicle=$6, min_rest_hours=$7 WHERE id=$8`,
-		shift.Name, shift.NameEn, shift.StartTime, shift.EndTime,
+		`UPDATE shifts SET shift_code=$1, name=$2, name_en=$3, start_time=$4, end_time=$5, color_code=$6,
+			requires_vehicle=$7, min_rest_hours=$8 WHERE id=$9`,
+		shift.ShiftCode, shift.Name, shift.NameEn, shift.StartTime, shift.EndTime,
 		shift.ColorCode, shift.RequiresVehicle, shift.MinRestHours, shift.ID)
 	return err
 }
