@@ -1,7 +1,0 @@
-2026/05/04 11:17:15 Database connected:  pool=10-50 timeout=30s
-2026/05/04 11:17:15 task_boards migration applied successfully
-2026/05/04 11:17:15 swap_status enum migration applied successfully
-2026/05/04 11:17:15 ShiftMaster API running in production mode on 0.0.0.0:8080
-2026/05/04 11:18:09 Shutting down gracefully...
-2026/05/04 11:18:09 Server stopped
-2026/05/04 11:18:09 Database connections closed
