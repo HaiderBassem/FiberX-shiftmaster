@@ -1,19 +1,27 @@
 import { format } from 'date-fns';
 
 /**
- * Parse a timestamp string from the backend.
- * The Go/PostgreSQL backend returns timestamps already in local time
- * (no timezone suffix needed). Using new Date() directly is correct.
+ * Parse a timestamp from the Go backend.
+ *
+ * pgx returns timestamptz as Go time.Time, which JSON-serializes as UTC with 'Z'.
+ * Example: "2026-05-05T19:21:00Z" → should display as 22:21 (UTC+3/Baghdad)
+ *
+ * However, some fields may come without 'Z' (plain timestamps).
+ * We always ensure UTC interpretation by appending 'Z' when missing.
  */
 export function parseTimestamp(dateStr: string | null | undefined): Date {
   if (!dateStr) return new Date();
-  return new Date(dateStr);
+  // Already has explicit timezone info → parse as-is
+  if (dateStr.includes('Z') || dateStr.includes('+') || dateStr.includes('-', 10)) {
+    return new Date(dateStr);
+  }
+  // No timezone suffix → append Z to treat as UTC (Go pgx behavior)
+  return new Date(dateStr + 'Z');
 }
 
 /**
  * Parse a date-only string (YYYY-MM-DD).
- * Appends T12:00:00 (local noon) to avoid day-boundary shifts
- * that occur when JS parses bare ISO dates as UTC midnight.
+ * Uses local noon to avoid day-boundary shifts in UTC+3.
  */
 export function parseDate(dateStr: string | null | undefined): Date {
   if (!dateStr) return new Date();
@@ -21,7 +29,7 @@ export function parseDate(dateStr: string | null | undefined): Date {
   return new Date(datePart + 'T12:00:00');
 }
 
-/** Format a DB timestamp (date + time) in the browser's local timezone */
+/** Format a DB timestamp (date + time) — displays in browser local timezone */
 export function fmtDateTime(
   dateStr: string | null | undefined,
   fmt = 'MMM d, yyyy · h:mm a'
