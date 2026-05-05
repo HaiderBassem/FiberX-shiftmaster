@@ -123,7 +123,7 @@ export const TaskManagement = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Task Title</Label>
-                <Input value={title} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} placeholder="e.g. Clean lab equipment" />
+                <Input value={title} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} placeholder="e.g. Node check" />
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
