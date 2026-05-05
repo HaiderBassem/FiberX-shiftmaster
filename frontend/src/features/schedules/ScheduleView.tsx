@@ -118,19 +118,42 @@ export const ScheduleView = () => {
 
   const shiftsByShift: Record<string, any[]> = useMemo(() => {
     const groups: Record<string, any[]> = {};
+
+    // Track which employees already have a real DB record for this day
+    const coveredEmployeeIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
+      coveredEmployeeIds.add(String(es.employee_id));
       const key = es.shift_id || 'off_no_shift';
       if (filterShiftId && key !== filterShiftId) return;
       if (!groups[key]) groups[key] = [];
       groups[key].push(es);
     });
+
+    // Add virtual rows for employees with no record today
+    (employees || []).forEach((emp: any) => {
+      if (coveredEmployeeIds.has(String(emp.id))) return; // already has a real row
+      const key = emp.default_shift_id || 'off_no_shift';
+      if (filterShiftId && key !== filterShiftId) return;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push({
+        id: `virtual-${emp.id}`,
+        employee_id: emp.id,
+        shift_id: emp.default_shift_id || null,
+        shift_status: 'working',
+        _isVirtual: true,
+      });
+    });
+
     Object.values(groups).forEach((list) => list.sort((a: any, b: any) => (a.employee_id || '').localeCompare(b.employee_id || '')));
     return groups;
-  }, [activeSchedule, filterShiftId]);
+  }, [activeSchedule, employees, filterShiftId]);
 
   const stats = useMemo(() => {
     const base = { working: 0, off: 0, leave: 0, vacation: 0, other: 0, total: 0 };
+    // Count real DB rows
+    const coveredIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
+      coveredIds.add(String(es.employee_id));
       base.total++;
       const st = (es.shift_status || '').toLowerCase();
       if (st === 'working') base.working++;
@@ -139,8 +162,15 @@ export const ScheduleView = () => {
       else if (st === 'vacation') base.vacation++;
       else base.other++;
     });
+    // Count virtual rows (employees with no record = assumed working)
+    (employees || []).forEach((emp: any) => {
+      if (!coveredIds.has(String(emp.id))) {
+        base.total++;
+        base.working++;
+      }
+    });
     return base;
-  }, [activeSchedule]);
+  }, [activeSchedule, employees]);
 
   const assignReplacement = useMutation({
     mutationFn: async ({ employeeShiftId, replacementEmployeeId }: { employeeShiftId: string; replacementEmployeeId: string }) => {
@@ -362,8 +392,11 @@ export const ScheduleView = () => {
                               <span className={`text-xs font-semibold uppercase tracking-wider ${statusTone}`}>
                                 {status}
                               </span>
+                              {es._isVirtual && (
+                                <span className="text-[10px] text-muted-foreground/50 italic">default</span>
+                              )}
 
-                              {isAdmin && (
+                              {isAdmin && !es._isVirtual && (
                                 <ReplacementButton
                                   employeeShiftId={es.id}
                                   date={viewDate}
