@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   CheckSquare, ChevronLeft, ChevronRight, Calendar, Play,
-  CheckCircle2, Clock, Loader2, ArrowRight, Timer, AlertTriangle, X
+  CheckCircle2, Clock, Loader2, ArrowRight, Timer, AlertTriangle, X,
+  LayoutGrid, ClipboardList,
 } from 'lucide-react';
 import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-fns';
 
@@ -107,6 +108,7 @@ const CompletionDialog = ({
 export const MyTasksWeekly = () => {
   const queryClient = useQueryClient();
 
+  const [view, setView] = useState<'weekly' | 'boards'>('weekly');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
   const [expandedDay, setExpandedDay] = useState<number | null>(() => new Date().getDay());
   const [completingTask, setCompletingTask] = useState<MyTask | null>(null);
@@ -208,6 +210,26 @@ export const MyTasksWeekly = () => {
         <StatCard label="Completion" value={`${completionPct}%`} color="text-primary" icon={<Timer className="w-5 h-5 text-primary" />} />
       </div>
 
+      {/* ── View Tabs ── */}
+      <div className="flex items-center gap-2 p-1 bg-muted/30 rounded-xl border border-border w-fit">
+        <button
+          onClick={() => setView('weekly')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            view === 'weekly' ? 'bg-card text-primary shadow-sm border border-border' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Calendar className="w-4 h-4" /> Weekly View
+        </button>
+        <button
+          onClick={() => setView('boards')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+            view === 'boards' ? 'bg-card text-primary shadow-sm border border-border' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4" /> Board View
+        </button>
+      </div>
+
       {/* ── Week Navigation ── */}
       <div className="flex items-center justify-between bg-muted/30 rounded-xl p-3 border border-border">
         <Button variant="outline" size="sm" onClick={() => setWeekStart((prev) => subDays(prev, 7))} className="gap-2">
@@ -222,7 +244,7 @@ export const MyTasksWeekly = () => {
         </Button>
       </div>
 
-      {/* ── Loading ── */}
+      {/* ── Loading/Data ── */}
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -233,8 +255,11 @@ export const MyTasksWeekly = () => {
           <h3 className="text-xl font-semibold text-muted-foreground mb-2">No tasks this week</h3>
           <p className="text-muted-foreground">You're clear! Check back later or navigate to a different week.</p>
         </div>
+      ) : view === 'boards' ? (
+        <BoardView tasks={tasks || []} statusConfig={statusConfig} formatDuration={formatDuration}
+          onStart={(id) => startTask.mutate(id)} onComplete={setCompletingTask}
+          startPending={startTask.isPending} />
       ) : (
-        /* ── Day Cards ── */
         <div className="space-y-3">
           {weekDates.map((date, dayIdx) => {
             const dateKey = format(date, 'yyyy-MM-dd');
@@ -246,17 +271,9 @@ export const MyTasksWeekly = () => {
             const isPast = isBefore(date, new Date()) && !today;
 
             return (
-              <Card
-                key={dayIdx}
-                className={`transition-all duration-300 overflow-hidden ${
-                  today ? 'border-primary/30 shadow-[0_0_30px_rgba(12,204,204,0.06)]' : ''
-                }`}
-              >
-                {/* Day Header */}
-                <button
-                  onClick={() => setExpandedDay(isExpanded ? null : dayIdx)}
-                  className="w-full text-left px-5 py-4 flex items-center justify-between group"
-                >
+              <Card key={dayIdx} className={`transition-all duration-300 overflow-hidden ${today ? 'border-primary/30 shadow-[0_0_30px_rgba(12,204,204,0.06)]' : ''}`}>
+                <button onClick={() => setExpandedDay(isExpanded ? null : dayIdx)}
+                  className="w-full text-left px-5 py-4 flex items-center justify-between group">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center text-xs font-bold ${
                       today ? 'bg-primary/15 text-primary border border-primary/20'
@@ -268,31 +285,21 @@ export const MyTasksWeekly = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className={`font-semibold ${today ? 'text-primary' : 'text-foreground'}`}>
-                          {format(date, 'EEEE')}
-                        </span>
-                        {today && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 uppercase tracking-wider">
-                            Today
-                          </span>
-                        )}
+                        <span className={`font-semibold ${today ? 'text-primary' : 'text-foreground'}`}>{format(date, 'EEEE')}</span>
+                        {today && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 uppercase tracking-wider">Today</span>}
                       </div>
                       <span className="text-xs text-muted-foreground">{format(date, 'MMMM d, yyyy')}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3">
                     {dayTotal > 0 ? (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
-                              style={{ width: `${dayTotal > 0 ? (dayCompleted / dayTotal) * 100 : 0}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground min-w-[40px]">{dayCompleted}/{dayTotal}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+                            style={{ width: `${dayTotal > 0 ? (dayCompleted / dayTotal) * 100 : 0}%` }} />
                         </div>
-                      </>
+                        <span className="text-xs text-muted-foreground min-w-[40px]">{dayCompleted}/{dayTotal}</span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">No tasks</span>
                     )}
@@ -304,79 +311,11 @@ export const MyTasksWeekly = () => {
                 {isExpanded && dayTotal > 0 && (
                   <CardContent className="pt-0 pb-4 px-5">
                     <div className="space-y-2 border-t border-border pt-4">
-                      {dayTasks.map((task) => {
-                        const cfg = statusConfig[task.status];
-                        return (
-                          <div key={task.assignment_id}
-                            className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all duration-200 ${cfg.bg}`}>
-                            <div className={`flex-shrink-0 ${cfg.color}`}>{cfg.icon}</div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-0.5">
-                                <span className="font-medium text-foreground truncate">{task.task_title}</span>
-                                {task.board_name && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
-                                    {task.board_name}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 text-xs flex-wrap">
-                                {task.shift_name && (
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: task.shift_color || '#0CCCCC' }} />
-                                    <span className="text-muted-foreground">{task.shift_name}</span>
-                                  </span>
-                                )}
-                                {task.started_at && (
-                                  <span className="text-muted-foreground flex items-center gap-1">
-                                    <Timer className="w-3 h-3" />
-                                    {formatDuration(task.started_at, task.completed_at)}
-                                  </span>
-                                )}
-                                {task.completed_at && (
-                                  <span className="text-emerald-500/70">
-                                    Done at {format(new Date(task.completed_at), 'hh:mm a')}
-                                  </span>
-                                )}
-                                {/* Completion type badge */}
-                                {task.completion_type === 'without_issue' && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                    ✓ No Issues
-                                  </span>
-                                )}
-                                {task.completion_type === 'with_issue' && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">
-                                    ⚠ Has Issues
-                                  </span>
-                                )}
-                              </div>
-                              {/* Notes display */}
-                              {task.notes && task.status === 'completed' && (
-                                <p className="text-xs text-muted-foreground mt-1 italic">📝 {task.notes}</p>
-                              )}
-                            </div>
-
-                            {/* Actions */}
-                            {task.execution_id && task.status === 'pending' && (
-                              <Button size="sm" onClick={() => startTask.mutate(task.execution_id!)}
-                                disabled={startTask.isPending}
-                                className="bg-amber-500 hover:bg-amber-400 text-white gap-1.5 text-xs h-8">
-                                <Play className="w-3.5 h-3.5" /> Start
-                              </Button>
-                            )}
-                            {task.execution_id && task.status === 'in_progress' && (
-                              <Button size="sm" onClick={() => setCompletingTask(task)}
-                                className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-8">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Complete
-                              </Button>
-                            )}
-                            {task.status === 'completed' && (
-                              <span className="text-emerald-500 text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-500/5">
-                                ✓ Done
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {dayTasks.map((task) => (
+                        <TaskRow key={task.assignment_id} task={task} statusConfig={statusConfig}
+                          formatDuration={formatDuration} onStart={(id) => startTask.mutate(id)}
+                          onComplete={setCompletingTask} startPending={startTask.isPending} />
+                      ))}
                     </div>
                   </CardContent>
                 )}
@@ -413,3 +352,136 @@ const StatCard = ({ label, value, color, icon }: { label: string; value: string 
     </CardContent>
   </Card>
 );
+
+// ───────────────────────────────────────────────────────────
+// Task Row (shared)
+// ───────────────────────────────────────────────────────────
+
+const TaskRow = ({
+  task, statusConfig, formatDuration, onStart, onComplete, startPending,
+}: {
+  task: MyTask;
+  statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: string; label: string }>;
+  formatDuration: (s: string, e?: string | null) => string;
+  onStart: (id: string) => void;
+  onComplete: (t: MyTask) => void;
+  startPending: boolean;
+}) => {
+  const cfg = statusConfig[task.status];
+  return (
+    <div className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all duration-200 ${cfg.bg}`}>
+      <div className={`flex-shrink-0 ${cfg.color}`}>{cfg.icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="font-medium text-foreground truncate">{task.task_title}</span>
+          {task.board_name && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 flex-shrink-0">{task.board_name}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs flex-wrap">
+          {task.shift_name && (
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: task.shift_color || '#0CCCCC' }} />
+              <span className="text-muted-foreground">{task.shift_name}</span>
+            </span>
+          )}
+          {task.started_at && (
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Timer className="w-3 h-3" />{formatDuration(task.started_at, task.completed_at)}
+            </span>
+          )}
+          {task.completed_at && <span className="text-emerald-500/70">Done at {format(new Date(task.completed_at), 'hh:mm a')}</span>}
+          {task.completion_type === 'without_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ No Issues</span>}
+          {task.completion_type === 'with_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">⚠ Has Issues</span>}
+        </div>
+        {task.notes && task.status === 'completed' && <p className="text-xs text-muted-foreground mt-1 italic">📝 {task.notes}</p>}
+      </div>
+      {task.execution_id && task.status === 'pending' && (
+        <Button size="sm" onClick={() => onStart(task.execution_id!)} disabled={startPending}
+          className="bg-amber-500 hover:bg-amber-400 text-white gap-1.5 text-xs h-8">
+          <Play className="w-3.5 h-3.5" /> Start
+        </Button>
+      )}
+      {task.execution_id && task.status === 'in_progress' && (
+        <Button size="sm" onClick={() => onComplete(task)}
+          className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-8">
+          <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+        </Button>
+      )}
+      {task.status === 'completed' && (
+        <span className="text-emerald-500 text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-500/5">✓ Done</span>
+      )}
+    </div>
+  );
+};
+
+// ───────────────────────────────────────────────────────────
+// Board View — groups tasks by board name
+// ───────────────────────────────────────────────────────────
+
+const BoardView = ({
+  tasks, statusConfig, formatDuration, onStart, onComplete, startPending,
+}: {
+  tasks: MyTask[];
+  statusConfig: Record<string, { icon: React.ReactNode; color: string; bg: string; label: string }>;
+  formatDuration: (s: string, e?: string | null) => string;
+  onStart: (id: string) => void;
+  onComplete: (t: MyTask) => void;
+  startPending: boolean;
+}) => {
+  // Group by board_name (null => 'Unassigned')
+  const grouped: Record<string, MyTask[]> = {};
+  tasks.forEach((t) => {
+    const key = t.board_name || 'No Board';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(t);
+  });
+
+  if (Object.keys(grouped).length === 0) {
+    return (
+      <div className="py-16 text-center border border-border border-dashed rounded-xl bg-muted/10">
+        <ClipboardList className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
+        <h3 className="text-xl font-semibold text-muted-foreground mb-2">No board tasks this week</h3>
+        <p className="text-muted-foreground">Your team leader hasn't assigned any board tasks yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([boardName, boardTasks]) => {
+        const done = boardTasks.filter((t) => t.status === 'completed').length;
+        const pct = Math.round((done / boardTasks.length) * 100);
+        return (
+          <Card key={boardName}>
+            <CardHeader className="pb-3 border-b border-border">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-primary" />
+                  {boardName}
+                </span>
+                <div className="flex items-center gap-3">
+                  <div className="w-28 h-2 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-sm text-primary font-bold min-w-[36px] text-right">{pct}%</span>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-2">
+              {boardTasks.sort((a, b) => a.assigned_date.localeCompare(b.assigned_date)).map((task) => (
+                <div key={task.assignment_id}>
+                  <div className="text-[10px] text-muted-foreground/60 mb-1 ml-1">
+                    {format(new Date(task.assigned_date.split('T')[0] + 'T00:00:00'), 'EEE, MMM d')}
+                  </div>
+                  <TaskRow task={task} statusConfig={statusConfig} formatDuration={formatDuration}
+                    onStart={onStart} onComplete={onComplete} startPending={startPending} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
