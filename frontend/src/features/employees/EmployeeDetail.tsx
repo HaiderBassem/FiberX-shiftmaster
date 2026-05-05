@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Phone, Briefcase, Building2, CalendarDays, Users, Edit3, Save, X, PhoneCall, AtSign } from 'lucide-react';
+import { Key, ArrowLeft, Mail, Phone, Briefcase, Building2, CalendarDays, Users, Edit3, Save, X, PhoneCall, AtSign } from 'lucide-react';
+import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 
 type Employee = {
   id: string;
@@ -40,6 +41,7 @@ export const EmployeeDetail = () => {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [editData, setEditData] = useState<Partial<Employee>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -143,12 +145,24 @@ export const EmployeeDetail = () => {
           </div>
         </div>
 
+        {user?.role === 'admin' && !isEditing && (
+          <Button onClick={() => setShowResetPassword(true)} variant="outline" className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
+            <Key className="w-4 h-4" /> Reset Password
+          </Button>
+        )}
         {canEdit && !isEditing && (
           <Button onClick={startEdit} className="gap-2">
             <Edit3 className="w-4 h-4" /> Edit Employee
           </Button>
         )}
       </div>
+
+      <ChangePasswordModal
+        isOpen={showResetPassword}
+        onClose={() => setShowResetPassword(false)}
+        employeeId={id || ''}
+        requireOldPassword={false}
+      />
 
       {error && (
         <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>

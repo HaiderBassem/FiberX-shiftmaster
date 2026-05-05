@@ -416,3 +416,43 @@ func (h *EmployeeHandler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "employee deleted"}})
 }
+
+type updatePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
+// UpdatePassword updates an employee's password.
+func (h *EmployeeHandler) UpdatePassword(c *gin.Context) {
+	targetID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	var req updatePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+	isAdmin := role == "admin"
+
+	requesterStr, _ := c.Get("employee_id")
+	requesterID, _ := uuid.Parse(requesterStr.(string))
+
+	// If not admin, you can only change your own password
+	if !isAdmin && targetID != requesterID {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "you can only change your own password"})
+		return
+	}
+
+	if err := h.employeeService.ChangePassword(c.Request.Context(), targetID, req.OldPassword, req.NewPassword, isAdmin); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "password updated successfully"}})
+}

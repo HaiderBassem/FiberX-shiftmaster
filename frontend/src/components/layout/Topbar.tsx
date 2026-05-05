@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
-import { LogOut, Sun, Moon, User, Menu } from 'lucide-react';
+import { LogOut, Sun, Moon, User, Menu, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -64,6 +67,17 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           </span>
         </div>
 
+        {/* Change Password */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowChangePassword(true)}
+          className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
+          title="Change Password"
+        >
+          <Key className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+        </Button>
+
         {/* Logout */}
         <Button
           variant="ghost"
@@ -75,6 +89,15 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           <LogOut className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </Button>
       </div>
+
+      {user && (
+        <ChangePasswordModal
+          isOpen={showChangePassword}
+          onClose={() => setShowChangePassword(false)}
+          employeeId={user.id}
+          requireOldPassword={true}
+        />
+      )}
     </header>
   );
 };

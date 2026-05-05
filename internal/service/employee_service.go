@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
@@ -128,6 +129,32 @@ func (s *EmployeeService) UpdateStatus(ctx context.Context, id uuid.UUID, status
 		return fmt.Errorf("invalid status: %s", status)
 	}
 	return s.employeeRepo.UpdateStatus(ctx, id, status)
+}
+
+func (s *EmployeeService) ChangePassword(ctx context.Context, id uuid.UUID, oldPassword, newPassword string, isAdmin bool) error {
+	// If not admin, verify old password
+	if !isAdmin {
+		emp, err := s.employeeRepo.GetByID(ctx, id)
+		if err != nil {
+			return ErrEmployeeNotFound
+		}
+		if emp.PasswordHash == nil || *emp.PasswordHash == "" {
+			return fmt.Errorf("no existing password, contact admin")
+		}
+		
+		err = bcrypt.CompareHashAndPassword([]byte(*emp.PasswordHash), []byte(oldPassword))
+		if err != nil {
+			return fmt.Errorf("incorrect old password")
+		}
+	}
+
+	// Hash new password
+	hash, err := s.authService.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	return s.employeeRepo.UpdatePassword(ctx, id, hash)
 }
 
 func (s *EmployeeService) DeleteEmployee(ctx context.Context, id uuid.UUID) error {
