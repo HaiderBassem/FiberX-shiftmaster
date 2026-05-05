@@ -330,6 +330,24 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		req.DepartmentID = me.DepartmentID
 	}
 
+	// If status or other enum fields are empty, fall back to current values.
+	if req.Status == "" || req.Role == "" || req.Gender == "" {
+		current, fetchErr := h.employeeService.GetByID(c.Request.Context(), id)
+		if fetchErr != nil {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": fetchErr.Error()})
+			return
+		}
+		if req.Status == "" {
+			req.Status = current.Status
+		}
+		if req.Role == "" {
+			req.Role = current.Role
+		}
+		if req.Gender == "" {
+			req.Gender = current.Gender
+		}
+	}
+
 	emp := &models.Employee{
 		ID:                 id,
 		FirstName:          req.FirstName,
