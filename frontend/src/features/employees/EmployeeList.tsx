@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Users, Plus, Search, Loader2, X, Edit3, Trash2, Save, UserCircle } from 'lucide-react';
+import { Users, Plus, Search, Loader2, X, Edit3, Trash2, Save, UserCircle, Key } from 'lucide-react';
+import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 
 interface Employee {
   id: string;
@@ -61,6 +62,7 @@ export const EmployeeList = () => {
   const [filterShift, setFilterShift] = useState<string>('');
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [resetPasswordEmpId, setResetPasswordEmpId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Create form
@@ -502,6 +504,13 @@ export const EmployeeList = () => {
                   </CardContent>
                   {canCreate && (
                     <CardFooter className="pt-0 flex justify-end gap-2" onClick={(e) => e.preventDefault()}>
+                      {user?.role === 'admin' && (
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                          onClick={() => setResetPasswordEmpId(emp.id)}
+                        >
+                          <Key className="w-4 h-4 mr-1" /> Reset Pwd
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline" onClick={() => startEdit(emp)}>
                         <Edit3 className="w-4 h-4 mr-1" /> Edit
                       </Button>
@@ -523,6 +532,15 @@ export const EmployeeList = () => {
             </div>
           )}
         </div>
+      )}
+
+      {resetPasswordEmpId && (
+        <ChangePasswordModal
+          isOpen={!!resetPasswordEmpId}
+          onClose={() => setResetPasswordEmpId(null)}
+          employeeId={resetPasswordEmpId}
+          requireOldPassword={false}
+        />
       )}
     </div>
   );
