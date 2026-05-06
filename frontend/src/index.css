@@ -108,7 +108,7 @@
      Background: #000000 / very dark surfaces
      Primary: #0CCCCC bright teal on dark
      ═══════════════════════════════════════════════════════════ */
-  .dark {
+  :root.dark {
     --background: 0 0% 4%;
     --foreground: 0 0% 95%;
     --card: 0 0% 7%;
