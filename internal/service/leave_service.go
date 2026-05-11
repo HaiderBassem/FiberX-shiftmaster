@@ -232,6 +232,63 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		return err
 	}
 
+	// ── Apply leave to employee_shifts ──────────────────────────────────────
+	// For each calendar day in the leave range, upsert the employee's shift row
+	// to shift_status='leave'. This makes the daily schedule display correctly.
+	leaveReason := "leave"
+	if leave.Reason != nil && *leave.Reason != "" {
+		leaveReason = *leave.Reason
+	}
+
+	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+
+	start := leave.StartDate.UTC().Truncate(24 * time.Hour)
+	end := leave.EndDate.UTC().Truncate(24 * time.Hour)
+
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		weekStart := d
+		for weekStart.Weekday() != time.Sunday {
+			weekStart = weekStart.AddDate(0, 0, -1)
+		}
+		weekEnd := weekStart.AddDate(0, 0, 6)
+
+		ws, wsErr := s.scheduleRepo.GetWeeklySchedule(ctx, weekStart)
+		if wsErr != nil {
+			ws = &models.WeeklySchedule{
+				WeekStartDate: weekStart,
+				WeekEndDate:   weekEnd,
+				Status:        "draft",
+			}
+			if createErr := s.scheduleRepo.CreateWeeklySchedule(ctx, ws); createErr != nil {
+				fmt.Printf("[LEAVE] Failed to create weekly schedule for %s: %v\n", weekStart.Format("2006-01-02"), createErr)
+				continue
+			}
+		}
+
+		var shiftID *uuid.UUID
+		existing, existErr := s.scheduleRepo.GetEmployeeShift(ctx, leave.EmployeeID, d)
+		if existErr == nil && existing != nil {
+			shiftID = existing.ShiftID
+		} else if emp != nil {
+			shiftID = emp.DefaultShiftID
+		}
+
+		leaveReasonPtr := &leaveReason
+		es := &models.EmployeeShift{
+			ScheduleID:  ws.ID,
+			EmployeeID:  leave.EmployeeID,
+			ShiftID:     shiftID,
+			ShiftDate:   d,
+			ShiftStatus: "leave",
+			LeaveReason: leaveReasonPtr,
+			CreatedBy:   &managerID,
+		}
+		if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
+			fmt.Printf("[LEAVE] Failed to upsert employee shift for %s on %s: %v\n", leave.EmployeeID, d.Format("2006-01-02"), upsertErr)
+		}
+	}
+	// ────────────────────────────────────────────────────────────────────────
+
 	// Notify employee about final approval
 	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       leave.EmployeeID,

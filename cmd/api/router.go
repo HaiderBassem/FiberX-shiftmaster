@@ -90,7 +90,7 @@ func SetupRouter(
 		{
 			swaps.POST("", swapH.Request)
 			swaps.GET("/me", swapH.MyRequests)
-			swaps.GET("/pending", swapH.PendingForMe)
+			swaps.GET("/pending/for-me", swapH.PendingForMe)
 			swaps.GET("/eligible-targets", swapH.EligibleTargets)
 			swaps.POST("/:id/respond", swapH.Respond)
 			swaps.POST("/:id/cancel", swapH.Cancel)
