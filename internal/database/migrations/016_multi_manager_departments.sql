@@ -91,6 +91,7 @@ FROM   departments
 WHERE  manager_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
--- 3c. Drop the old FK constraint and column
+-- 3c. Drop the old unique index & FK constraint, then drop the column
+DROP INDEX IF EXISTS uq_departments_manager_single;
 ALTER TABLE departments DROP CONSTRAINT IF EXISTS fk_departments_manager;
 ALTER TABLE departments DROP COLUMN IF EXISTS manager_id;

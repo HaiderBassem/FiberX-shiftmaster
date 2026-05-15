@@ -14,7 +14,7 @@ interface Department {
   department_code: string;
   name: string;
   description: string | null;
-  manager_id: string | null;
+  manager_ids: string[]; // now an array (multi-manager support)
   created_at: string;
 }
 
@@ -32,19 +32,23 @@ export const DepartmentList = () => {
   const isAdmin = user?.role === 'admin';
   const queryClient = useQueryClient();
 
+  // ── create form state ──────────────────────────────────────────────
   const [deptCode, setDeptCode] = useState('');
   const [deptName, setDeptName] = useState('');
   const [deptDesc, setDeptDesc] = useState('');
+  // single dropdown; we wrap it in an array before sending
   const [deptManagerId, setDeptManagerId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
+  // ── edit form state ────────────────────────────────────────────────
   const [editId, setEditId] = useState<string | null>(null);
   const [editCode, setEditCode] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editManagerId, setEditManagerId] = useState('');
 
+  // ── queries ────────────────────────────────────────────────────────
   const { data: departments, isLoading, isError } = useQuery<Department[]>({
     queryKey: ['departments'],
     queryFn: async () => {
@@ -68,6 +72,7 @@ export const DepartmentList = () => {
     return m;
   }, [managers]);
 
+  // ── mutations ──────────────────────────────────────────────────────
   const createDepartment = useMutation({
     mutationFn: async () => {
       setError(null);
@@ -75,7 +80,8 @@ export const DepartmentList = () => {
         department_code: deptCode,
         name: deptName,
         description: deptDesc || null,
-        manager_id: deptManagerId || null,
+        // backend expects manager_ids array
+        manager_ids: deptManagerId ? [deptManagerId] : [],
       });
     },
     onSuccess: () => {
@@ -92,18 +98,28 @@ export const DepartmentList = () => {
       if (!editId) return;
       setError(null);
       await api.put(`/departments/${editId}`, {
-        department_code: editCode, name: editName,
-        description: editDesc || null, manager_id: editManagerId || null,
+        name: editName,
+        description: editDesc || null,
+        // send the selected manager wrapped in array (replaces current list)
+        manager_ids: editManagerId ? [editManagerId] : [],
       });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['departments'] }); setEditId(null); },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update department'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      setEditId(null);
+    },
+    onError: (err: any) =>
+      setError(err?.response?.data?.error || err?.message || 'Failed to update department'),
   });
 
   const deleteDepartment = useMutation({
-    mutationFn: async (id: string) => { setError(null); await api.delete(`/departments/${id}`); },
+    mutationFn: async (id: string) => {
+      setError(null);
+      await api.delete(`/departments/${id}`);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['departments'] }),
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to delete department'),
+    onError: (err: any) =>
+      setError(err?.response?.data?.error || err?.message || 'Failed to delete department'),
   });
 
   const filteredDepartments = useMemo(() => {
@@ -114,8 +130,20 @@ export const DepartmentList = () => {
     );
   }, [departments, search]);
 
-  const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
+  // ── helpers ────────────────────────────────────────────────────────
+  const selectClass =
+    'w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors';
 
+  /** Returns the first manager's display name, or "Unassigned" */
+  const primaryManagerLabel = (dept: Department) => {
+    const firstId = dept.manager_ids?.[0];
+    if (!firstId || !managerMap[firstId]) return 'Unassigned';
+    const m = managerMap[firstId];
+    const extra = (dept.manager_ids?.length ?? 0) > 1 ? ` +${dept.manager_ids.length - 1}` : '';
+    return `${m.first_name} ${m.last_name}${extra}`;
+  };
+
+  // ── render ─────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       <div>
@@ -131,7 +159,11 @@ export const DepartmentList = () => {
           <div className="grid md:grid-cols-3 gap-4">
             <div className="space-y-2 md:col-span-2">
               <Label>Search</Label>
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or department code..." />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or department code..."
+              />
             </div>
           </div>
         </CardContent>
@@ -148,7 +180,9 @@ export const DepartmentList = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                {error}
+              </div>
             )}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -161,10 +195,16 @@ export const DepartmentList = () => {
               </div>
               <div className="space-y-2">
                 <Label>Manager</Label>
-                <select className={selectClass} value={deptManagerId} onChange={(e) => setDeptManagerId(e.target.value)}>
+                <select
+                  className={selectClass}
+                  value={deptManagerId}
+                  onChange={(e) => setDeptManagerId(e.target.value)}
+                >
                   <option value="">Unassigned</option>
                   {managers?.map((m) => (
-                    <option key={m.id} value={m.id}>{m.first_name} {m.last_name} — {m.employee_code}</option>
+                    <option key={m.id} value={m.id}>
+                      {m.first_name} {m.last_name} — {m.employee_code}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -175,7 +215,11 @@ export const DepartmentList = () => {
             </div>
           </CardContent>
           <CardFooter>
-            <Button onClick={() => createDepartment.mutate()} disabled={createDepartment.isPending || !deptCode || !deptName} className="gap-2">
+            <Button
+              onClick={() => createDepartment.mutate()}
+              disabled={createDepartment.isPending || !deptCode || !deptName}
+              className="gap-2"
+            >
               <Plus className="w-4 h-4" /> Create
             </Button>
           </CardFooter>
@@ -203,55 +247,109 @@ export const DepartmentList = () => {
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <div className="space-y-1">
                     <CardTitle className="text-lg font-medium">{dept.name}</CardTitle>
-                    <CardDescription className="text-xs font-mono">{dept.department_code}</CardDescription>
+                    <CardDescription className="text-xs font-mono">
+                      {dept.department_code}
+                    </CardDescription>
                   </div>
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                     <Building2 className="h-5 w-5" />
                   </div>
                 </CardHeader>
+
                 <CardContent className="space-y-2">
                   {editId === dept.id ? (
                     <div className="space-y-3 pt-1" onClick={(e) => e.preventDefault()}>
-                      <div className="space-y-2"><Label className="text-xs">Code</Label><Input value={editCode} onChange={(e) => setEditCode(e.target.value)} className="h-9" /></div>
-                      <div className="space-y-2"><Label className="text-xs">Name</Label><Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9" /></div>
-                      <div className="space-y-2"><Label className="text-xs">Manager</Label>
-                        <select className={selectClass} value={editManagerId} onChange={(e) => setEditManagerId(e.target.value)}>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Name</Label>
+                        <Input
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Manager</Label>
+                        <select
+                          className={selectClass}
+                          value={editManagerId}
+                          onChange={(e) => setEditManagerId(e.target.value)}
+                        >
                           <option value="">Unassigned</option>
-                          {managers?.map((m) => <option key={m.id} value={m.id}>{m.first_name} {m.last_name}</option>)}
+                          {managers?.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.first_name} {m.last_name}
+                            </option>
+                          ))}
                         </select>
                       </div>
-                      <div className="space-y-2"><Label className="text-xs">Description</Label><Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className="h-9" /></div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Description</Label>
+                        <Input
+                          value={editDesc}
+                          onChange={(e) => setEditDesc(e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
                       <div className="flex justify-end gap-2 pt-1">
-                        <Button size="sm" variant="outline" onClick={(e) => { e.preventDefault(); setEditId(null); }}><X className="w-4 h-4 mr-1" /> Cancel</Button>
-                        <Button size="sm" onClick={(e) => { e.preventDefault(); updateDepartment.mutate(); }} disabled={updateDepartment.isPending || !editCode || !editName}><Save className="w-4 h-4 mr-1" /> Save</Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => { e.preventDefault(); setEditId(null); }}
+                        >
+                          <X className="w-4 h-4 mr-1" /> Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.preventDefault(); updateDepartment.mutate(); }}
+                          disabled={updateDepartment.isPending || !editName}
+                        >
+                          <Save className="w-4 h-4 mr-1" /> Save
+                        </Button>
                       </div>
                     </div>
                   ) : (
                     <>
-                      {dept.description && <p className="text-sm text-muted-foreground">{dept.description}</p>}
+                      {dept.description && (
+                        <p className="text-sm text-muted-foreground">{dept.description}</p>
+                      )}
                       <div className="text-sm text-muted-foreground flex items-center gap-2">
                         <Crown className="w-4 h-4 text-amber-500/80" />
                         <span>Manager:</span>
                         <span className="text-foreground font-medium">
-                          {dept.manager_id && managerMap[dept.manager_id]
-                            ? `${managerMap[dept.manager_id].first_name} ${managerMap[dept.manager_id].last_name}`
-                            : 'Unassigned'}
+                          {primaryManagerLabel(dept)}
                         </span>
                       </div>
                     </>
                   )}
                 </CardContent>
+
                 {isAdmin && editId !== dept.id && (
-                  <CardFooter className="pt-0 flex justify-end gap-2" onClick={(e) => e.preventDefault()}>
-                    <Button size="sm" variant="outline" onClick={() => {
-                      setEditId(dept.id); setEditCode(dept.department_code);
-                      setEditName(dept.name); setEditDesc(dept.description || '');
-                      setEditManagerId(dept.manager_id || '');
-                    }}>
+                  <CardFooter
+                    className="pt-0 flex justify-end gap-2"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEditId(dept.id);
+                        setEditCode(dept.department_code);
+                        setEditName(dept.name);
+                        setEditDesc(dept.description || '');
+                        // pre-fill with first assigned manager (if any)
+                        setEditManagerId(dept.manager_ids?.[0] || '');
+                      }}
+                    >
                       <Edit3 className="w-4 h-4 mr-1" /> Edit
                     </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                      onClick={() => { if (confirm(`Delete department "${dept.name}"?`)) deleteDepartment.mutate(dept.id); }}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={() => {
+                        if (confirm(`Delete department "${dept.name}"?`))
+                          deleteDepartment.mutate(dept.id);
+                      }}
                     >
                       <Trash2 className="w-4 h-4 mr-1" /> Delete
                     </Button>

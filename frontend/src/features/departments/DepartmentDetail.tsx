@@ -11,7 +11,7 @@ type Department = {
   department_code: string;
   name: string;
   description: string | null;
-  manager_id: string | null;
+  manager_ids: string[]; // array from department_managers junction table
   created_at: string;
 };
 
@@ -35,13 +35,19 @@ export const DepartmentDetail = () => {
 
   const { data: dept, isLoading: deptLoading } = useQuery<Department>({
     queryKey: ['department', id],
-    queryFn: async () => { const res = await api.get(`/departments/${id}`); return res.data?.data; },
+    queryFn: async () => {
+      const res = await api.get(`/departments/${id}`);
+      return res.data?.data;
+    },
     enabled: !!id,
   });
 
   const { data: shifts } = useQuery<Shift[]>({
     queryKey: ['shifts'],
-    queryFn: async () => { const res = await api.get('/shifts'); return res.data?.data || []; },
+    queryFn: async () => {
+      const res = await api.get('/shifts');
+      return res.data?.data || [];
+    },
   });
 
   const shiftMap = useMemo(() => {
@@ -52,14 +58,28 @@ export const DepartmentDetail = () => {
 
   const { data: employees, isLoading: empLoading } = useQuery<Employee[]>({
     queryKey: ['employees', 'department', id],
-    queryFn: async () => { const res = await api.get(`/employees?department_id=${id}`); return res.data?.data || []; },
+    queryFn: async () => {
+      const res = await api.get(`/employees?department_id=${id}`);
+      return res.data?.data || [];
+    },
     enabled: !!id,
   });
 
-  const { data: manager } = useQuery<Employee | null>({
-    queryKey: ['employee', 'manager', dept?.manager_id],
-    queryFn: async () => { if (!dept?.manager_id) return null; const res = await api.get(`/employees/${dept.manager_id}`); return res.data?.data; },
-    enabled: !!dept?.manager_id,
+  // Fetch all managers assigned to this department in parallel
+  const managerIds = dept?.manager_ids ?? [];
+
+  const { data: managers } = useQuery<Employee[]>({
+    queryKey: ['department-managers', id, managerIds],
+    queryFn: async () => {
+      if (!managerIds.length) return [];
+      const results = await Promise.all(
+        managerIds.map((mId) =>
+          api.get(`/employees/${mId}`).then((r) => r.data?.data as Employee).catch(() => null),
+        ),
+      );
+      return results.filter(Boolean) as Employee[];
+    },
+    enabled: !!dept && managerIds.length > 0,
   });
 
   if (deptLoading) return <Card className="animate-pulse h-40" />;
@@ -77,10 +97,13 @@ export const DepartmentDetail = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/departments">
-            <Button variant="outline" className="gap-2"><ArrowLeft className="w-4 h-4" /> Back</Button>
+            <Button variant="outline" className="gap-2">
+              <ArrowLeft className="w-4 h-4" /> Back
+            </Button>
           </Link>
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
@@ -95,30 +118,47 @@ export const DepartmentDetail = () => {
         </div>
       </div>
 
-      {/* Manager */}
+      {/* Managers card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="w-5 h-5 text-amber-500" />
-            Department Manager
+            Department Manager{managerIds.length !== 1 ? 's' : ''}
           </CardTitle>
-          <CardDescription>Assigned manager for this department</CardDescription>
+          <CardDescription>
+            {managerIds.length > 1
+              ? `${managerIds.length} managers assigned to this department`
+              : 'Assigned manager for this department'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {manager ? (
-            <Link to={`/employees/${manager.id}`} className="block">
-              <div className="p-4 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-                <div className="font-semibold text-foreground">{manager.first_name} {manager.last_name}</div>
-                <div className="text-sm text-muted-foreground">{manager.email} · {manager.employee_code}</div>
-              </div>
-            </Link>
-          ) : (
+          {!managers || managers.length === 0 ? (
             <p className="text-muted-foreground">No manager assigned yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {managers.map((manager) => (
+                <Link key={manager.id} to={`/employees/${manager.id}`} className="block">
+                  <div className="p-4 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-colors flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
+                      <Crown className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-foreground">
+                        {manager.first_name} {manager.last_name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {manager.email} · {manager.employee_code}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Employees */}
+      {/* Employees card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -130,7 +170,9 @@ export const DepartmentDetail = () => {
         <CardContent>
           {empLoading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="animate-pulse h-14 bg-muted/40 rounded-xl" />)}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse h-14 bg-muted/40 rounded-xl" />
+              ))}
             </div>
           ) : employeesOnly.length ? (
             <div className="grid md:grid-cols-2 gap-4">
@@ -139,9 +181,17 @@ export const DepartmentDetail = () => {
                 return (
                   <Link key={e.id} to={`/employees/${e.id}`} className="block">
                     <div className="p-4 rounded-xl bg-muted/30 border border-border hover:bg-muted/50 transition-colors">
-                      <div className="font-semibold text-foreground">{e.first_name} {e.last_name}</div>
-                      <div className="text-sm text-muted-foreground">{e.employee_code} · {e.email}</div>
-                      {shift && <div className="text-xs text-muted-foreground mt-1">Shift: {shift.name} ({shift.shift_code})</div>}
+                      <div className="font-semibold text-foreground">
+                        {e.first_name} {e.last_name}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {e.employee_code} · {e.email}
+                      </div>
+                      {shift && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Shift: {shift.name} ({shift.shift_code})
+                        </div>
+                      )}
                     </div>
                   </Link>
                 );
