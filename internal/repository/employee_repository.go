@@ -256,7 +256,7 @@ func (r *employeeRepo) Delete(ctx context.Context, id uuid.UUID) error {
 func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 	return r.db.ExecTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		queries := []string{
-			`UPDATE departments SET manager_id = NULL WHERE manager_id = $1`,
+			`DELETE FROM department_managers WHERE manager_id = $1`,
 			`UPDATE employees SET created_by = NULL WHERE created_by = $1`,
 			`UPDATE weekly_schedule SET published_by = NULL WHERE published_by = $1`,
 			`UPDATE weekly_schedule SET created_by = NULL WHERE created_by = $1`,

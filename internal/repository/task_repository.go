@@ -70,9 +70,7 @@ func NewTaskRepository(db *database.DB) TaskRepository {
 	return &taskRepo{db: db}
 }
 
-// ═══════════════════════════════════════════
 // Task Schedules
-// ═══════════════════════════════════════════
 
 const scheduleColumns = `id, title, description, schedule_type, board_id, shift_id, recurrence, recurrence_days,
 	max_assignees, is_active, created_by, created_at, updated_at`
@@ -192,9 +190,7 @@ func (r *taskRepo) DeleteSchedule(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-// ═══════════════════════════════════════════
 // Board View & Tracker
-// ═══════════════════════════════════════════
 
 func (r *taskRepo) GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID *uuid.UUID, fromDate *time.Time, toDate *time.Time) ([]models.BoardViewRow, error) {
 	query := `

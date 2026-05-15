@@ -8,13 +8,13 @@ import (
 
 // Internal models
 type Department struct {
-	ID             uuid.UUID `json:"id"`
-	DepartmentCode string    `json:"department_code"`
-	Name           string    `json:"name"`
-	Description    *string   `json:"description"`
-	ManagerID      *uuid.UUID `json:"manager_id"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uuid.UUID   `json:"id"`
+	DepartmentCode string      `json:"department_code"`
+	Name           string      `json:"name"`
+	Description    *string     `json:"description"`
+	ManagerIDs     []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
+	CreatedAt      time.Time   `json:"created_at"`
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
 type Employee struct {

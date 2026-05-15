@@ -220,6 +220,8 @@ func SetupRouter(
 				adminDept.POST("", deptH.Create)
 				adminDept.PUT("/:id", deptH.Update)
 				adminDept.DELETE("/:id", deptH.Delete)
+				adminDept.POST("/:id/managers", deptH.AddManager)
+				adminDept.DELETE("/:id/managers/:manager_id", deptH.RemoveManager)
 			}
 		}
 	}

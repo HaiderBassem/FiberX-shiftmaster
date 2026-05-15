@@ -50,11 +50,12 @@ func (h *DepartmentHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": dept})
 }
 
+// createDepartmentRequest supports assigning multiple managers on creation.
 type createDepartmentRequest struct {
-	DepartmentCode string     `json:"department_code" binding:"required"`
-	Name           string     `json:"name" binding:"required"`
-	Description    *string    `json:"description"`
-	ManagerID      *uuid.UUID `json:"manager_id"`
+	DepartmentCode string      `json:"department_code" binding:"required"`
+	Name           string      `json:"name"            binding:"required"`
+	Description    *string     `json:"description"`
+	ManagerIDs     []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
 }
 
 // Create creates a new department.
@@ -65,14 +66,18 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if req.ManagerID != nil {
-		emp, err := h.employeeRepo.GetByID(c.Request.Context(), *req.ManagerID)
+	// Validate every supplied manager
+	for _, mID := range req.ManagerIDs {
+		emp, err := h.employeeRepo.GetByID(c.Request.Context(), mID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager_id: " + mID.String()})
 			return
 		}
 		if emp.Role != "manager" {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "manager_id must be a manager account"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "employee " + mID.String() + " is not a manager",
+			})
 			return
 		}
 	}
@@ -81,7 +86,7 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		DepartmentCode: req.DepartmentCode,
 		Name:           req.Name,
 		Description:    req.Description,
-		ManagerID:      req.ManagerID,
+		ManagerIDs:     req.ManagerIDs,
 	}
 
 	if err := h.deptRepo.Create(c.Request.Context(), dept); err != nil {
@@ -92,10 +97,12 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": dept})
 }
 
+// updateDepartmentRequest supports replacing the full list of managers.
+// If manager_ids is omitted from the JSON body the existing assignments are kept.
 type updateDepartmentRequest struct {
-	Name        string     `json:"name"`
-	Description *string    `json:"description"`
-	ManagerID   *uuid.UUID `json:"manager_id"`
+	Name        string      `json:"name"`
+	Description *string     `json:"description"`
+	ManagerIDs  []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
 }
 
 // Update updates a department.
@@ -112,14 +119,18 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if req.ManagerID != nil {
-		emp, err := h.employeeRepo.GetByID(c.Request.Context(), *req.ManagerID)
+	// Validate every supplied manager
+	for _, mID := range req.ManagerIDs {
+		emp, err := h.employeeRepo.GetByID(c.Request.Context(), mID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager_id: " + mID.String()})
 			return
 		}
 		if emp.Role != "manager" {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "manager_id must be a manager account"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"success": false,
+				"error":   "employee " + mID.String() + " is not a manager",
+			})
 			return
 		}
 	}
@@ -128,7 +139,7 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		ID:          id,
 		Name:        req.Name,
 		Description: req.Description,
-		ManagerID:   req.ManagerID,
+		ManagerIDs:  req.ManagerIDs, // nil when key is absent → repo skips sync
 	}
 
 	if err := h.deptRepo.Update(c.Request.Context(), dept); err != nil {
@@ -136,7 +147,14 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": dept})
+	// Re-fetch to return the fresh state (including updated manager_ids)
+	updated, err := h.deptRepo.GetByID(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": dept})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": updated})
 }
 
 // Delete deletes a department.
@@ -153,4 +171,62 @@ func (h *DepartmentHandler) Delete(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "department deleted"}})
+}
+
+// AddManager links a single manager to a department.
+// POST /departments/:id/managers   body: {"manager_id": "<uuid>"}
+func (h *DepartmentHandler) AddManager(c *gin.Context) {
+	deptID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid department ID"})
+		return
+	}
+
+	var body struct {
+		ManagerID uuid.UUID `json:"manager_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	emp, err := h.employeeRepo.GetByID(c.Request.Context(), body.ManagerID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager_id"})
+		return
+	}
+	if emp.Role != "manager" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "employee is not a manager"})
+		return
+	}
+
+	if err := h.deptRepo.AddManager(c.Request.Context(), deptID, body.ManagerID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "manager added"}})
+}
+
+// RemoveManager unlinks a manager from a department.
+// DELETE /departments/:id/managers/:manager_id
+func (h *DepartmentHandler) RemoveManager(c *gin.Context) {
+	deptID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid department ID"})
+		return
+	}
+
+	mgrID, err := uuid.Parse(c.Param("manager_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid manager ID"})
+		return
+	}
+
+	if err := h.deptRepo.RemoveManager(c.Request.Context(), deptID, mgrID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "manager removed"}})
 }
