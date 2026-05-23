@@ -43,7 +43,7 @@ export const DepartmentList = () => {
 
   // ── edit form state ────────────────────────────────────────────────
   const [editId, setEditId] = useState<string | null>(null);
-  const [editCode, setEditCode] = useState('');
+  const [_editCode, setEditCode] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editManagerId, setEditManagerId] = useState('');

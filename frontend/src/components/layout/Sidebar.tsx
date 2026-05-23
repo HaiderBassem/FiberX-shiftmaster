@@ -30,7 +30,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   );
 
   return (
-    <aside className="w-64 min-h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
+    <aside className="w-64 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
       {/* ── Brand ── */}
       <div className="px-5 py-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">

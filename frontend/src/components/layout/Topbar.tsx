@@ -26,7 +26,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           variant="ghost"
           size="icon"
           onClick={onMenuClick}
-          className="text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground md:hidden"
           title={sidebarOpen ? 'Close menu' : 'Open menu'}
         >
           <Menu className="w-5 h-5" />
