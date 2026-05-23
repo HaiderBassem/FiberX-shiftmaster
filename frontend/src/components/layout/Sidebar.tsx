@@ -93,12 +93,18 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
 
       {/* ── Live Map Tab ── */}
       <div className="px-3 pb-3">
-        <a
-          href="https://maps.shift-master.org/"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
           id="live-map-tab"
-          className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02]"
+          onClick={() => {
+            // تحديد الكريدنشلز حسب الدور
+            const sysRoles = ['admin', 'manager', 'team_leader'];
+            const isSys = user && sysRoles.includes(user.role);
+            const u = isSys ? 'sys@fiberx.iq'  : 'emp@fiberx.iq';
+            const p = isSys ? 'fibersysX'       : 'empfiberX';
+            const url = `https://maps.shift-master.org/?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }}
+          className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
           style={{
             background: 'linear-gradient(135deg, rgba(12,204,204,0.18) 0%, rgba(1,163,163,0.10) 100%)',
             border: '1px solid rgba(12,204,204,0.30)',
@@ -136,7 +142,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
           </div>
 
           {/* Text */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-semibold leading-tight" style={{ color: '#0CCCCC' }}>
               Live Map
             </p>
@@ -150,7 +156,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
             style={{ color: 'rgba(12,204,204,0.70)' }}
           />
-        </a>
+        </button>
       </div>
 
       {/* ── Footer ── */}
