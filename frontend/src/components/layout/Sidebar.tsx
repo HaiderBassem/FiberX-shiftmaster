@@ -101,7 +101,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             const isSys = user && sysRoles.includes(user.role);
             const u = isSys ? 'sys@fiberx.iq'  : 'emp@fiberx.iq';
             const p = isSys ? 'fibersysX'       : 'empfiberX';
-            const url = `https://maps.shift-master.org/?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
+            const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
             window.open(url, '_blank', 'noopener,noreferrer');
           }}
           className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
