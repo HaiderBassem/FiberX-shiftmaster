@@ -58,13 +58,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	accessToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, time.Duration(h.accessExpMin)*time.Minute)
+	var deptID *string
+	if emp.DepartmentID != nil {
+		idStr := emp.DepartmentID.String()
+		deptID = &idStr
+	}
+
+	accessToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, deptID, time.Duration(h.accessExpMin)*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate token"})
 		return
 	}
 
-	refreshToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, time.Duration(h.refreshExpDays)*24*time.Hour)
+	refreshToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, deptID, time.Duration(h.refreshExpDays)*24*time.Hour)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate refresh token"})
 		return
@@ -81,11 +87,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) generateToken(employeeID, email, role string, expiry time.Duration) (string, error) {
+func (h *AuthHandler) generateToken(employeeID, email, role string, departmentID *string, expiry time.Duration) (string, error) {
 	claims := middleware.Claims{
-		EmployeeID: employeeID,
-		Email:      email,
-		Role:       role,
+		EmployeeID:   employeeID,
+		Email:        email,
+		Role:         role,
+		DepartmentID: departmentID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -196,13 +203,13 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	}
 
 	// Generate new tokens
-	accessToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, time.Duration(h.accessExpMin)*time.Minute)
+	accessToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, claims.DepartmentID, time.Duration(h.accessExpMin)*time.Minute)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate access token"})
 		return
 	}
 
-	refreshToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, time.Duration(h.refreshExpDays)*24*time.Hour)
+	refreshToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, claims.DepartmentID, time.Duration(h.refreshExpDays)*24*time.Hour)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate refresh token"})
 		return

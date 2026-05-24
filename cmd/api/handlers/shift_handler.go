@@ -22,7 +22,8 @@ func NewShiftHandler(shiftRepo repository.ShiftRepository) *ShiftHandler {
 
 // List returns all shifts.
 func (h *ShiftHandler) List(c *gin.Context) {
-	shifts, err := h.shiftRepo.GetAll(c.Request.Context())
+	deptID := getDepartmentID(c)
+	shifts, err := h.shiftRepo.GetAll(c.Request.Context(), deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -80,6 +81,8 @@ func (h *ShiftHandler) Create(c *gin.Context) {
 		return
 	}
 
+	deptID := getDepartmentID(c)
+
 	shift := &models.Shift{
 		ShiftCode:       req.ShiftCode,
 		Name:            req.Name,
@@ -89,6 +92,7 @@ func (h *ShiftHandler) Create(c *gin.Context) {
 		ColorCode:       req.ColorCode,
 		RequiresVehicle: req.RequiresVehicle,
 		MinRestHours:    req.MinRestHours,
+		DepartmentID:    deptID,
 	}
 
 	if err := h.shiftRepo.Create(c.Request.Context(), shift); err != nil {

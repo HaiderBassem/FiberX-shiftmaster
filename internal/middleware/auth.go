@@ -11,9 +11,10 @@ import (
 
 // Claims represents the JWT token claims.
 type Claims struct {
-	EmployeeID string `json:"employee_id"`
-	Email      string `json:"email"`
-	Role       string `json:"role"`
+	EmployeeID   string  `json:"employee_id"`
+	Email        string  `json:"email"`
+	Role         string  `json:"role"`
+	DepartmentID *string `json:"department_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -93,6 +94,9 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		c.Set("employee_id", claims.EmployeeID)
 		c.Set("email", claims.Email)
 		c.Set("role", claims.Role)
+		if claims.DepartmentID != nil {
+			c.Set("department_id", *claims.DepartmentID)
+		}
 		c.Set("claims", claims)
 
 		c.Next()

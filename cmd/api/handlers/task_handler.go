@@ -25,7 +25,8 @@ func NewTaskHandler(taskSvc *service.TaskService) *TaskHandler {
 // ═══════════════════════════════════════════
 
 func (h *TaskHandler) ListBoards(c *gin.Context) {
-	boards, err := h.taskSvc.GetAllBoards(c.Request.Context())
+	deptID := getDepartmentID(c)
+	boards, err := h.taskSvc.GetAllBoards(c.Request.Context(), deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -49,10 +50,16 @@ func (h *TaskHandler) CreateBoard(c *gin.Context) {
 		return
 	}
 	createdByStr, _ := c.Get("employee_id")
-	createdBy, _ := uuid.Parse(createdByStr.(string))
+	empID, _ := uuid.Parse(createdByStr.(string))
+	deptID := getDepartmentID(c)
+
 	b := &models.TaskBoard{
-		Name: req.Name, Description: req.Description, RecurrenceType: req.RecurrenceType,
-		IsActive: true, CreatedBy: &createdBy,
+		Name:           req.Name,
+		Description:    req.Description,
+		RecurrenceType: req.RecurrenceType,
+		IsActive:       true,
+		DepartmentID:   deptID,
+		CreatedBy:      &empID,
 	}
 	if err := h.taskSvc.CreateBoard(c.Request.Context(), b); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
@@ -152,7 +159,8 @@ func (h *TaskHandler) GetBoardView(c *gin.Context) {
 
 // GetBoardStats returns completion analytics for all active boards.
 func (h *TaskHandler) GetBoardStats(c *gin.Context) {
-	stats, err := h.taskSvc.GetBoardStats(c.Request.Context())
+	deptID := getDepartmentID(c)
+	stats, err := h.taskSvc.GetBoardStats(c.Request.Context(), deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -257,7 +265,8 @@ func (h *TaskHandler) ListSchedules(c *gin.Context) {
 		}
 		schedules, err = h.taskSvc.GetSchedulesByShift(ctx, shiftID)
 	default:
-		schedules, err = h.taskSvc.GetAllSchedules(ctx)
+		deptID := getDepartmentID(c)
+		schedules, err = h.taskSvc.GetAllSchedules(ctx, deptID)
 	}
 
 	if err != nil {
@@ -311,12 +320,19 @@ func (h *TaskHandler) CreateSchedule(c *gin.Context) {
 		return
 	}
 	createdByStr, _ := c.Get("employee_id")
-	createdBy, _ := uuid.Parse(createdByStr.(string))
+	empID, _ := uuid.Parse(createdByStr.(string))
+
 	ts := &models.TaskSchedule{
-		Title: req.Title, Description: req.Description, ScheduleType: req.ScheduleType,
-		BoardID: req.BoardID, ShiftID: req.ShiftID, Recurrence: req.Recurrence,
-		RecurrenceDays: req.RecurrenceDays, MaxAssignees: req.MaxAssignees,
-		IsActive: req.IsActive, CreatedBy: &createdBy,
+		Title:          req.Title,
+		Description:    req.Description,
+		ScheduleType:   req.ScheduleType,
+		BoardID:        req.BoardID,
+		ShiftID:        req.ShiftID,
+		Recurrence:     req.Recurrence,
+		RecurrenceDays: req.RecurrenceDays,
+		MaxAssignees:   req.MaxAssignees,
+		IsActive:       true,
+		CreatedBy:      &empID,
 	}
 	if err := h.taskSvc.CreateSchedule(c.Request.Context(), ts); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})

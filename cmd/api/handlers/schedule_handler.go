@@ -80,7 +80,8 @@ func (h *ScheduleHandler) DailyShifts(c *gin.Context) {
 		return
 	}
 
-	shifts, err := h.scheduleSvc.GetDailyShifts(c.Request.Context(), date)
+	deptID := getDepartmentID(c)
+	shifts, err := h.scheduleSvc.GetDailyShifts(c.Request.Context(), date, deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
