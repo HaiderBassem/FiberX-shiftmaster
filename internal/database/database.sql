@@ -141,6 +141,7 @@ CREATE TABLE shifts (
     color_code VARCHAR(7) DEFAULT '#3788d8',
     requires_vehicle BOOLEAN DEFAULT false,
     min_rest_hours INTEGER DEFAULT 8,
+    department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -182,9 +183,10 @@ CREATE TABLE weekly_schedule (
     published_by UUID REFERENCES employees(id),
     published_at TIMESTAMP,
     notes TEXT,
+    department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_by UUID REFERENCES employees(id),
-    UNIQUE (week_start_date)
+    UNIQUE (department_id, week_start_date)
 );
 
 COMMENT ON TABLE weekly_schedule IS 'Each published week';
@@ -431,6 +433,7 @@ CREATE TABLE task_boards (
     description TEXT,
     recurrence_type VARCHAR(10) NOT NULL DEFAULT 'weekly' CHECK (recurrence_type IN ('daily', 'weekly')),
     is_active BOOLEAN DEFAULT true,
+    department_id UUID REFERENCES departments(id) ON DELETE CASCADE,
     created_by UUID REFERENCES employees(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

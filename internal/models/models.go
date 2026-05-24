@@ -45,16 +45,17 @@ type Employee struct {
 }
 
 type Shift struct {
-	ID              uuid.UUID `json:"id"`
-	ShiftCode       string    `json:"shift_code"`
-	Name            string    `json:"name"`
-	NameEn          *string   `json:"name_en"`
-	StartTime       time.Time `json:"start_time"` // Storing TIME as time.Time
-	EndTime         time.Time `json:"end_time"`
-	ColorCode       *string   `json:"color_code"`
-	RequiresVehicle bool      `json:"requires_vehicle"`
-	MinRestHours    int       `json:"min_rest_hours"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              uuid.UUID  `json:"id"`
+	ShiftCode       string     `json:"shift_code"`
+	Name            string     `json:"name"`
+	NameEn          *string    `json:"name_en"`
+	StartTime       time.Time  `json:"start_time"` // Storing TIME as time.Time
+	EndTime         time.Time  `json:"end_time"`
+	ColorCode       *string    `json:"color_code"`
+	RequiresVehicle bool       `json:"requires_vehicle"`
+	MinRestHours    int        `json:"min_rest_hours"`
+	DepartmentID    *uuid.UUID `json:"department_id"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type ScheduleTemplate struct {
@@ -78,6 +79,7 @@ type WeeklySchedule struct {
 	PublishedBy   *uuid.UUID `json:"published_by"`
 	PublishedAt   *time.Time `json:"published_at"`
 	Notes         *string    `json:"notes"`
+	DepartmentID  *uuid.UUID `json:"department_id"`
 	CreatedAt     time.Time  `json:"created_at"`
 }
 
@@ -107,6 +109,7 @@ type TaskBoard struct {
 	Description    *string    `json:"description"`
 	RecurrenceType string     `json:"recurrence_type"` // "daily" or "weekly"
 	IsActive       bool       `json:"is_active"`
+	DepartmentID   *uuid.UUID `json:"department_id"`
 	CreatedBy      *uuid.UUID `json:"created_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
