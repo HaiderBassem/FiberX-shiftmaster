@@ -30,7 +30,7 @@ func NewBoardRepository(db *database.DB) BoardRepository {
 
 func (r *boardRepo) GetAll(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoard, error) {
 	query := `SELECT id, name, description, recurrence_type, is_active, department_id, created_by, created_at, updated_at
-		 FROM task_boards WHERE ($1::uuid IS NULL OR department_id = $1) ORDER BY created_at DESC`
+		 FROM task_boards WHERE ($1::uuid IS NULL OR department_id = $1 OR department_id IS NULL) ORDER BY created_at DESC`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get all boards: %w", err)
