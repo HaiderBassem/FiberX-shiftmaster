@@ -9,6 +9,7 @@ import {
   LayoutGrid, ClipboardList,
 } from 'lucide-react';
 import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-fns';
+import { useAuthStore } from '@/store/authStore';
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -107,6 +108,7 @@ const CompletionDialog = ({
 
 export const MyTasksWeekly = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   const [view, setView] = useState<'weekly' | 'boards'>('weekly');
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 0 }));
@@ -131,6 +133,17 @@ export const MyTasksWeekly = () => {
       const response = await api.get('/leaves/me');
       return response.data?.data || [];
     },
+  });
+
+  const weekEndStr = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+  const { data: scheduleRows } = useQuery({
+    queryKey: ['my-schedule', user?.id, weekStartStr, weekEndStr],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const res = await api.get(`/schedules/employee/${user?.id}?from=${weekStartStr}&to=${weekEndStr}`);
+      return res.data?.data || [];
+    },
+    enabled: !!user?.id,
   });
 
   // ── Mutations ──
@@ -280,10 +293,14 @@ export const MyTasksWeekly = () => {
 
             const dayLeave = leaves?.find((l: any) => {
               if (l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
-              const sDate = l.start_date.split('T')[0];
+              const sDate = l.start_date?.split('T')[0];
+              if (!sDate) return false;
               const eDate = l.end_date ? l.end_date.split('T')[0] : sDate;
               return dateKey >= sDate && dateKey <= eDate;
             });
+
+            const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && s.shift_status === 'off');
+            const isOff = !!dayLeave || !!dayOffSchedule;
 
             return (
               <Card key={dayIdx} className={`transition-all duration-300 overflow-hidden ${today ? 'border-primary/30 shadow-[0_0_30px_rgba(12,204,204,0.06)]' : ''}`}>
@@ -315,7 +332,7 @@ export const MyTasksWeekly = () => {
                         </div>
                         <span className="text-xs text-muted-foreground min-w-[40px]">{dayCompleted}/{dayTotal}</span>
                       </div>
-                    ) : dayLeave ? (
+                    ) : isOff ? (
                       <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">🌴 Off</span>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">No tasks</span>
@@ -341,7 +358,7 @@ export const MyTasksWeekly = () => {
                 {isExpanded && dayTotal === 0 && (
                   <CardContent className="pt-0 pb-4 px-5">
                     <div className="text-center py-6 border-t border-border">
-                      {dayLeave ? (
+                      {isOff ? (
                         <div className="animate-in fade-in zoom-in duration-300">
                           <div className="text-4xl mb-3">🌴</div>
                           <p className="text-base font-bold text-emerald-600">Off / Happy Holiday!</p>
