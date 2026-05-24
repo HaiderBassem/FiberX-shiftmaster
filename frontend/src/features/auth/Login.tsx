@@ -29,8 +29,8 @@ export const Login = () => {
         password,
       });
 
-      const { access_token, employee } = response.data.data;
-      setAuth(access_token, employee);
+      const { access_token, refresh_token, employee } = response.data.data;
+      setAuth(access_token, employee, refresh_token);
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');

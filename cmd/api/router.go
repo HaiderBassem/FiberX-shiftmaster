@@ -28,6 +28,7 @@ func SetupRouter(
 	auth := api.Group("/auth")
 	{
 		auth.POST("/login", authH.Login)
+		auth.POST("/refresh", authH.Refresh)
 	}
 
 	// --- Protected routes (JWT required) ---

@@ -169,3 +169,65 @@ func (h *AuthHandler) Me(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": emp})
 }
+
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
+// Refresh validates a refresh token and issues new access + refresh tokens.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "refresh_token is required"})
+		return
+	}
+
+	// Parse and validate the refresh token
+	claims := &middleware.Claims{}
+	token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(h.jwtSecret), nil
+	})
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid or expired refresh token"})
+		return
+	}
+
+	// Generate new tokens
+	accessToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, time.Duration(h.accessExpMin)*time.Minute)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate access token"})
+		return
+	}
+
+	refreshToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, time.Duration(h.refreshExpDays)*24*time.Hour)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate refresh token"})
+		return
+	}
+
+	// Fetch employee data
+	empID, err := uuid.Parse(claims.EmployeeID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid token claims"})
+		return
+	}
+
+	emp, err := h.employeeService.GetByID(c.Request.Context(), empID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "employee not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": loginResponse{
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			ExpiresIn:    h.accessExpMin * 60,
+			Employee:     emp,
+		},
+	})
+}
