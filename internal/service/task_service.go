@@ -32,8 +32,8 @@ func NewTaskService(taskRepo repository.TaskRepository, boardRepo repository.Boa
 // Boards
 // ═══════════════════════════════════════════
 
-func (s *TaskService) GetAllBoards(ctx context.Context) ([]models.TaskBoard, error) {
-	return s.boardRepo.GetAll(ctx)
+func (s *TaskService) GetAllBoards(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoard, error) {
+	return s.boardRepo.GetAll(ctx, departmentID)
 }
 
 func (s *TaskService) GetBoardByID(ctx context.Context, id uuid.UUID) (*models.TaskBoard, error) {
@@ -71,8 +71,8 @@ func (s *TaskService) GetBoardView(ctx context.Context, boardID uuid.UUID, shift
 	return s.taskRepo.GetBoardView(ctx, boardID, shiftID, fromDate, toDate)
 }
 
-func (s *TaskService) GetBoardStats(ctx context.Context) ([]models.TaskBoardStats, error) {
-	return s.taskRepo.GetBoardStats(ctx)
+func (s *TaskService) GetBoardStats(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoardStats, error) {
+	return s.taskRepo.GetBoardStats(ctx, departmentID)
 }
 
 func (s *TaskService) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error) {
@@ -166,8 +166,8 @@ func (s *TaskService) DeleteSchedule(ctx context.Context, id uuid.UUID) error {
 	return s.taskRepo.DeleteSchedule(ctx, id)
 }
 
-func (s *TaskService) GetAllSchedules(ctx context.Context) ([]models.TaskSchedule, error) {
-	return s.taskRepo.GetAllSchedules(ctx)
+func (s *TaskService) GetAllSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
+	return s.taskRepo.GetAllSchedules(ctx, departmentID)
 }
 
 // ═══════════════════════════════════════════

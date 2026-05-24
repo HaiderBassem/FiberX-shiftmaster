@@ -27,7 +27,7 @@ type ScheduleRepository interface {
 	UpdateWeeklyScheduleStatus(ctx context.Context, id uuid.UUID, status string, publishedBy *uuid.UUID) error
 
 	// Employee Shifts (daily assignments)
-	GetEmployeeShiftsByDate(ctx context.Context, date time.Time) ([]models.EmployeeShift, error)
+	GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsByEmployee(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error)
 	CreateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
@@ -171,9 +171,23 @@ const employeeShiftColumns = `id, schedule_id, employee_id, shift_id, shift_date
 	check_in_time, check_out_time, actual_worked_hours, overtime_hours,
 	created_at, updated_at, created_by`
 
-func (r *scheduleRepo) GetEmployeeShiftsByDate(ctx context.Context, date time.Time) ([]models.EmployeeShift, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT `+employeeShiftColumns+` FROM employee_shifts WHERE shift_date = $1 ORDER BY employee_id`, date)
+func (r *scheduleRepo) GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error) {
+	query := `SELECT es.id, es.schedule_id, es.employee_id, es.shift_id, es.shift_date, es.shift_status,
+		es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
+		es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
+		es.created_at, es.updated_at, es.created_by
+		FROM employee_shifts es
+		JOIN employees e ON e.id = es.employee_id
+		WHERE es.shift_date = $1`
+	args := []interface{}{date}
+
+	if departmentID != nil {
+		query += ` AND e.department_id = $2`
+		args = append(args, *departmentID)
+	}
+	query += ` ORDER BY es.employee_id`
+
+	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get shifts by date: %w", err)
 	}

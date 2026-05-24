@@ -15,7 +15,7 @@ import (
 type ShiftRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Shift, error)
 	GetByCode(ctx context.Context, code string) (*models.Shift, error)
-	GetAll(ctx context.Context) ([]models.Shift, error)
+	GetAll(ctx context.Context, departmentID *uuid.UUID) ([]models.Shift, error)
 	Create(ctx context.Context, shift *models.Shift) error
 	Update(ctx context.Context, shift *models.Shift) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -33,10 +33,10 @@ func (r *shiftRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Shift, e
 	var s models.Shift
 	err := r.db.QueryRow(ctx,
 		`SELECT id, shift_code, name, name_en, start_time, end_time, color_code,
-				requires_vehicle, min_rest_hours, created_at
+				requires_vehicle, min_rest_hours, department_id, created_at
 		 FROM shifts WHERE id = $1`, id,
 	).Scan(&s.ID, &s.ShiftCode, &s.Name, &s.NameEn, &s.StartTime, &s.EndTime,
-		&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.CreatedAt)
+		&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.DepartmentID, &s.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("shift not found: %w", err)
@@ -50,10 +50,10 @@ func (r *shiftRepo) GetByCode(ctx context.Context, code string) (*models.Shift, 
 	var s models.Shift
 	err := r.db.QueryRow(ctx,
 		`SELECT id, shift_code, name, name_en, start_time, end_time, color_code,
-				requires_vehicle, min_rest_hours, created_at
+				requires_vehicle, min_rest_hours, department_id, created_at
 		 FROM shifts WHERE shift_code = $1`, code,
 	).Scan(&s.ID, &s.ShiftCode, &s.Name, &s.NameEn, &s.StartTime, &s.EndTime,
-		&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.CreatedAt)
+		&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.DepartmentID, &s.CreatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("shift not found: %w", err)
@@ -63,11 +63,12 @@ func (r *shiftRepo) GetByCode(ctx context.Context, code string) (*models.Shift, 
 	return &s, nil
 }
 
-func (r *shiftRepo) GetAll(ctx context.Context) ([]models.Shift, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT id, shift_code, name, name_en, start_time, end_time, color_code,
-				requires_vehicle, min_rest_hours, created_at
-		 FROM shifts ORDER BY start_time`)
+func (r *shiftRepo) GetAll(ctx context.Context, departmentID *uuid.UUID) ([]models.Shift, error) {
+	query := `SELECT id, shift_code, name, name_en, start_time, end_time, color_code,
+				requires_vehicle, min_rest_hours, department_id, created_at
+		 FROM shifts WHERE ($1::uuid IS NULL OR department_id = $1) ORDER BY start_time`
+	
+	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get all shifts: %w", err)
 	}
@@ -77,7 +78,7 @@ func (r *shiftRepo) GetAll(ctx context.Context) ([]models.Shift, error) {
 	for rows.Next() {
 		var s models.Shift
 		if err := rows.Scan(&s.ID, &s.ShiftCode, &s.Name, &s.NameEn, &s.StartTime, &s.EndTime,
-			&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.CreatedAt); err != nil {
+			&s.ColorCode, &s.RequiresVehicle, &s.MinRestHours, &s.DepartmentID, &s.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan shift: %w", err)
 		}
 		shifts = append(shifts, s)
@@ -88,19 +89,19 @@ func (r *shiftRepo) GetAll(ctx context.Context) ([]models.Shift, error) {
 func (r *shiftRepo) Create(ctx context.Context, shift *models.Shift) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO shifts (shift_code, name, name_en, start_time, end_time, color_code,
-			requires_vehicle, min_rest_hours)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, created_at`,
+			requires_vehicle, min_rest_hours, department_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, created_at`,
 		shift.ShiftCode, shift.Name, shift.NameEn, shift.StartTime, shift.EndTime,
-		shift.ColorCode, shift.RequiresVehicle, shift.MinRestHours,
+		shift.ColorCode, shift.RequiresVehicle, shift.MinRestHours, shift.DepartmentID,
 	).Scan(&shift.ID, &shift.CreatedAt)
 }
 
 func (r *shiftRepo) Update(ctx context.Context, shift *models.Shift) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE shifts SET shift_code=$1, name=$2, name_en=$3, start_time=$4, end_time=$5, color_code=$6,
-			requires_vehicle=$7, min_rest_hours=$8 WHERE id=$9`,
+			requires_vehicle=$7, min_rest_hours=$8, department_id=$9 WHERE id=$10`,
 		shift.ShiftCode, shift.Name, shift.NameEn, shift.StartTime, shift.EndTime,
-		shift.ColorCode, shift.RequiresVehicle, shift.MinRestHours, shift.ID)
+		shift.ColorCode, shift.RequiresVehicle, shift.MinRestHours, shift.DepartmentID, shift.ID)
 	return err
 }
 

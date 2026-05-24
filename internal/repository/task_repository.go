@@ -19,8 +19,8 @@ type TaskRepository interface {
 	GetSchedulesByType(ctx context.Context, scheduleType string) ([]models.TaskSchedule, error)
 	GetSchedulesByShift(ctx context.Context, shiftID uuid.UUID) ([]models.TaskSchedule, error)
 	GetSchedulesByBoard(ctx context.Context, boardID uuid.UUID) ([]models.TaskSchedule, error)
-	GetAllSchedules(ctx context.Context) ([]models.TaskSchedule, error)
-	GetActiveSchedules(ctx context.Context) ([]models.TaskSchedule, error)
+	GetAllSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error)
+	GetActiveSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error)
 	CreateSchedule(ctx context.Context, ts *models.TaskSchedule) error
 	UpdateSchedule(ctx context.Context, ts *models.TaskSchedule) error
 	ToggleScheduleActive(ctx context.Context, id uuid.UUID, isActive bool) error
@@ -28,7 +28,7 @@ type TaskRepository interface {
 
 	// Board View & Tracker
 	GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID *uuid.UUID, fromDate *time.Time, toDate *time.Time) ([]models.BoardViewRow, error)
-	GetBoardStats(ctx context.Context) ([]models.TaskBoardStats, error)
+	GetBoardStats(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoardStats, error)
 	GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error)
 
 	// Employee Weekly View
@@ -139,9 +139,9 @@ func (r *taskRepo) GetSchedulesByBoard(ctx context.Context, boardID uuid.UUID) (
 	return r.scanSchedules(rows)
 }
 
-func (r *taskRepo) GetActiveSchedules(ctx context.Context) ([]models.TaskSchedule, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT `+scheduleColumns+` FROM task_schedules WHERE is_active = true ORDER BY schedule_type, title`)
+func (r *taskRepo) GetActiveSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
+	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ts.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get active schedules: %w", err)
 	}
@@ -149,9 +149,9 @@ func (r *taskRepo) GetActiveSchedules(ctx context.Context) ([]models.TaskSchedul
 	return r.scanSchedules(rows)
 }
 
-func (r *taskRepo) GetAllSchedules(ctx context.Context) ([]models.TaskSchedule, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT `+scheduleColumns+` FROM task_schedules ORDER BY schedule_type, title`)
+func (r *taskRepo) GetAllSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
+	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get all schedules: %w", err)
 	}
@@ -261,8 +261,8 @@ func (r *taskRepo) GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID 
 	return results, rows.Err()
 }
 
-func (r *taskRepo) GetBoardStats(ctx context.Context) ([]models.TaskBoardStats, error) {
-	rows, err := r.db.Query(ctx, `
+func (r *taskRepo) GetBoardStats(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoardStats, error) {
+	query := `
 		SELECT
 			tb.id,
 			tb.name,
@@ -277,9 +277,11 @@ func (r *taskRepo) GetBoardStats(ctx context.Context) ([]models.TaskBoardStats, 
 		LEFT JOIN task_schedules ts ON ts.board_id = tb.id AND ts.is_active = true
 		LEFT JOIN task_assignments ta ON ta.schedule_id = ts.id
 		LEFT JOIN task_executions te ON te.assignment_id = ta.id
-		WHERE tb.is_active = true
+		WHERE tb.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1)
 		GROUP BY tb.id, tb.name
-		ORDER BY tb.name`)
+		ORDER BY tb.name`
+		
+	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get board stats: %w", err)
 	}

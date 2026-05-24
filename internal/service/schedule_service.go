@@ -192,8 +192,8 @@ func (s *ScheduleService) GetEmployeeShifts(ctx context.Context, employeeID uuid
 }
 
 // GetDailyShifts returns all shifts for a specific date.
-func (s *ScheduleService) GetDailyShifts(ctx context.Context, date time.Time) ([]models.EmployeeShift, error) {
-	return s.scheduleRepo.GetEmployeeShiftsByDate(ctx, date)
+func (s *ScheduleService) GetDailyShifts(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error) {
+	return s.scheduleRepo.GetEmployeeShiftsByDate(ctx, date, departmentID)
 }
 
 // SetEmployeeShift upserts a single employee shift for a day.
