@@ -125,6 +125,14 @@ export const MyTasksWeekly = () => {
     },
   });
 
+  const { data: leaves } = useQuery({
+    queryKey: ['leaves', 'me'],
+    queryFn: async () => {
+      const response = await api.get('/leaves/me');
+      return response.data?.data || [];
+    },
+  });
+
   // ── Mutations ──
   const startTask = useMutation({
     mutationFn: async (executionId: string) => { await api.post(`/tasks/executions/${executionId}/start`); },
@@ -270,6 +278,13 @@ export const MyTasksWeekly = () => {
             const today = isToday(date);
             const isPast = isBefore(date, new Date()) && !today;
 
+            const dayLeave = leaves?.find((l: any) => {
+              if (l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
+              const sDate = l.start_date.split('T')[0];
+              const eDate = l.end_date ? l.end_date.split('T')[0] : sDate;
+              return dateKey >= sDate && dateKey <= eDate;
+            });
+
             return (
               <Card key={dayIdx} className={`transition-all duration-300 overflow-hidden ${today ? 'border-primary/30 shadow-[0_0_30px_rgba(12,204,204,0.06)]' : ''}`}>
                 <button onClick={() => setExpandedDay(isExpanded ? null : dayIdx)}
@@ -300,6 +315,8 @@ export const MyTasksWeekly = () => {
                         </div>
                         <span className="text-xs text-muted-foreground min-w-[40px]">{dayCompleted}/{dayTotal}</span>
                       </div>
+                    ) : dayLeave ? (
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">🌴 Off</span>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">No tasks</span>
                     )}
@@ -320,11 +337,19 @@ export const MyTasksWeekly = () => {
                   </CardContent>
                 )}
 
-                {/* Collapsed empty day */}
+                {/* Empty day / Off day */}
                 {isExpanded && dayTotal === 0 && (
                   <CardContent className="pt-0 pb-4 px-5">
                     <div className="text-center py-6 border-t border-border">
-                      <p className="text-sm text-muted-foreground/60">No tasks assigned for this day</p>
+                      {dayLeave ? (
+                        <div className="animate-in fade-in zoom-in duration-300">
+                          <div className="text-4xl mb-3">🌴</div>
+                          <p className="text-base font-bold text-emerald-600">Off / Happy Holiday!</p>
+                          <p className="text-sm text-muted-foreground mt-1">Enjoy your time off.</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground/60">No tasks assigned for this day</p>
+                      )}
                     </div>
                   </CardContent>
                 )}
