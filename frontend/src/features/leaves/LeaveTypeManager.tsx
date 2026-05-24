@@ -23,9 +23,9 @@ export const LeaveTypeManager = () => {
   const saveMutation = useMutation({
     mutationFn: async (payload: any) => {
       if (editingId && editingId !== 'new') {
-        return await api.put(`/admin/leave-types/${editingId}`, payload);
+        return await api.put(`/leave-types/${editingId}`, payload);
       } else {
-        return await api.post('/admin/leave-types', payload);
+        return await api.post('/leave-types', payload);
       }
     },
     onSuccess: () => {
@@ -37,7 +37,7 @@ export const LeaveTypeManager = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(`/admin/leave-types/${id}`);
+      await api.delete(`/leave-types/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });

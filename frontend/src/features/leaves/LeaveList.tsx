@@ -8,8 +8,13 @@ import { Label } from '@/components/ui/label';
 import { CalendarOff, Send, Clock, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
+import { useAuthStore } from '@/store/authStore';
+import { LeaveTypeManager } from './LeaveTypeManager';
 
 export const LeaveList = () => {
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+  const [activeTab, setActiveTab] = useState<'requests' | 'types'>('requests');
   const [leaveTypeId, setLeaveTypeId] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -79,9 +84,30 @@ export const LeaveList = () => {
         <p className="text-muted-foreground">Request time off and track your leave balances.</p>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
+      {isAdmin && (
+        <div className="flex gap-4 border-b border-border/50 pb-2">
+          <button 
+            className={`font-medium text-sm transition-colors ${activeTab === 'requests' ? 'text-primary border-b-2 border-primary pb-2 -mb-[10px]' : 'text-muted-foreground hover:text-foreground pb-2 -mb-[10px]'}`} 
+            onClick={() => setActiveTab('requests')}
+          >
+            Leave Requests
+          </button>
+          <button 
+            className={`font-medium text-sm transition-colors ${activeTab === 'types' ? 'text-primary border-b-2 border-primary pb-2 -mb-[10px]' : 'text-muted-foreground hover:text-foreground pb-2 -mb-[10px]'}`} 
+            onClick={() => setActiveTab('types')}
+          >
+            Leave Types
+          </button>
+        </div>
       )}
+
+      {activeTab === 'types' && isAdmin ? (
+        <LeaveTypeManager />
+      ) : (
+        <>
+          {error && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
+          )}
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
@@ -206,6 +232,8 @@ export const LeaveList = () => {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };
