@@ -198,7 +198,7 @@ func (s *ScheduleService) GetDailyShifts(ctx context.Context, date time.Time, de
 
 // SetEmployeeShift upserts a single employee shift for a day.
 // If the weekly schedule record for that week doesn't exist, it will be created as a draft.
-func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID) (*models.EmployeeShift, error) {
+func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID, creatorRole string) (*models.EmployeeShift, error) {
 	valid := map[string]bool{"working": true, "off": true, "leave": true, "vacation": true}
 	if !valid[shiftStatus] {
 		return nil, fmt.Errorf("invalid shift_status: %s", shiftStatus)
@@ -210,6 +210,14 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 	}
 	if emp.Status != "active" {
 		return nil, fmt.Errorf("employee is not active")
+	}
+
+	// Enforce role hierarchy: TLs cannot set schedule for Managers/Admins, Managers cannot set for Admins.
+	if creatorRole == "team_leader" && (emp.Role == "manager" || emp.Role == "admin") {
+		return nil, fmt.Errorf("team leaders cannot modify schedules for managers or admins")
+	}
+	if creatorRole == "manager" && emp.Role == "admin" {
+		return nil, fmt.Errorf("managers cannot modify schedules for admins")
 	}
 
 	// For working shifts, shift_id is required.

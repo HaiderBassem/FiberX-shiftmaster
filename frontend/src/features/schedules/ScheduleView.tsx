@@ -35,13 +35,21 @@ export const ScheduleView = () => {
     },
   });
 
-  const { data: employees } = useQuery({
+  const { data: rawEmployees } = useQuery({
     queryKey: ['employees', 'all'],
     queryFn: async () => {
       const res = await api.get('/employees');
       return res.data?.data || [];
     },
   });
+
+  const employees = useMemo(() => {
+    if (!rawEmployees) return [];
+    if (user?.role === 'admin') return rawEmployees;
+    if (user?.role === 'manager') return rawEmployees.filter((e: any) => e.role !== 'admin');
+    if (user?.role === 'team_leader') return rawEmployees.filter((e: any) => e.role !== 'admin' && e.role !== 'manager');
+    return rawEmployees;
+  }, [rawEmployees, user]);
 
   const { data: shifts } = useQuery({
     queryKey: ['shifts'],

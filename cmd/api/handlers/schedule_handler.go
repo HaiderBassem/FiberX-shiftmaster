@@ -222,8 +222,10 @@ func (h *ScheduleHandler) SetEmployeeShift(c *gin.Context) {
 
 	createdByStr, _ := c.Get("employee_id")
 	createdBy, _ := uuid.Parse(createdByStr.(string))
+	roleVal, _ := c.Get("role")
+	roleStr, _ := roleVal.(string)
 
-	es, err := h.scheduleSvc.SetEmployeeShift(c.Request.Context(), employeeID, shiftDate, shiftID, req.ShiftStatus, req.LeaveReason, createdBy)
+	es, err := h.scheduleSvc.SetEmployeeShift(c.Request.Context(), employeeID, shiftDate, shiftID, req.ShiftStatus, req.LeaveReason, createdBy, roleStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return

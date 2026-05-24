@@ -64,7 +64,7 @@ func (r *shiftRepo) GetByCode(ctx context.Context, code string) (*models.Shift, 
 }
 
 func (r *shiftRepo) GetAll(ctx context.Context, departmentID *uuid.UUID) ([]models.Shift, error) {
-	query := `SELECT id, shift_code, name, name_en, start_time, end_time, color_code, is_active, department_id, created_at, updated_at
+	query := `SELECT id, shift_code, name, name_en, start_time, end_time, color_code, requires_vehicle, min_rest_hours, department_id, created_at
 		 FROM shifts WHERE ($1::uuid IS NULL OR department_id = $1 OR department_id IS NULL) ORDER BY start_time`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
