@@ -9,7 +9,7 @@ import type {
 export const infoTableService = {
   getVisibleTables: async (): Promise<InfoTable[]> => {
     const res = await api.get('/info-tables');
-    return res.data.data;
+    return res.data.data || [];
   },
 
   createTable: async (data: Partial<InfoTable>): Promise<InfoTable> => {
@@ -19,7 +19,7 @@ export const infoTableService = {
 
   getTableRows: async (tableId: string): Promise<InfoTableRow[]> => {
     const res = await api.get(`/info-tables/${tableId}/rows`);
-    return res.data.data;
+    return res.data.data || [];
   },
 
   createTableRow: async (tableId: string, data: Record<string, any>): Promise<InfoTableRow> => {
@@ -41,7 +41,10 @@ export const infoTableService = {
     employees: InfoTableEmployeeAccess[];
   }> => {
     const res = await api.get(`/info-tables/${tableId}/access`);
-    return res.data;
+    return {
+      departments: res.data.departments || [],
+      employees: res.data.employees || [],
+    };
   },
 
   shareWithDepartment: async (tableId: string, departmentId: string): Promise<void> => {
