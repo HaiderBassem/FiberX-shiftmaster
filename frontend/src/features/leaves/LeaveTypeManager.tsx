@@ -10,7 +10,7 @@ import { Trash2, Plus, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 export const LeaveTypeManager = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name_en: '', name_ar: '', requires_approval: true, color_code: '#3b82f6' });
+  const [formData, setFormData] = useState({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6' });
 
   const { data: leaveTypes, isLoading } = useQuery({
     queryKey: ['leave-types'],
@@ -31,7 +31,7 @@ export const LeaveTypeManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });
       setEditingId(null);
-      setFormData({ name_en: '', name_ar: '', requires_approval: true, color_code: '#3b82f6' });
+      setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6' });
     },
   });
 
@@ -50,13 +50,14 @@ export const LeaveTypeManager = () => {
       name_en: type.name_en,
       name_ar: type.name_ar,
       requires_approval: type.requires_approval,
+      is_active: type.is_active,
       color_code: type.color_code || '#3b82f6',
     });
   };
 
   const handleAddNew = () => {
     setEditingId('new');
-    setFormData({ name_en: '', name_ar: '', requires_approval: true, color_code: '#3b82f6' });
+    setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6' });
   };
 
   return (
@@ -89,6 +90,10 @@ export const LeaveTypeManager = () => {
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="reqAppNew" checked={formData.requires_approval} onChange={e => setFormData({ ...formData, requires_approval: e.target.checked })} />
                 <Label htmlFor="reqAppNew">Requires Approval</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isActiveNew" checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })} />
+                <Label htmlFor="isActiveNew">Is Active</Label>
               </div>
               <div className="space-y-2">
                 <Label>Color Code</Label>
@@ -126,6 +131,10 @@ export const LeaveTypeManager = () => {
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id={`reqApp${type.id}`} checked={formData.requires_approval} onChange={e => setFormData({ ...formData, requires_approval: e.target.checked })} />
                     <Label htmlFor={`reqApp${type.id}`}>Requires Approval</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" id={`isActive${type.id}`} checked={formData.is_active} onChange={e => setFormData({ ...formData, is_active: e.target.checked })} />
+                    <Label htmlFor={`isActive${type.id}`}>Is Active</Label>
                   </div>
                   <div className="space-y-2">
                     <Label>Color Code</Label>
