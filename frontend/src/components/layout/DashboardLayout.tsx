@@ -8,26 +8,25 @@ export const DashboardLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-background">
-      {/* Mobile overlay */}
+      {/* Overlay — all screen sizes */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar — fixed overlay on mobile, permanent on desktop */}
+      {/* Sidebar — always hidden by default, slides in on toggle */}
       <div className={`
         fixed inset-y-0 left-0 z-50
         transform transition-all duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        md:relative md:translate-x-0 md:flex md:flex-shrink-0
       `}>
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0">
+      {/* Main content — always full width */}
+      <main className="flex-1 flex flex-col min-w-0 w-full">
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
         <div className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
           <Outlet />

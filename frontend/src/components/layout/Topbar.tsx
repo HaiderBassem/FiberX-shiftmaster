@@ -21,12 +21,12 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     <header className="h-14 sm:h-16 border-b border-border bg-card/80 backdrop-blur-sm px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30">
       {/* Left: Menu + context */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Hamburger menu - mobile only */}
+        {/* Hamburger menu — all screen sizes */}
         <Button
           variant="ghost"
           size="icon"
           onClick={onMenuClick}
-          className="text-muted-foreground hover:text-foreground md:hidden"
+          className="text-muted-foreground hover:text-foreground"
           title={sidebarOpen ? 'Close menu' : 'Open menu'}
         >
           <Menu className="w-5 h-5" />
