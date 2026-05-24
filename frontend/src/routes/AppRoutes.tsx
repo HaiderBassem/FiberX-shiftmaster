@@ -17,6 +17,8 @@ import { NotificationList } from '../features/notifications/NotificationList';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { DepartmentDetail } from '../features/departments/DepartmentDetail';
 import { EmployeeDetail } from '../features/employees/EmployeeDetail';
+import InfoTableHub from '../features/infotables/InfoTableHub';
+import InfoTableView from '../features/infotables/InfoTableView';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -69,6 +71,22 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
                 <NotificationList />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="info-tables" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <InfoTableHub />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="info-tables/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <InfoTableView />
               </ProtectedRoute>
             } 
           />

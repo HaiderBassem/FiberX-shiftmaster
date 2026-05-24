@@ -22,6 +22,7 @@ func SetupRouter(
 	notifH *handlers.NotificationHandler,
 	auditH *handlers.AuditHandler,
 	leaveTypeH *handlers.LeaveTypeHandler,
+	infoTableH *handlers.InfoTableHandler,
 ) {
 	api := r.Group("/api")
 
@@ -135,6 +136,22 @@ func SetupRouter(
 
 		// Activity history (audit logs)
 		protected.GET("/activity", auditH.ListActivity)
+
+		// Info Tables (Dynamic Tables)
+		infoTables := protected.Group("/info-tables")
+		{
+			infoTables.GET("", infoTableH.GetVisibleTables)
+			infoTables.POST("", infoTableH.CreateTable)
+			infoTables.GET("/:id/rows", infoTableH.GetTableRows)
+			infoTables.POST("/:id/rows", infoTableH.CreateTableRow)
+			infoTables.PUT("/:id/rows/:rowId", infoTableH.UpdateTableRow)
+			infoTables.DELETE("/:id/rows/:rowId", infoTableH.DeleteTableRow)
+			
+			// Access Management
+			infoTables.GET("/:id/access", infoTableH.GetAccessLists)
+			infoTables.POST("/:id/access", infoTableH.AddEmployeeAccess)
+			infoTables.POST("/:id/department-access", infoTableH.ShareWithDepartment)
+		}
 
 		// --- Supervisor routes (manager + admin + team_leader) ---
 		// READ access and approval workflows

@@ -45,6 +45,7 @@ func main() {
 	notifRepo := repository.NewNotificationRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db)
+	infoTableRepo := repository.NewInfoTableRepository(db)
 
 	// --- Initialize Services ---
 	authService := service.NewAuthService(employeeRepo, cfg.JWT.BcryptCost)
@@ -56,6 +57,7 @@ func main() {
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
 	leaveTypeService := service.NewLeaveTypeService(leaveTypeRepo)
+	infoTableService := service.NewInfoTableService(infoTableRepo, employeeRepo)
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
@@ -69,6 +71,7 @@ func main() {
 	notifHandler := handlers.NewNotificationHandler(notifService)
 	auditHandler := handlers.NewAuditHandler(auditService)
 	leaveTypeHandler := handlers.NewLeaveTypeHandler(leaveTypeService)
+	infoTableHandler := handlers.NewInfoTableHandler(infoTableService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -100,7 +103,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler,
 	)
 
 	// --- Start HTTP Server ---

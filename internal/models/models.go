@@ -42,6 +42,7 @@ type Employee struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	CreatedBy          *uuid.UUID `json:"created_by"`
+	CanCreateTables    bool      `json:"can_create_tables"`
 }
 
 type Shift struct {
