@@ -1,5 +1,5 @@
-import api from './api';
-import {
+import api from '@/lib/api';
+import type {
   InfoTable,
   InfoTableRow,
   InfoTableDepartmentAccess,

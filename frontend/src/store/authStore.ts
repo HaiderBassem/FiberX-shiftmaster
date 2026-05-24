@@ -9,6 +9,7 @@ interface User {
   email: string;
   role: 'employee' | 'team_leader' | 'manager' | 'admin';
   department_id: string | null;
+  can_create_tables?: boolean;
 }
 
 interface AuthState {

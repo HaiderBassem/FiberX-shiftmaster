@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, UserPlus } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import { departmentService } from '../../services/api/departmentService';
-import { employeeService } from '../../services/api/employeeService';
-import { InfoTable, InfoTableDepartmentAccess, InfoTableEmployeeAccess } from '../../types/infoTable';
-import { Department } from '../../types/department';
-import { Employee } from '../../types/employee';
+import api from '@/lib/api';
+import type { InfoTable, InfoTableDepartmentAccess, InfoTableEmployeeAccess } from '../../types/infoTable';
+
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface Employee {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
 
 interface AccessModalProps {
   isOpen: boolean;
@@ -35,8 +44,8 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
     try {
       setLoading(true);
       const [deps, emps, access] = await Promise.all([
-        departmentService.getAll(),
-        employeeService.getAll(),
+        api.get('/departments').then(res => res.data?.data || []),
+        api.get('/employees').then(res => res.data?.data || []),
         infoTableService.getAccessLists(table.id)
       ]);
       setDepartments(deps);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import { InfoTable, InfoTableRow } from '../../types/infoTable';
+import type { InfoTable, InfoTableRow } from '../../types/infoTable';
 
 interface RowModalProps {
   isOpen: boolean;

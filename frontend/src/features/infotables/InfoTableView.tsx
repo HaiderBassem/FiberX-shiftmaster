@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Edit2, Trash2, Shield, Search } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import { InfoTable, InfoTableRow } from '../../types/infoTable';
-import { useAuth } from '../../context/AuthContext';
+import type { InfoTable, InfoTableRow } from '../../types/infoTable';
+import { useAuthStore } from '@/store/authStore';
 import RowModal from './RowModal';
 import AccessModal from './AccessModal';
 
 const InfoTableView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   
   const [table, setTable] = useState<InfoTable | null>(null);
   const [rows, setRows] = useState<InfoTableRow[]>([]);

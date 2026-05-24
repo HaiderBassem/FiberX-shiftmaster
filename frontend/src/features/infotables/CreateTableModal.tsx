@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import { InfoTable, InfoTableColumn } from '../../types/infoTable';
+import type { InfoTable, InfoTableColumn } from '../../types/infoTable';
 
 interface CreateTableModalProps {
   isOpen: boolean;
@@ -126,7 +126,7 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
           </div>
 
           <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-            {columns.map((col, index) => (
+            {columns.map((col) => (
               <div key={col.id} className="flex gap-3 items-center bg-gray-50 dark:bg-gray-900/50 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                 <GripVertical className="w-4 h-4 text-gray-400 cursor-move flex-shrink-0" />
                 

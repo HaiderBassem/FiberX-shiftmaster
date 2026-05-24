@@ -10,8 +10,8 @@ import {
   Globe
 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import { InfoTable } from '../../types/infoTable';
-import { useAuth } from '../../context/AuthContext';
+import type { InfoTable } from '../../types/infoTable';
+import { useAuthStore } from '@/store/authStore';
 import CreateTableModal from './CreateTableModal';
 
 const InfoTableHub: React.FC = () => {
@@ -19,7 +19,7 @@ const InfoTableHub: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const navigate = useNavigate();
 
   const fetchTables = async () => {
