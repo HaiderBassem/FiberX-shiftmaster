@@ -299,7 +299,7 @@ export const MyTasksWeekly = () => {
               return dateKey >= sDate && dateKey <= eDate;
             });
 
-            const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && s.shift_status === 'off');
+            const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && ['off', 'vacation', 'leave'].includes(s.shift_status));
             const isOff = !!dayLeave || !!dayOffSchedule;
 
             return (

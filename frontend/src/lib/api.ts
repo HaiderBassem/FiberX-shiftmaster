@@ -10,10 +10,17 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const store = useAuthStore.getState();
+    const token = store.token;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    if (store.user?.role === 'admin' && store.adminSelectedDepartmentId) {
+      config.headers['X-Department-ID'] = store.adminSelectedDepartmentId;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

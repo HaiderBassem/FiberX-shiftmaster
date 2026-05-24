@@ -3,14 +3,25 @@ import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { LogOut, Sun, Moon, User, Menu, Key } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, adminSelectedDepartmentId, setAdminSelectedDepartmentId } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showChangePassword, setShowChangePassword] = useState(false);
+
+  const { data: departments } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const res = await api.get('/departments');
+      return res.data?.data || [];
+    },
+    enabled: user?.role === 'admin',
+  });
 
   const handleLogout = () => {
     logout();
@@ -35,6 +46,25 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {user?.role?.replace('_', ' ')}
         </span>
+        {user?.role === 'admin' && departments && departments.length > 0 && (
+          <div className="ml-4 hidden md:flex items-center">
+            <select
+              className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              value={adminSelectedDepartmentId || ''}
+              onChange={(e) => {
+                setAdminSelectedDepartmentId(e.target.value || null);
+                window.location.reload(); // Reload to fetch context with new department
+              }}
+            >
+              <option value="">All Departments</option>
+              {departments.map((d: any) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Right: Actions */}
