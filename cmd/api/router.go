@@ -21,6 +21,7 @@ func SetupRouter(
 	taskH *handlers.TaskHandler,
 	notifH *handlers.NotificationHandler,
 	auditH *handlers.AuditHandler,
+	leaveTypeH *handlers.LeaveTypeHandler,
 ) {
 	api := r.Group("/api")
 
@@ -84,6 +85,13 @@ func SetupRouter(
 			leaves.POST("", leaveH.Request)
 			leaves.GET("/me", leaveH.MyLeaves)
 			leaves.GET("/pending", leaveH.PendingForApproval)
+		}
+
+		// Leave Types (read)
+		leaveTypes := protected.Group("/leave-types")
+		{
+			leaveTypes.GET("", leaveTypeH.GetAll)
+			leaveTypes.GET("/:id", leaveTypeH.GetByID)
 		}
 
 		// Swaps
@@ -210,6 +218,11 @@ func SetupRouter(
 			// Schedule management
 			admin.POST("/schedules/:id/publish", scheduleH.Publish)
 			admin.POST("/schedules/shifts/:id/replace", scheduleH.AssignReplacement)
+			
+			// Leave Types management
+			admin.POST("/leave-types", leaveTypeH.Create)
+			admin.PUT("/leave-types/:id", leaveTypeH.Update)
+			admin.DELETE("/leave-types/:id", leaveTypeH.Delete)
 
 		}
 

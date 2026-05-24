@@ -20,7 +20,7 @@ func NewLeaveHandler(leaveSvc *service.LeaveService) *LeaveHandler {
 }
 
 type createLeaveRequest struct {
-	LeaveType   string  `json:"leave_type" binding:"required"`
+	LeaveTypeID uuid.UUID `json:"leave_type_id" binding:"required"`
 	StartDate   string  `json:"start_date" binding:"required"`
 	EndDate     string  `json:"end_date" binding:"required"`
 	Reason      *string `json:"reason"`
@@ -48,12 +48,10 @@ func (h *LeaveHandler) Request(c *gin.Context) {
 		return
 	}
 
-	// Validate hourly leave requires start_time and end_time
-	if req.LeaveType == "hourly" {
-		if req.StartTime == nil || req.EndTime == nil || *req.StartTime == "" || *req.EndTime == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "start_time and end_time are required for hourly leave"})
-			return
-		}
+	// Validate hourly leave requires start_time and end_time (can be relaxed if we check it in DB later)
+	if req.StartTime != nil && req.EndTime != nil && (*req.StartTime == "" || *req.EndTime == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "start_time and end_time must be valid for hourly leave"})
+		return
 	}
 
 	empIDStr, _ := c.Get("employee_id")
@@ -61,7 +59,7 @@ func (h *LeaveHandler) Request(c *gin.Context) {
 
 	leave := &models.Leave{
 		EmployeeID:  empID,
-		LeaveType:   req.LeaveType,
+		LeaveTypeID: req.LeaveTypeID,
 		StartDate:   startDate,
 		EndDate:     endDate,
 		Reason:      req.Reason,

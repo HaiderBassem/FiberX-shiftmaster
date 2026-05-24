@@ -72,7 +72,7 @@ echo "  ✓  shiftmaster.service started"
 
 # ── 7. Configure Caddy ──
 echo "→ Configuring Caddy..."
-sudo cp "$PROJECT_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
+#sudo cp "$PROJECT_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
 sudo systemctl restart caddy
 echo "  ✓  Caddy configured and restarted"
 
@@ -82,7 +82,7 @@ echo "→ Waiting for services to start..."
 sleep 3
 
 API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/health 2>/dev/null || echo "000")
-WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://192.168.16.138/ 2>/dev/null || echo "000")
+WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://shift-master.org/ 2>/dev/null || echo "000")
 
 echo ""
 echo "╔═══════════════════════════════════════════╗"

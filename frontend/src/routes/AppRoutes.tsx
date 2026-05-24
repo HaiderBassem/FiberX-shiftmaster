@@ -11,6 +11,7 @@ import { TaskManagement } from '../features/tasks/TaskManagement';
 import { TaskBoards } from '../features/tasks/TaskBoards';
 import { TaskHistory } from '../features/tasks/TaskHistory';
 import { LeaveList } from '../features/leaves/LeaveList';
+import { LeaveTypeManager } from '../features/leaves/LeaveTypeManager';
 import { SwapList } from '../features/swaps/SwapList';
 import { ApprovalDashboard } from '../features/approvals/ApprovalDashboard';
 import { NotificationList } from '../features/notifications/NotificationList';
@@ -124,6 +125,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <DepartmentList />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="leave-types" 
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <LeaveTypeManager />
               </ProtectedRoute>
             } 
           />

@@ -162,7 +162,7 @@ const LeaveHistory = () => {
                     <span className="text-xs text-muted-foreground font-mono">({item.employee_code})</span>
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {item.leave_type?.charAt(0).toUpperCase() + item.leave_type?.slice(1)} Leave ·{' '}
+                    {item.leave_type_name_en?.charAt(0).toUpperCase() + item.leave_type_name_en?.slice(1) || 'Leave'} ·{' '}
                     {fmtDate(item.start_date, 'MMM d')} → {fmtDate(item.end_date, 'MMM d, yyyy')} ·{' '}
                     {item.total_days} day{item.total_days > 1 ? 's' : ''}
                   </CardDescription>
@@ -339,8 +339,8 @@ export const ApprovalDashboard = () => {
                           <span className="text-xs text-muted-foreground font-mono">({leave.employee_code})</span>
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          {leave.leave_type?.charAt(0).toUpperCase() + leave.leave_type?.slice(1)} Leave ·{' '}
-                          {leave.leave_type === 'hourly' ? (
+                          {leave.leave_type_name_en?.charAt(0).toUpperCase() + leave.leave_type_name_en?.slice(1) || 'Leave'} ·{' '}
+                          {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
                             <>
                               {fmtDate(leave.start_date, 'MMM d, yyyy')}
                               {leave.start_time && leave.end_time && (

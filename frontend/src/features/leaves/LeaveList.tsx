@@ -10,7 +10,7 @@ import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
 
 export const LeaveList = () => {
-  const [leaveType, setLeaveType] = useState('annual');
+  const [leaveTypeId, setLeaveTypeId] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reason, setReason] = useState('');
@@ -25,11 +25,16 @@ export const LeaveList = () => {
     queryFn: async () => { const response = await api.get('/leaves/me'); return response.data?.data || []; },
   });
 
+  const { data: leaveTypes, isLoading: isLoadingTypes } = useQuery({
+    queryKey: ['leave-types', 'active'],
+    queryFn: async () => { const response = await api.get('/leave-types?active=true'); return response.data?.data || []; },
+  });
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      const payload: any = { leave_type: leaveType, start_date: startDate, end_date: endDate, reason };
-      if (leaveType === 'hourly') {
+      const payload: any = { leave_type_id: leaveTypeId || (leaveTypes?.[0]?.id), start_date: startDate, end_date: endDate, reason };
+      if (isHourly) {
         payload.start_time = startTime;
         payload.end_time = endTime;
       }
@@ -39,7 +44,8 @@ export const LeaveList = () => {
     onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to submit leave'),
   });
 
-  const isHourly = leaveType === 'hourly';
+  const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
+  const isHourly = selectedType?.name_en?.toLowerCase() === 'hourly';
   const canSubmit = reason && (isHourly ? (startTime && endTime) : true);
 
   const getStatusIcon = (status: string) => {
@@ -89,11 +95,10 @@ export const LeaveList = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Leave Type</Label>
-                <select className={selectClass} value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
-                  <option value="annual">Annual Leave</option>
-                  <option value="sick">Sick Leave</option>
-                  <option value="unpaid">Unpaid Leave</option>
-                  <option value="hourly">Hourly Leave</option>
+                <select className={selectClass} value={leaveTypeId || (leaveTypes?.[0]?.id || '')} onChange={(e) => setLeaveTypeId(e.target.value)} disabled={isLoadingTypes}>
+                  {leaveTypes?.map((type: any) => (
+                    <option key={type.id} value={type.id}>{type.name_en}</option>
+                  ))}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -158,9 +163,9 @@ export const LeaveList = () => {
                         {getStatusIcon(leave.status)}
                       </div>
                       <div>
-                        <div className="font-medium text-foreground capitalize">{leave.leave_type} Leave</div>
+                        <div className="font-medium text-foreground capitalize">{leave.leave_type_name_en || 'Leave'}</div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {leave.leave_type === 'hourly' ? (
+                          {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
                             <>
                               {fmtDate(leave.start_date)}
                               {leave.start_time && leave.end_time && (

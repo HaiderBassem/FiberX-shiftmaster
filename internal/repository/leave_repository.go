@@ -40,14 +40,14 @@ func NewLeaveRepository(db *database.DB) LeaveRepository {
 	return &leaveRepo{db: db}
 }
 
-const leaveColumns = `id, employee_id, leave_type, start_date, end_date, total_days, reason, status,
-	applied_date, approved_by_team_leader, approved_by_manager, rejection_reason, attachments,
-	start_time, end_time, created_at, updated_at`
+const leaveColumns = `l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en, l.start_date, l.end_date, l.total_days, l.reason, l.status,
+	l.applied_date, l.approved_by_team_leader, l.approved_by_manager, l.rejection_reason, l.attachments,
+	l.start_time, l.end_time, l.created_at, l.updated_at`
 
 func (r *leaveRepo) scanLeave(row pgx.Row) (*models.Leave, error) {
 	var l models.Leave
 	err := row.Scan(
-		&l.ID, &l.EmployeeID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.TotalDays,
+		&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
 		&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 		&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 	)
@@ -59,7 +59,7 @@ func (r *leaveRepo) scanLeaves(rows pgx.Rows) ([]models.Leave, error) {
 	for rows.Next() {
 		var l models.Leave
 		if err := rows.Scan(
-			&l.ID, &l.EmployeeID, &l.LeaveType, &l.StartDate, &l.EndDate, &l.TotalDays,
+			&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
 			&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 			&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
@@ -72,7 +72,7 @@ func (r *leaveRepo) scanLeaves(rows pgx.Rows) ([]models.Leave, error) {
 
 func (r *leaveRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Leave, error) {
 	l, err := r.scanLeave(r.db.QueryRow(ctx,
-		`SELECT `+leaveColumns+` FROM leaves WHERE id = $1`, id))
+		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.id = $1`, id))
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("leave not found: %w", err)
@@ -84,7 +84,7 @@ func (r *leaveRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Leave, e
 
 func (r *leaveRepo) GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT `+leaveColumns+` FROM leaves WHERE employee_id = $1 ORDER BY start_date DESC`, employeeID)
+		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.employee_id = $1 ORDER BY l.start_date DESC`, employeeID)
 	if err != nil {
 		return nil, fmt.Errorf("get leaves by employee: %w", err)
 	}
@@ -94,7 +94,7 @@ func (r *leaveRepo) GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]
 
 func (r *leaveRepo) GetByStatus(ctx context.Context, status string) ([]models.Leave, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT `+leaveColumns+` FROM leaves WHERE status = $1 ORDER BY applied_date DESC`, status)
+		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.status = $1 ORDER BY l.applied_date DESC`, status)
 	if err != nil {
 		return nil, fmt.Errorf("get leaves by status: %w", err)
 	}
@@ -104,7 +104,7 @@ func (r *leaveRepo) GetByStatus(ctx context.Context, status string) ([]models.Le
 
 func (r *leaveRepo) GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT `+leaveColumns+` FROM leaves WHERE start_date <= $2 AND end_date >= $1 ORDER BY start_date`, from, to)
+		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.start_date <= $2 AND l.end_date >= $1 ORDER BY l.start_date`, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("get leaves by date range: %w", err)
 	}
@@ -125,11 +125,12 @@ func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole stri
 		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
 	}
 
-	query := `SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days, l.reason, l.status,
+	query := `SELECT l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en, l.start_date, l.end_date, l.total_days, l.reason, l.status,
 	          l.applied_date, l.approved_by_team_leader, l.approved_by_manager, l.rejection_reason, l.attachments,
 	          l.start_time, l.end_time, l.created_at, l.updated_at
 	          FROM leaves l
 	          JOIN employees e ON e.id = l.employee_id
+			  LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 	          WHERE l.status = $1`
 	args := []interface{}{statusFilter}
 
@@ -164,7 +165,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
 	}
 
-	query := `SELECT l.id, l.employee_id, l.leave_type, l.start_date, l.end_date, l.total_days,
+	query := `SELECT l.id, l.employee_id, l.leave_type_id, lt.name_ar, lt.name_en, l.start_date, l.end_date, l.total_days,
 		        l.reason, l.status, l.applied_date,
 		        e.first_name || ' ' || e.last_name as employee_name,
 		        e.employee_code,
@@ -178,6 +179,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		        l.start_time, l.end_time
 		 FROM leaves l
 		 JOIN employees e ON e.id = l.employee_id
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 		 LEFT JOIN shifts s ON s.id = e.default_shift_id
 		 LEFT JOIN departments d ON d.id = e.department_id
 		 WHERE l.status = $1`
@@ -202,7 +204,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 	for rows.Next() {
 		var p models.PendingLeaveRich
 		if err := rows.Scan(
-			&p.ID, &p.EmployeeID, &p.LeaveType, &p.StartDate, &p.EndDate, &p.TotalDays,
+			&p.ID, &p.EmployeeID, &p.LeaveTypeID, &p.LeaveTypeNameAr, &p.LeaveTypeNameEn, &p.StartDate, &p.EndDate, &p.TotalDays,
 			&p.Reason, &p.Status, &p.AppliedDate,
 			&p.EmployeeName, &p.EmployeeCode, &p.DefaultShiftID, &p.ShiftName, &p.ShiftCode,
 			&p.DepartmentName, &p.TLApprovals, &p.TotalTLs, &p.StartTime, &p.EndTime,
@@ -216,9 +218,9 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 
 func (r *leaveRepo) Create(ctx context.Context, leave *models.Leave) error {
 	return r.db.QueryRow(ctx,
-		`INSERT INTO leaves (employee_id, leave_type, start_date, end_date, reason, attachments, start_time, end_time)
+		`INSERT INTO leaves (employee_id, leave_type_id, start_date, end_date, reason, attachments, start_time, end_time)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, total_days, status, applied_date, created_at, updated_at`,
-		leave.EmployeeID, leave.LeaveType, leave.StartDate, leave.EndDate, leave.Reason, leave.Attachments, leave.StartTime, leave.EndTime,
+		leave.EmployeeID, leave.LeaveTypeID, leave.StartDate, leave.EndDate, leave.Reason, leave.Attachments, leave.StartTime, leave.EndTime,
 	).Scan(&leave.ID, &leave.TotalDays, &leave.Status, &leave.AppliedDate, &leave.CreatedAt, &leave.UpdatedAt)
 }
 
@@ -278,10 +280,11 @@ func (r *leaveRepo) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryR
 	// Get all leaves with employee info
 	rows, err := r.db.Query(ctx,
 		`SELECT l.id, e.first_name || ' ' || e.last_name, e.employee_code,
-		        l.leave_type, l.start_date, l.end_date, l.total_days, l.reason,
+		        l.leave_type_id, lt.name_ar, lt.name_en, l.start_date, l.end_date, l.total_days, l.reason,
 		        l.status, l.applied_date, l.rejection_reason
 		 FROM leaves l
 		 JOIN employees e ON e.id = l.employee_id
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 		 ORDER BY l.applied_date DESC NULLS LAST
 		 LIMIT 200`)
 	if err != nil {
@@ -293,7 +296,7 @@ func (r *leaveRepo) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryR
 	for rows.Next() {
 		var h models.LeaveHistoryRow
 		if err := rows.Scan(&h.LeaveID, &h.EmployeeName, &h.EmployeeCode,
-			&h.LeaveType, &h.StartDate, &h.EndDate, &h.TotalDays, &h.Reason,
+			&h.LeaveTypeID, &h.LeaveTypeNameAr, &h.LeaveTypeNameEn, &h.StartDate, &h.EndDate, &h.TotalDays, &h.Reason,
 			&h.Status, &h.AppliedDate, &h.RejectionReason); err != nil {
 			return nil, err
 		}

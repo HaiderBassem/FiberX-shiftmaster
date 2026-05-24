@@ -180,7 +180,9 @@ type TaskHistoryRow struct {
 type Leave struct {
 	ID                   uuid.UUID  `json:"id"`
 	EmployeeID           uuid.UUID  `json:"employee_id"`
-	LeaveType            string     `json:"leave_type"`
+	LeaveTypeID          uuid.UUID  `json:"leave_type_id"`
+	LeaveTypeNameAr      *string    `json:"leave_type_name_ar"`
+	LeaveTypeNameEn      *string    `json:"leave_type_name_en"`
 	StartDate            time.Time  `json:"start_date"`
 	EndDate              time.Time  `json:"end_date"`
 	TotalDays            int        `json:"total_days"`
@@ -213,7 +215,9 @@ type LeaveHistoryRow struct {
 	LeaveID       uuid.UUID  `json:"leave_id"`
 	EmployeeName  string     `json:"employee_name"`
 	EmployeeCode  string     `json:"employee_code"`
-	LeaveType     string     `json:"leave_type"`
+	LeaveTypeID   uuid.UUID  `json:"leave_type_id"`
+	LeaveTypeNameAr *string  `json:"leave_type_name_ar"`
+	LeaveTypeNameEn *string  `json:"leave_type_name_en"`
 	StartDate     time.Time  `json:"start_date"`
 	EndDate       time.Time  `json:"end_date"`
 	TotalDays     int        `json:"total_days"`
@@ -237,7 +241,9 @@ type LeaveApprovalDetail struct {
 type PendingLeaveRich struct {
 	ID             uuid.UUID  `json:"id"`
 	EmployeeID     uuid.UUID  `json:"employee_id"`
-	LeaveType      string     `json:"leave_type"`
+	LeaveTypeID    uuid.UUID  `json:"leave_type_id"`
+	LeaveTypeNameAr *string   `json:"leave_type_name_ar"`
+	LeaveTypeNameEn *string   `json:"leave_type_name_en"`
 	StartDate      time.Time  `json:"start_date"`
 	EndDate        time.Time  `json:"end_date"`
 	TotalDays      int        `json:"total_days"`

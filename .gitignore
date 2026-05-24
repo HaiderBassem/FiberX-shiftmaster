@@ -87,3 +87,8 @@ Icon
 *.ntvs*
 *.njsproj
 *.sln
+
+
+ seed_db.sh
+ seed.sql
+ 008_seed_data.sql 

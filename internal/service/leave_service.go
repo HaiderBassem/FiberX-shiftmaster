@@ -55,14 +55,11 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 
 	// Build notification message
 	var msg string
-	if leave.LeaveType == "hourly" {
-		timeInfo := ""
-		if leave.StartTime != nil && leave.EndTime != nil {
-			timeInfo = fmt.Sprintf(" from %s to %s", *leave.StartTime, *leave.EndTime)
-		}
+	if leave.StartTime != nil && leave.EndTime != nil {
+		timeInfo := fmt.Sprintf(" from %s to %s", *leave.StartTime, *leave.EndTime)
 		msg = fmt.Sprintf("%s %s requested hourly leave on %s%s", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"), timeInfo)
 	} else {
-		msg = fmt.Sprintf("%s %s requested %s leave from %s to %s", emp.FirstName, emp.LastName, leave.LeaveType, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
+		msg = fmt.Sprintf("%s %s requested a leave from %s to %s", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
 	}
 
 	// Notify team leaders of the SAME department to review
