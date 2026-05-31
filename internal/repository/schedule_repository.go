@@ -19,6 +19,10 @@ type ScheduleRepository interface {
 	CreateTemplate(ctx context.Context, t *models.ScheduleTemplate) error
 	UpdateTemplate(ctx context.Context, t *models.ScheduleTemplate) error
 	DeleteTemplate(ctx context.Context, id uuid.UUID) error
+	// UpsertTemplateForDay ensures a permanent off/working template exists for the
+	// given employee + day-of-week. Used by SetEmployeeShift so manual changes
+	// carry forward into every future generated weekly schedule automatically.
+	UpsertTemplateForDay(ctx context.Context, employeeID uuid.UUID, dayOfWeek int, isOff bool, shiftID *uuid.UUID) error
 
 	// Weekly Schedules
 	GetWeeklySchedule(ctx context.Context, weekStart time.Time) (*models.WeeklySchedule, error)
@@ -96,6 +100,39 @@ func (r *scheduleRepo) UpdateTemplate(ctx context.Context, t *models.ScheduleTem
 func (r *scheduleRepo) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM schedule_templates WHERE id=$1`, id)
 	return err
+}
+
+// UpsertTemplateForDay sets a permanent off/working template for an employee day.
+// It updates the existing row if one exists for (employee_id, day_of_week),
+// otherwise inserts a new one with valid_to=NULL (permanent).
+func (r *scheduleRepo) UpsertTemplateForDay(
+	ctx context.Context,
+	employeeID uuid.UUID,
+	dayOfWeek int,
+	isOff bool,
+	shiftID *uuid.UUID,
+) error {
+	// Attempt to update existing template for this employee + day
+	tag, err := r.db.Exec(ctx,
+		`UPDATE schedule_templates
+		 SET is_off=$3, shift_id=$4, valid_to=NULL, updated_at=CURRENT_TIMESTAMP
+		 WHERE employee_id=$1 AND day_of_week=$2`,
+		employeeID, dayOfWeek, isOff, shiftID)
+	if err != nil {
+		return fmt.Errorf("upsert template (update): %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		return nil // updated in place
+	}
+	// No existing row — insert a new permanent template
+	_, err = r.db.Exec(ctx,
+		`INSERT INTO schedule_templates (employee_id, day_of_week, shift_id, is_off, valid_from, valid_to)
+		 VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP,NULL)`,
+		employeeID, dayOfWeek, shiftID, isOff)
+	if err != nil {
+		return fmt.Errorf("upsert template (insert): %w", err)
+	}
+	return nil
 }
 
 // --- Weekly Schedules ---

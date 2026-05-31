@@ -261,6 +261,21 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 	if err := s.scheduleRepo.UpsertEmployeeShift(ctx, es); err != nil {
 		return nil, err
 	}
+
+	// ── Persist off/working into the schedule template so the setting
+	// survives future GenerateWeeklySchedule calls automatically.
+	// "leave" and "vacation" are intentionally excluded — they are
+	// one-off temporary states, not permanent schedule patterns.
+	if shiftStatus == "off" || shiftStatus == "working" {
+		dayOfWeek := int(shiftDate.Weekday()) // 0=Sunday … 6=Saturday
+		isOff := shiftStatus == "off"
+		if tmplErr := s.scheduleRepo.UpsertTemplateForDay(ctx, employeeID, dayOfWeek, isOff, shiftID); tmplErr != nil {
+			// Log the failure but don't roll back the shift — the weekly entry
+			// was already saved successfully.
+			_ = tmplErr
+		}
+	}
+
 	return es, nil
 }
 
