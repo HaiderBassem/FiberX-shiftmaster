@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Users, UserPlus } from 'lucide-react';
+import { X, Users, UserPlus, Trash2 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import api from '@/lib/api';
 import type { InfoTable, InfoTableDepartmentAccess, InfoTableEmployeeAccess } from '../../types/infoTable';
@@ -78,6 +78,15 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
       fetchData(); // Refresh list
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to add employee access');
+    }
+  };
+
+  const handleRemoveEmployeeAccess = async (employeeId: string) => {
+    try {
+      await infoTableService.removeEmployeeAccess(table.id, employeeId);
+      fetchData(); // Refresh list
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to remove employee access');
     }
   };
 
@@ -167,6 +176,7 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
                   >
                     <option value="read">Read Only</option>
                     <option value="write">Read & Write</option>
+                    <option value="none">Block Access (None)</option>
                   </select>
                   <button
                     onClick={handleAddEmployeeAccess}
@@ -185,9 +195,22 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
                         return (
                           <li key={ea.id} className="flex justify-between items-center text-sm text-gray-700 dark:text-gray-300">
                             <span>{emp ? `${emp.first_name} ${emp.last_name}` : ea.employee_id}</span>
-                            <span className={`text-xs px-2 py-1 rounded ${ea.access_level === 'write' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
-                              {ea.access_level.toUpperCase()}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                ea.access_level === 'write' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 
+                                ea.access_level === 'none' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                              }`}>
+                                {ea.access_level === 'none' ? 'BLOCKED' : ea.access_level.toUpperCase()}
+                              </span>
+                              <button
+                                onClick={() => handleRemoveEmployeeAccess(ea.employee_id)}
+                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                title="Remove Rule"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </li>
                         );
                       })}

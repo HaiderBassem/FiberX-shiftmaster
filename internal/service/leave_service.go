@@ -33,7 +33,9 @@ func NewLeaveService(
 	}
 }
 
-// RequestLeave creates a new leave request and notifies team leaders.
+// RequestLeave creates a new leave request.
+// - If the requester is a team_leader → notifies managers directly (skips TL step).
+// - If the requester is an employee → notifies all team leaders in the same department.
 func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) error {
 	// Validate dates
 	if leave.EndDate.Before(leave.StartDate) {
@@ -62,7 +64,42 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		msg = fmt.Sprintf("%s %s requested a leave from %s to %s", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
 	}
 
-	// Notify team leaders of the SAME department to review
+	actionUrl := "/approvals"
+
+	// Team leader requests go directly to managers — skip TL approval step.
+	if emp.Role == "team_leader" {
+		var managers []models.Employee
+		if emp.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "manager" {
+					managers = append(managers, e)
+				}
+			}
+		}
+		// If no manager found in dept, fall back to all managers
+		if len(managers) == 0 {
+			managers, _ = s.employeeRepo.GetByRole(ctx, "manager")
+		}
+		for _, mgr := range managers {
+			if err := s.notifService.SendNotification(ctx, &models.Notification{
+				RecipientID:       mgr.ID,
+				SenderID:          &leave.EmployeeID,
+				Type:              "leave_request",
+				Title:             "New Leave Request (Team Leader)",
+				Message:           strPtr(msg),
+				RelatedEntityType: strPtr("leave"),
+				RelatedEntityID:   &leave.ID,
+				Priority:          "high",
+				ActionUrl:         &actionUrl,
+			}); err != nil {
+				fmt.Printf("Failed to send leave notification to manager: %v\n", err)
+			}
+		}
+		return nil
+	}
+
+	// Employee requests → notify all team leaders in the same department.
 	var teamLeaders []models.Employee
 	if emp.DepartmentID != nil {
 		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
@@ -72,8 +109,6 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 			}
 		}
 	}
-
-	actionUrl := "/approvals"
 	for _, tl := range teamLeaders {
 		if err := s.notifService.SendNotification(ctx, &models.Notification{
 			RecipientID:       tl.ID,
@@ -93,8 +128,9 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	return nil
 }
 
-// ApproveByTeamLeader records one TL's approval. Only when ALL TLs approve
-// does the leave move to "approved_by_team_leader" status.
+// ApproveByTeamLeader grants final approval to a leave request.
+// The FIRST team leader to approve immediately finalizes the leave — no other TLs
+// or manager approval is required for employee leaves.
 func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUID, teamLeaderID uuid.UUID) error {
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
@@ -110,32 +146,6 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		return fmt.Errorf("you have already approved this leave request")
 	}
 
-	// Record the individual approval
-	if err := s.leaveRepo.RecordApproval(ctx, leaveID, teamLeaderID, "team_leader", "approved", nil); err != nil {
-		return err
-	}
-
-	// Count how many TLs have now approved
-	approvedCount, _ := s.leaveRepo.CountTLApprovals(ctx, leaveID)
-
-	// Count total team leaders in the employee's department
-	var teamLeaders []models.Employee
-	// Removed unused deptErr
-	if leave.EmployeeID != uuid.Nil {
-		leaveEmp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
-		if leaveEmp != nil && leaveEmp.DepartmentID != nil {
-			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *leaveEmp.DepartmentID)
-			for _, e := range deptEmps {
-				if e.Role == "team_leader" {
-					teamLeaders = append(teamLeaders, e)
-				}
-			}
-		} else {
-			teamLeaders, _ = s.employeeRepo.GetByRole(ctx, "team_leader")
-		}
-	}
-	totalTLs := len(teamLeaders)
-
 	// Get the TL's name for the notification
 	tlEmployee, _ := s.employeeRepo.GetByID(ctx, teamLeaderID)
 	tlName := "A team leader"
@@ -143,81 +153,49 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		tlName = tlEmployee.FirstName + " " + tlEmployee.LastName
 	}
 
-	if totalTLs > 0 && approvedCount >= totalTLs {
-		// ALL team leaders approved → move to next stage
-		if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "approved_by_team_leader", teamLeaderID, "team_leader"); err != nil {
-			return err
-		}
+	// Record the individual approval
+	if err := s.leaveRepo.RecordApproval(ctx, leaveID, teamLeaderID, "team_leader", "approved", nil); err != nil {
+		return err
+	}
 
-		// Notify managers of the SAME department for final approval
-		var managers []models.Employee
-		if leave.EmployeeID != uuid.Nil {
-			leaveEmp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
-			if leaveEmp != nil && leaveEmp.DepartmentID != nil {
-				deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *leaveEmp.DepartmentID)
-				for _, e := range deptEmps {
-					if e.Role == "manager" {
-						managers = append(managers, e)
-					}
-				}
-			}
-		}
+	// Immediately finalize: set status to approved_by_manager so the leave is fully approved.
+	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "approved_by_manager", teamLeaderID, "manager"); err != nil {
+		return err
+	}
 
-		for _, mgr := range managers {
-			if err := s.notifService.SendNotification(ctx, &models.Notification{
-				RecipientID:       mgr.ID,
-				SenderID:          &teamLeaderID,
-				Type:              "approval",
-				Title:             "Leave Request Awaiting Approval",
-				Message:           strPtr("A leave request has been approved by ALL team leaders and needs your final approval"),
-				RelatedEntityType: strPtr("leave"),
-				RelatedEntityID:   &leaveID,
-				Priority:          "high",
-			}); err != nil {
-				fmt.Printf("Failed to send manager notification: %v\n", err)
-			}
-		}
+	// Apply leave to employee_shifts (same logic as manager final approval)
+	if applyErr := s.applyLeaveToShifts(ctx, leave, teamLeaderID); applyErr != nil {
+		fmt.Printf("[LEAVE] Failed to apply leave shifts: %v\n", applyErr)
+	}
 
-		// Notify employee — all TLs approved
-		if err := s.notifService.SendNotification(ctx, &models.Notification{
-			RecipientID:       leave.EmployeeID,
-			SenderID:          &teamLeaderID,
-			Type:              "approval",
-			Title:             "Leave Approved by All Team Leaders",
-			Message:           strPtr(fmt.Sprintf("%s has approved your leave request. All team leaders have now approved — awaiting manager approval.", tlName)),
-			RelatedEntityType: strPtr("leave"),
-			RelatedEntityID:   &leaveID,
-			Priority:          "medium",
-		}); err != nil {
-			fmt.Printf("Failed to send employee notification (all TLs): %v\n", err)
-		}
-	} else {
-		// Notify employee — partial approval with TL name
-		if err := s.notifService.SendNotification(ctx, &models.Notification{
-			RecipientID:       leave.EmployeeID,
-			SenderID:          &teamLeaderID,
-			Type:              "approval",
-			Title:             fmt.Sprintf("Leave Approved by %s", tlName),
-			Message:           strPtr(fmt.Sprintf("%s has approved your leave request (%d of %d team leaders approved).", tlName, approvedCount, totalTLs)),
-			RelatedEntityType: strPtr("leave"),
-			RelatedEntityID:   &leaveID,
-			Priority:          "low",
-		}); err != nil {
-			fmt.Printf("Failed to send employee notification (partial TL): %v\n", err)
-		}
+	// Notify the employee that the leave is fully approved
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       leave.EmployeeID,
+		SenderID:          &teamLeaderID,
+		Type:              "approval",
+		Title:             "Leave Approved",
+		Message:           strPtr(fmt.Sprintf("%s has approved your leave request. Your leave is now fully approved!", tlName)),
+		RelatedEntityType: strPtr("leave"),
+		RelatedEntityID:   &leaveID,
+		Priority:          "high",
+	}); err != nil {
+		fmt.Printf("Failed to send employee approval notification: %v\n", err)
 	}
 
 	return nil
 }
 
 // ApproveByManager gives final approval to a leave request.
+// Used for team_leader-submitted leaves that go directly to the manager.
 func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, managerID uuid.UUID) error {
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
 		return fmt.Errorf("leave not found: %w", err)
 	}
-	if leave.Status != "approved_by_team_leader" {
-		return fmt.Errorf("leave must be approved by all team leaders first, current status: %s", leave.Status)
+	// Accept both "pending" (TL-submitted leave routed directly to manager)
+	// and "approved_by_team_leader" (legacy path, kept for safety).
+	if leave.Status != "pending" && leave.Status != "approved_by_team_leader" {
+		return fmt.Errorf("leave cannot be approved in its current status: %s", leave.Status)
 	}
 
 	// Record the manager approval
@@ -229,9 +207,31 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		return err
 	}
 
-	// ── Apply leave to employee_shifts ──────────────────────────────────────
-	// For each calendar day in the leave range, upsert the employee's shift row
-	// to shift_status='leave'. This makes the daily schedule display correctly.
+	// Apply leave to employee_shifts
+	if applyErr := s.applyLeaveToShifts(ctx, leave, managerID); applyErr != nil {
+		fmt.Printf("[LEAVE] Failed to apply leave shifts: %v\n", applyErr)
+	}
+
+	// Notify employee about final approval
+	if err := s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       leave.EmployeeID,
+		SenderID:          &managerID,
+		Type:              "approval",
+		Title:             "Leave Approved",
+		Message:           strPtr("Your leave request has been fully approved!"),
+		RelatedEntityType: strPtr("leave"),
+		RelatedEntityID:   &leaveID,
+		Priority:          "high",
+	}); err != nil {
+		fmt.Printf("Failed to send manager approval notification: %v\n", err)
+	}
+
+	return nil
+}
+
+// applyLeaveToShifts upserts employee_shifts rows to shift_status='leave' for every
+// day in the leave date range. This is shared between TL and manager approval paths.
+func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Leave, approverID uuid.UUID) error {
 	leaveReason := "leave"
 	if leave.Reason != nil && *leave.Reason != "" {
 		leaveReason = *leave.Reason
@@ -278,28 +278,12 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 			ShiftDate:   d,
 			ShiftStatus: "leave",
 			LeaveReason: leaveReasonPtr,
-			CreatedBy:   &managerID,
+			CreatedBy:   &approverID,
 		}
 		if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
 			fmt.Printf("[LEAVE] Failed to upsert employee shift for %s on %s: %v\n", leave.EmployeeID, d.Format("2006-01-02"), upsertErr)
 		}
 	}
-	// ────────────────────────────────────────────────────────────────────────
-
-	// Notify employee about final approval
-	if err := s.notifService.SendNotification(ctx, &models.Notification{
-		RecipientID:       leave.EmployeeID,
-		SenderID:          &managerID,
-		Type:              "approval",
-		Title:             "Leave Approved",
-		Message:           strPtr("Your leave request has been fully approved!"),
-		RelatedEntityType: strPtr("leave"),
-		RelatedEntityID:   &leaveID,
-		Priority:          "high",
-	}); err != nil {
-		fmt.Printf("Failed to send manager approval notification: %v\n", err)
-	}
-
 	return nil
 }
 

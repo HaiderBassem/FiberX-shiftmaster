@@ -258,6 +258,38 @@ func (h *InfoTableHandler) AddEmployeeAccess(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func (h *InfoTableHandler) RemoveEmployeeAccess(c *gin.Context) {
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+	roleStr, _ := c.Get("role")
+	role := roleStr.(string)
+	
+	var depID *uuid.UUID
+	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
+		id, _ := uuid.Parse(depStr.(string))
+		depID = &id
+	}
+
+	tableID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table id"})
+		return
+	}
+
+	targetEmployeeID, err := uuid.Parse(c.Param("employeeId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid employee id"})
+		return
+	}
+
+	err = h.svc.RemoveEmployeeAccess(c.Request.Context(), empID, role, depID, tableID, targetEmployeeID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (h *InfoTableHandler) GetAccessLists(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))

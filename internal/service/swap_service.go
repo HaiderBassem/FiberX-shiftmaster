@@ -171,40 +171,77 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 		return nil
 	}
 
-	// Employee accepted → Notify ONLY Team Leaders of the SAME department for approval
-	var teamLeaders []models.Employee
+	// Employee accepted.
+	// If the requester is a team_leader → notify managers directly for approval.
+	// If the requester is a regular employee → notify team leaders as before.
+	requester, _ := s.employeeRepo.GetByID(ctx, swap.RequesterID)
+	requesterIsTeamLeader := requester != nil && requester.Role == "team_leader"
+
 	target, _ := s.employeeRepo.GetByID(ctx, swap.TargetEmployeeID)
-	if target != nil && target.DepartmentID != nil {
-		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *target.DepartmentID)
-		for _, e := range deptEmps {
-			if e.Role == "team_leader" {
-				teamLeaders = append(teamLeaders, e)
+
+	if requesterIsTeamLeader {
+		// TL swap → notify managers
+		var managers []models.Employee
+		if target != nil && target.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *target.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "manager" {
+					managers = append(managers, e)
+				}
+			}
+		}
+		for _, mgr := range managers {
+			if err := s.notifService.SendNotification(ctx, &models.Notification{
+				RecipientID:       mgr.ID,
+				SenderID:          &employeeID,
+				Type:              "approval",
+				Title:             "Shift Swap Approval Required (Team Leader)",
+				Message:           strPtr("A team leader shift swap has been agreed upon by both employees and needs your approval"),
+				RelatedEntityType: strPtr("swap"),
+				RelatedEntityID:   &swapID,
+				Priority:          "high",
+			}); err != nil {
+				fmt.Printf("[SWAP] Failed to notify manager %s about TL swap approval: %v\n", mgr.ID, err)
+			}
+		}
+	} else {
+		// Employee swap → notify team leaders of the SAME department
+		var teamLeaders []models.Employee
+		if target != nil && target.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *target.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "team_leader" {
+					teamLeaders = append(teamLeaders, e)
+				}
+			}
+		}
+		for _, tl := range teamLeaders {
+			if err := s.notifService.SendNotification(ctx, &models.Notification{
+				RecipientID:       tl.ID,
+				SenderID:          &employeeID,
+				Type:              "approval",
+				Title:             "Shift Swap Approval Required",
+				Message:           strPtr("A shift swap has been agreed upon by both employees and needs your approval"),
+				RelatedEntityType: strPtr("swap"),
+				RelatedEntityID:   &swapID,
+				Priority:          "high",
+			}); err != nil {
+				fmt.Printf("[SWAP] Failed to notify team leader %s about swap approval needed: %v\n", tl.ID, err)
 			}
 		}
 	}
 
-	for _, tl := range teamLeaders {
-		if err := s.notifService.SendNotification(ctx, &models.Notification{
-			RecipientID:       tl.ID,
-			SenderID:          &employeeID,
-			Type:              "approval",
-			Title:             "Shift Swap Approval Required",
-			Message:           strPtr("A shift swap has been agreed upon by both employees and needs your approval"),
-			RelatedEntityType: strPtr("swap"),
-			RelatedEntityID:   &swapID,
-			Priority:          "high",
-		}); err != nil {
-			fmt.Printf("[SWAP] Failed to notify team leader %s about swap approval needed: %v\n", tl.ID, err)
-		}
-	}
-
 	// Notify requester that target accepted
+	awaiting := "team leader"
+	if requesterIsTeamLeader {
+		awaiting = "manager"
+	}
 	if err := s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       swap.RequesterID,
 		SenderID:          &employeeID,
 		Type:              "shift_change",
 		Title:             "Swap Accepted",
-		Message:           strPtr("Your swap request has been accepted! Awaiting team leader approval."),
+		Message:           strPtr(fmt.Sprintf("Your swap request has been accepted! Awaiting %s approval.", awaiting)),
 		RelatedEntityType: strPtr("swap"),
 		RelatedEntityID:   &swapID,
 		Priority:          "medium",
@@ -216,18 +253,19 @@ func (s *SwapService) EmployeeRespond(ctx context.Context, swapID uuid.UUID, emp
 }
 
 // ApproveSwap approves the swap and actually swaps the shifts in the schedule.
-// Phase 3: swap approvals are team_leader only (manager approval is skipped).
+// - Employee swaps: approved by team_leader only.
+// - Team leader swaps: approved by manager only.
 func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approverID uuid.UUID, approverRole string) error {
-	if approverRole != "team_leader" {
-		return fmt.Errorf("only team_leader can approve swaps")
+	if approverRole != "team_leader" && approverRole != "manager" {
+		return fmt.Errorf("only team_leader or manager can approve swaps")
 	}
 
 	swap, err := s.swapRepo.GetByID(ctx, swapID)
 	if err != nil {
-		return fmt.Errorf("swap not found: %w", err)
+		return err
 	}
 	if swap.Status != "employee_accepted" {
-		return fmt.Errorf("swap is not pending manager/leader approval, current status: %s", swap.Status)
+		return fmt.Errorf("swap is not pending approval, current status: %s", swap.Status)
 	}
 
 	err = s.db.ExecTx(ctx, func(txCtx context.Context, tx pgx.Tx) error {
@@ -318,10 +356,12 @@ func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approve
 	return nil
 }
 
-// RejectSwap rejects a swap request. Phase 3: team_leader only.
+// RejectSwap rejects a swap request.
+// - Employee swaps: rejected by team_leader.
+// - Team leader swaps: rejected by manager.
 func (s *SwapService) RejectSwap(ctx context.Context, swapID uuid.UUID, approverID uuid.UUID, approverRole string) error {
-	if approverRole != "team_leader" {
-		return fmt.Errorf("only team_leader can reject swaps")
+	if approverRole != "team_leader" && approverRole != "manager" {
+		return fmt.Errorf("only team_leader or manager can reject swaps")
 	}
 
 	swap, err := s.swapRepo.GetByID(ctx, swapID)

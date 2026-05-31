@@ -72,11 +72,14 @@ func (r *InfoTableRepository) GetVisibleTables(ctx context.Context, employeeID u
 			SELECT DISTINCT t.id, t.name, t.description, t.columns, t.department_id, t.created_by, t.created_at, t.updated_at
 			FROM info_tables t
 			LEFT JOIN info_table_department_access d_acc ON t.id = d_acc.table_id
-			LEFT JOIN info_table_employee_access e_acc ON t.id = e_acc.table_id
-			WHERE t.created_by = $1
+			LEFT JOIN info_table_employee_access e_acc ON t.id = e_acc.table_id AND e_acc.employee_id = $1
+			WHERE (
+			      t.created_by = $1
 			   OR (t.department_id = $2 AND $2 IS NOT NULL)
 			   OR (d_acc.department_id = $2 AND $2 IS NOT NULL)
-			   OR e_acc.employee_id = $1
+			   OR (e_acc.employee_id = $1 AND e_acc.access_level != 'none')
+			)
+			AND (e_acc.access_level IS NULL OR e_acc.access_level != 'none')
 			ORDER BY t.created_at DESC
 		`
 		rows, err = r.db.Query(ctx, query, employeeID, departmentID)

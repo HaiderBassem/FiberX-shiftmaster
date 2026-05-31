@@ -61,4 +61,8 @@ export const infoTableService = {
       access_level: accessLevel,
     });
   },
+
+  removeEmployeeAccess: async (tableId: string, employeeId: string): Promise<void> => {
+    await api.delete(`/info-tables/${tableId}/access/employee/${employeeId}`);
+  },
 };

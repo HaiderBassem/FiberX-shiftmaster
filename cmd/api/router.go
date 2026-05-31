@@ -150,6 +150,7 @@ func SetupRouter(
 			// Access Management
 			infoTables.GET("/:id/access", infoTableH.GetAccessLists)
 			infoTables.POST("/:id/access", infoTableH.AddEmployeeAccess)
+			infoTables.DELETE("/:id/access/employee/:employeeId", infoTableH.RemoveEmployeeAccess)
 			infoTables.POST("/:id/department-access", infoTableH.ShareWithDepartment)
 		}
 

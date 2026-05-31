@@ -44,6 +44,16 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 		return table, nil
 	}
 
+	// Check explicit employee accesses first for blocking
+	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
+	if err == nil {
+		for _, ea := range empAccesses {
+			if ea.EmployeeID == reqEmployeeID && ea.AccessLevel == "none" {
+				return nil, errors.New("unauthorized access to table (explicitly blocked)")
+			}
+		}
+	}
+
 	// Check department matching
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
 		return table, nil
@@ -59,8 +69,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 		}
 	}
 
-	// Check employee accesses
-	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
+	// Check employee accesses (again for granting)
 	if err == nil {
 		for _, ea := range empAccesses {
 			if ea.EmployeeID == reqEmployeeID {
@@ -85,6 +94,21 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 		return true
 	}
 	
+	// Check explicit employee access first
+	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
+	if err == nil {
+		for _, ea := range empAccesses {
+			if ea.EmployeeID == reqEmployeeID {
+				if ea.AccessLevel == "none" {
+					return false
+				}
+				if ea.AccessLevel == "write" {
+					return true
+				}
+			}
+		}
+	}
+
 	// If it's a manager/TL in the table's original department, they have full access to manage it.
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
 		if reqRole == "manager" || reqRole == "team_leader" {
@@ -104,16 +128,6 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 		}
 	}
 
-	// Check explicit employee write access
-	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
-	if err == nil {
-		for _, ea := range empAccesses {
-			if ea.EmployeeID == reqEmployeeID && ea.AccessLevel == "write" {
-				return true
-			}
-		}
-	}
-
 	return false
 }
 
@@ -128,6 +142,16 @@ func (s *InfoTableService) HasManageAccessRight(ctx context.Context, tableID uui
 	if table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID {
 		return true
 	}
+	// Explicit block check
+	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
+	if err == nil {
+		for _, ea := range empAccesses {
+			if ea.EmployeeID == reqEmployeeID && ea.AccessLevel == "none" {
+				return false
+			}
+		}
+	}
+
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
 		if reqRole == "manager" || reqRole == "team_leader" {
 			return true
@@ -235,4 +259,22 @@ func (s *InfoTableService) GetAccessLists(ctx context.Context, tableID uuid.UUID
 	depAcc, _ := s.repo.GetDepartmentAccesses(ctx, tableID)
 	empAcc, _ := s.repo.GetEmployeeAccesses(ctx, tableID)
 	return depAcc, empAcc, nil
+}
+
+func (s *InfoTableService) RemoveEmployeeAccess(ctx context.Context, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID, tableID uuid.UUID, targetEmployeeID uuid.UUID) error {
+	if !s.HasManageAccessRight(ctx, tableID, reqEmployeeID, reqRole, reqDepID) {
+		return errors.New("unauthorized to manage access for this table")
+	}
+	
+	if reqRole != "admin" {
+		emp, err := s.employeeRepo.GetByID(ctx, targetEmployeeID)
+		if err != nil {
+			return err
+		}
+		if reqDepID == nil || emp.DepartmentID == nil || *reqDepID != *emp.DepartmentID {
+			return errors.New("cannot manage access for employees outside your department")
+		}
+	}
+
+	return s.repo.RemoveEmployeeAccess(ctx, tableID, targetEmployeeID)
 }
