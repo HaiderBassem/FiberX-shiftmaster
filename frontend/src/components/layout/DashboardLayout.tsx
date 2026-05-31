@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { NotificationToastContainer } from '@/components/NotificationToast';
 
 export const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +33,9 @@ export const DashboardLayout = () => {
           <Outlet />
         </div>
       </main>
+
+      {/* Global notification toasts — rendered above everything */}
+      <NotificationToastContainer />
     </div>
   );
 };
