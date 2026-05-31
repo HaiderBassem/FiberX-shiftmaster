@@ -73,18 +73,32 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	poolCfg.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 	poolCfg.ConnConfig.RuntimeParams = map[string]string{
 		"application_name":                    "shiftmaster-api",
-		"timezone":                            "Asia/Baghdad",
+		// Always use UTC at the DB session level. Timestamps are stored as UTC
+		// and the frontend converts to Asia/Baghdad (UTC+3) for display.
+		"timezone":                            "UTC",
 		"statement_timeout":                   fmt.Sprintf("%d", cfg.QueryTimeout.Milliseconds()),
 		"lock_timeout":                        "10000",
 		"idle_in_transaction_session_timeout": "60000",
 	}
 
+	// BeforeAcquire: re-apply UTC timezone (RESET ALL in AfterRelease would
+	// wipe RuntimeParams, so we must re-set it here) and inject tenant context.
 	poolCfg.BeforeAcquire = func(ctx context.Context, conn *pgx.Conn) bool {
+		if _, err := conn.Exec(ctx, "SET timezone TO 'UTC'"); err != nil {
+			return false
+		}
 		return setTenantContext(ctx, conn)
 	}
 
+	// AfterRelease: clear tenant-specific session variables so the next
+	// caller never inherits the previous user's context. We only reset the
+	// app settings rather than RESET ALL so that connection-level parameters
+	// (like statement_timeout) that are expensive to re-apply survive.
 	poolCfg.AfterRelease = func(conn *pgx.Conn) bool {
-		_, err := conn.Exec(context.Background(), "RESET ALL")
+		_, err := conn.Exec(context.Background(),
+			"SELECT set_config('app.current_company_id','',false),"+
+				"set_config('app.current_user_id','',false),"+
+				"set_config('app.client_ip','',false)")
 		return err == nil
 	}
 

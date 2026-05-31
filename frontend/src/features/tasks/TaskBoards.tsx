@@ -12,6 +12,7 @@ import {
   Filter, X, Loader2, Play, CheckCircle2, Clock, BarChart3
 } from 'lucide-react';
 import { format, startOfWeek, addDays, subDays } from 'date-fns';
+import { fmtDate } from '@/lib/dateUtils';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -359,7 +360,7 @@ const BoardListView = ({
                         }`}>
                           {board.recurrence_type === 'daily' ? '🔄 Daily' : '📅 Weekly'}
                         </span>
-                        <span className="text-muted-foreground/60">Created {format(new Date(board.created_at), 'MMM d, yyyy')}</span>
+                        <span className="text-muted-foreground/60">Created {fmtDate(board.created_at)}</span>
                       </div>
                     </CardContent>
                   </Card>
