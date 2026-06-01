@@ -56,6 +56,7 @@ func SetupRouter(
 		departments := protected.Group("/departments")
 		{
 			departments.GET("", deptH.List)
+			departments.GET("/my-managed", deptH.MyManaged)
 			departments.GET("/:id", deptH.GetByID)
 		}
 
