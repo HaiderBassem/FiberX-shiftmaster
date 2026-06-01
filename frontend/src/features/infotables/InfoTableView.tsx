@@ -78,9 +78,8 @@ const InfoTableView: React.FC = () => {
     );
   });
 
-  const canManageAccess = ['admin', 'manager', 'team_leader'].includes(user?.role || '') || table.created_by === user?.id;
-  // Simplistic write check (the backend enforces strictly)
-  const canWrite = true; 
+  const canManageAccess = table.my_access_level === 'manage' || user?.role === 'admin';
+  const canWrite = table.my_access_level === 'manage' || table.my_access_level === 'write' || user?.role === 'admin'; 
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -153,13 +152,13 @@ const InfoTableView: React.FC = () => {
                     {col.name}
                   </th>
                 ))}
-                <th className="px-6 py-4 text-right">Actions</th>
+                {canWrite && <th className="px-6 py-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={table.columns.length + 1} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={table.columns.length + (canWrite ? 1 : 0)} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No rows found.
                   </td>
                 </tr>
@@ -179,27 +178,29 @@ const InfoTableView: React.FC = () => {
                         )}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setEditingRow(row);
-                            setIsRowModalOpen(true);
-                          }}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-md transition-colors"
-                          title="Edit Row"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRow(row.id)}
-                          className="p-1.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 rounded-md transition-colors"
-                          title="Delete Row"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {canWrite && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingRow(row);
+                              setIsRowModalOpen(true);
+                            }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30 rounded-md transition-colors"
+                            title="Edit Row"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRow(row.id)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30 rounded-md transition-colors"
+                            title="Delete Row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

@@ -3,6 +3,7 @@ import { X, Users, UserPlus, Trash2 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import api from '@/lib/api';
 import type { InfoTable, InfoTableDepartmentAccess, InfoTableEmployeeAccess } from '../../types/infoTable';
+import { useAuthStore } from '@/store/authStore';
 
 interface Department {
   id: string;
@@ -28,6 +29,7 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
   const [depAccesses, setDepAccesses] = useState<InfoTableDepartmentAccess[]>([]);
   const [empAccesses, setEmpAccesses] = useState<InfoTableEmployeeAccess[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuthStore();
 
   // Form states
   const [selectedDepId, setSelectedDepId] = useState('');
@@ -49,7 +51,14 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
         infoTableService.getAccessLists(table.id)
       ]);
       setDepartments(deps);
-      setEmployees(emps);
+      
+      // Filter employees if not admin
+      let filteredEmps = emps;
+      if (user?.role !== 'admin') {
+        filteredEmps = emps.filter((e: any) => e.department_id === user?.department_id);
+      }
+      setEmployees(filteredEmps);
+      
       setDepAccesses(access.departments || []);
       setEmpAccesses(access.employees || []);
     } catch (error) {
@@ -112,6 +121,7 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
           ) : (
             <div className="space-y-8">
               {/* Department Sharing */}
+              {user?.role === 'admin' && (
               <div>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">
                   Share with Department
@@ -152,6 +162,7 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
                   </div>
                 )}
               </div>
+              )}
 
               {/* Employee Access */}
               <div>

@@ -65,8 +65,19 @@ func (r *InfoTableRepository) GetVisibleTables(ctx context.Context, employeeID u
 	var err error
 
 	if role == "admin" {
-		query = `SELECT id, name, description, columns, department_id, created_by, created_at, updated_at FROM info_tables ORDER BY created_at DESC`
-		rows, err = r.db.Query(ctx, query)
+		if departmentID != nil {
+			query = `
+				SELECT DISTINCT t.id, t.name, t.description, t.columns, t.department_id, t.created_by, t.created_at, t.updated_at
+				FROM info_tables t
+				LEFT JOIN info_table_department_access d_acc ON t.id = d_acc.table_id
+				WHERE t.department_id = $1 OR d_acc.department_id = $1
+				ORDER BY t.created_at DESC
+			`
+			rows, err = r.db.Query(ctx, query, departmentID)
+		} else {
+			query = `SELECT id, name, description, columns, department_id, created_by, created_at, updated_at FROM info_tables ORDER BY created_at DESC`
+			rows, err = r.db.Query(ctx, query)
+		}
 	} else {
 		query = `
 			SELECT DISTINCT t.id, t.name, t.description, t.columns, t.department_id, t.created_by, t.created_at, t.updated_at

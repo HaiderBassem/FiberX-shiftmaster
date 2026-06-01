@@ -18,10 +18,11 @@ type InfoTable struct {
 	Name         string            `json:"name"`
 	Description  *string           `json:"description"`
 	Columns      []InfoTableColumn `json:"columns"`
-	DepartmentID *uuid.UUID        `json:"department_id"`
-	CreatedBy    *uuid.UUID        `json:"created_by"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	DepartmentID  *uuid.UUID        `json:"department_id"`
+	CreatedBy     *uuid.UUID        `json:"created_by"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	MyAccessLevel string            `json:"my_access_level,omitempty"`
 }
 
 type InfoTableDepartmentAccess struct {

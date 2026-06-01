@@ -31,7 +31,16 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 }
 
 func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid.UUID, role string, departmentID *uuid.UUID) ([]models.InfoTable, error) {
-	return s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
+	tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
+	if err != nil {
+		return nil, err
+	}
+	
+	for i := range tables {
+		tables[i].MyAccessLevel = s.computeAccessLevel(ctx, &tables[i], employeeID, role, departmentID)
+	}
+	
+	return tables, nil
 }
 
 func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) (*models.InfoTable, error) {
@@ -41,6 +50,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	}
 
 	if reqRole == "admin" || (table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID) {
+		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
 		return table, nil
 	}
 
@@ -56,6 +66,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 
 	// Check department matching
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
+		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
 		return table, nil
 	}
 
@@ -64,6 +75,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	if err == nil {
 		for _, da := range depAccesses {
 			if reqDepID != nil && da.DepartmentID == *reqDepID {
+				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
 				return table, nil
 			}
 		}
@@ -73,12 +85,52 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	if err == nil {
 		for _, ea := range empAccesses {
 			if ea.EmployeeID == reqEmployeeID {
+				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
 				return table, nil
 			}
 		}
 	}
 
 	return nil, errors.New("unauthorized access to table")
+}
+
+func (s *InfoTableService) computeAccessLevel(ctx context.Context, table *models.InfoTable, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) string {
+	if reqRole == "admin" || (table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID) {
+		return "manage"
+	}
+
+	empAccesses, _ := s.repo.GetEmployeeAccesses(ctx, table.ID)
+	for _, ea := range empAccesses {
+		if ea.EmployeeID == reqEmployeeID {
+			if ea.AccessLevel == "none" {
+				return "none"
+			}
+			if ea.AccessLevel == "write" {
+				return "write"
+			}
+			if ea.AccessLevel == "read" {
+				return "read"
+			}
+		}
+	}
+
+	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
+		if reqRole == "manager" || reqRole == "team_leader" {
+			return "manage"
+		}
+	}
+
+	depAccesses, _ := s.repo.GetDepartmentAccesses(ctx, table.ID)
+	for _, da := range depAccesses {
+		if reqDepID != nil && da.DepartmentID == *reqDepID {
+			if reqRole == "manager" || reqRole == "team_leader" {
+				return "manage"
+			}
+		}
+	}
+
+	// Default for a member of the department (or shared department) who is not explicitly listed
+	return "read"
 }
 
 func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) bool {

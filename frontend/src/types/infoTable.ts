@@ -14,6 +14,7 @@ export interface InfoTable {
   created_by?: string;
   created_at: string;
   updated_at: string;
+  my_access_level?: string;
 }
 
 export interface InfoTableRow {
