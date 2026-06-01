@@ -25,6 +25,9 @@ type DepartmentRepository interface {
 	RemoveManager(ctx context.Context, departmentID, managerID uuid.UUID) error
 	SetManagers(ctx context.Context, departmentID uuid.UUID, managerIDs []uuid.UUID) error
 	GetManagers(ctx context.Context, departmentID uuid.UUID) ([]uuid.UUID, error)
+
+	// GetByManagerID returns all departments that a given manager is assigned to.
+	GetByManagerID(ctx context.Context, managerID uuid.UUID) ([]models.Department, error)
 }
 
 type departmentRepo struct {
@@ -214,4 +217,47 @@ func (r *departmentRepo) SetManagers(ctx context.Context, departmentID uuid.UUID
 // GetManagers returns the manager IDs for a department.
 func (r *departmentRepo) GetManagers(ctx context.Context, departmentID uuid.UUID) ([]uuid.UUID, error) {
 	return r.loadManagerIDs(ctx, departmentID)
+}
+
+// GetByManagerID returns all departments that the given manager is assigned to
+// via the department_managers junction table.
+func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID) ([]models.Department, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT d.id, d.department_code, d.name, d.description, d.created_at, d.updated_at
+		 FROM departments d
+		 INNER JOIN department_managers dm ON dm.department_id = d.id
+		 WHERE dm.manager_id = $1
+		 ORDER BY d.name`,
+		managerID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get departments by manager: %w", err)
+	}
+	defer rows.Close()
+
+	var departments []models.Department
+	for rows.Next() {
+		var dept models.Department
+		if err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
+			&dept.CreatedAt, &dept.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan department: %w", err)
+		}
+		departments = append(departments, dept)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Load manager IDs for each department
+	var loadErr error
+	for i := range departments {
+		departments[i].ManagerIDs, loadErr = r.loadManagerIDs(ctx, departments[i].ID)
+		if loadErr != nil {
+			return nil, fmt.Errorf("load manager ids for %s: %w", departments[i].ID, loadErr)
+		}
+	}
+	if departments == nil {
+		departments = []models.Department{}
+	}
+	return departments, nil
 }
