@@ -296,6 +296,6 @@ func (s *TaskService) GetTaskExecution(ctx context.Context, assignmentID uuid.UU
 	return s.taskRepo.GetExecutionByAssignment(ctx, assignmentID)
 }
 
-func (s *TaskService) GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID) ([]models.TaskHistoryRow, error) {
-	return s.taskRepo.GetTaskHistory(ctx, date, boardID)
+func (s *TaskService) GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID, departmentID *uuid.UUID) ([]models.TaskHistoryRow, error) {
+	return s.taskRepo.GetTaskHistory(ctx, date, boardID, departmentID)
 }

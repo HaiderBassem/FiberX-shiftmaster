@@ -219,9 +219,10 @@ func (h *LeaveHandler) Reject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "leave rejected"}})
 }
 
-// LeaveHistory returns all leaves with approval details for supervisors.
+// LeaveHistory returns all leaves with approval details for supervisors, optionally filtered by department.
 func (h *LeaveHandler) LeaveHistory(c *gin.Context) {
-	history, err := h.leaveSvc.GetLeaveHistory(c.Request.Context())
+	deptID := getDepartmentID(c)
+	history, err := h.leaveSvc.GetLeaveHistory(c.Request.Context(), deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

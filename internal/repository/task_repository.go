@@ -59,7 +59,7 @@ type TaskRepository interface {
 	CompleteExecution(ctx context.Context, id uuid.UUID, completionType string, notes *string) error
 
 	// Task History (supervisor view)
-	GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID) ([]models.TaskHistoryRow, error)
+	GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID, departmentID *uuid.UUID) ([]models.TaskHistoryRow, error)
 }
 
 type taskRepo struct {
@@ -585,8 +585,8 @@ func (r *taskRepo) CompleteExecution(ctx context.Context, id uuid.UUID, completi
 }
 
 // GetTaskHistory returns all completed/in_progress tasks for a given date,
-// optionally filtered by board. Used by team leaders and managers.
-func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID) ([]models.TaskHistoryRow, error) {
+// optionally filtered by board and department. Used by team leaders and managers.
+func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *uuid.UUID, departmentID *uuid.UUID) ([]models.TaskHistoryRow, error) {
 	query := `
 		SELECT
 			ta.id AS assignment_id,
@@ -611,11 +611,22 @@ func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *
 		WHERE ta.assigned_date = $1
 	`
 	args := []interface{}{date}
+	argCount := 1
+
 	if boardID != nil {
-		query += " AND ts.board_id = $2"
+		argCount++
+		query += fmt.Sprintf(" AND ts.board_id = $%d", argCount)
 		args = append(args, *boardID)
 	}
+
+	if departmentID != nil {
+		argCount++
+		query += fmt.Sprintf(" AND tb.department_id = $%d", argCount)
+		args = append(args, *departmentID)
+	}
+
 	query += " ORDER BY te.completed_at DESC NULLS LAST, e.first_name"
+
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

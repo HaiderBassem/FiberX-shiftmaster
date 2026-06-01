@@ -114,9 +114,11 @@ const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (e
 // ─── Leave History Tab ─────────────────────────────────────────────────────────
 const LeaveHistory = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
+  const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
 
   const { data: history, isLoading } = useQuery({
-    queryKey: ['leaves', 'history'],
+    queryKey: ['leaves', 'history', selectedDeptId],
     queryFn: async () => { const res = await api.get('/leaves/history'); return res.data?.data || []; },
   });
 
@@ -231,7 +233,8 @@ const LeaveHistory = () => {
 
 // ─── Main Approval Dashboard ───────────────────────────────────────────────────
 export const ApprovalDashboard = () => {
-  const { user } = useAuthStore();
+  const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
+  const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
   const queryClient = useQueryClient();
   const [expandedLeave, setExpandedLeave] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -240,12 +243,12 @@ export const ApprovalDashboard = () => {
 
   // Use the rich endpoint for pending leaves (includes employee name, shift, department, TL approvals)
   const { data: pendingLeaves, isLoading: leavesLoading } = useQuery({
-    queryKey: ['leaves', 'pending', 'rich'],
+    queryKey: ['leaves', 'pending', 'rich', selectedDeptId],
     queryFn: async () => { const res = await api.get('/leaves/pending/rich'); return res.data?.data || []; },
   });
 
   const { data: pendingSwaps, isLoading: swapsLoading } = useQuery({
-    queryKey: ['swaps', 'pending', 'manager'],
+    queryKey: ['swaps', 'pending', 'manager', selectedDeptId],
     queryFn: async () => { const res = await api.get('/swaps/pending/manager'); return res.data?.data || []; },
   });
 

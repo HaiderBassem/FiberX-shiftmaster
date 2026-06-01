@@ -660,7 +660,8 @@ func (h *TaskHandler) TaskHistory(c *gin.Context) {
 			boardID = &parsed
 		}
 	}
-	history, err := h.taskSvc.GetTaskHistory(c.Request.Context(), date, boardID)
+	deptID := getDepartmentID(c)
+	history, err := h.taskSvc.GetTaskHistory(c.Request.Context(), date, boardID, deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

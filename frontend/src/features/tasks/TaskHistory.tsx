@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,9 +45,12 @@ export const TaskHistory = () => {
   const [selectedBoard, setSelectedBoard] = useState<string>('');
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
+  const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
+  const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
+
   // Fetch boards for filter
   const { data: boards } = useQuery({
-    queryKey: ['boards-list'],
+    queryKey: ['boards-list', selectedDeptId],
     queryFn: async () => {
       const res = await api.get('/tasks/boards');
       return (res.data?.data || []) as TaskBoard[];
@@ -55,7 +59,7 @@ export const TaskHistory = () => {
 
   // Fetch history
   const { data: history, isLoading } = useQuery({
-    queryKey: ['task-history', dateStr, selectedBoard],
+    queryKey: ['task-history', dateStr, selectedBoard, selectedDeptId],
     queryFn: async () => {
       let url = `/tasks/history?date=${dateStr}`;
       if (selectedBoard) url += `&board_id=${selectedBoard}`;

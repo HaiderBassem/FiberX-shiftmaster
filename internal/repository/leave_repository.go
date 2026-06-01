@@ -28,7 +28,7 @@ type LeaveRepository interface {
 	RecordApproval(ctx context.Context, leaveID, approverID uuid.UUID, approverRole, action string, notes *string) error
 	CountTLApprovals(ctx context.Context, leaveID uuid.UUID) (int, error)
 	HasApproved(ctx context.Context, leaveID, approverID uuid.UUID) (bool, error)
-	GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error)
+	GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID) ([]models.LeaveHistoryRow, error)
 	GetPendingLeavesRich(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.PendingLeaveRich, error)
 }
 
@@ -276,7 +276,7 @@ func (r *leaveRepo) HasApproved(ctx context.Context, leaveID, approverID uuid.UU
 	return count > 0, err
 }
 
-func (r *leaveRepo) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error) {
+func (r *leaveRepo) GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID) ([]models.LeaveHistoryRow, error) {
 	// Get all leaves with employee info
 	rows, err := r.db.Query(ctx,
 		`SELECT l.id, e.first_name || ' ' || e.last_name, e.employee_code,
@@ -285,8 +285,9 @@ func (r *leaveRepo) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryR
 		 FROM leaves l
 		 JOIN employees e ON e.id = l.employee_id
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE ($1::uuid IS NULL OR e.department_id = $1)
 		 ORDER BY l.applied_date DESC NULLS LAST
-		 LIMIT 200`)
+		 LIMIT 200`, departmentID)
 	if err != nil {
 		return nil, err
 	}

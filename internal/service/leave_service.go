@@ -349,8 +349,8 @@ func (s *LeaveService) GetPendingLeavesRich(ctx context.Context, approverID uuid
 	return s.leaveRepo.GetPendingLeavesRich(ctx, approver.Role, approver.DepartmentID)
 }
 
-// GetLeaveHistory returns all leaves with their approval details.
-func (s *LeaveService) GetLeaveHistory(ctx context.Context) ([]models.LeaveHistoryRow, error) {
-	return s.leaveRepo.GetLeaveHistory(ctx)
+// GetLeaveHistory returns all leaves with their approval details, optionally filtered by department.
+func (s *LeaveService) GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID) ([]models.LeaveHistoryRow, error) {
+	return s.leaveRepo.GetLeaveHistory(ctx, departmentID)
 }
 
