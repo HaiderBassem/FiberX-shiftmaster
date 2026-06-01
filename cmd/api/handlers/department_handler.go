@@ -50,6 +50,32 @@ func (h *DepartmentHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": dept})
 }
 
+// MyManaged returns all departments that the authenticated manager is assigned to.
+// Only meaningful for role=manager; other roles get an empty list.
+func (h *DepartmentHandler) MyManaged(c *gin.Context) {
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+	if role != "manager" {
+		c.JSON(http.StatusOK, gin.H{"success": true, "data": []interface{}{}})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	managerID, err := uuid.Parse(empIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid token"})
+		return
+	}
+
+	departments, err := h.deptRepo.GetByManagerID(c.Request.Context(), managerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": departments, "meta": gin.H{"count": len(departments)}})
+}
+
 // createDepartmentRequest supports assigning multiple managers on creation.
 type createDepartmentRequest struct {
 	DepartmentCode string      `json:"department_code" binding:"required"`
