@@ -99,7 +99,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         )}
 
         {/* ── Manager department selector ── */}
-        {user?.role === 'manager' && managedDepartments && managedDepartments.length > 1 && (
+        {user?.role === 'manager' && managedDepartments && managedDepartments.length > 0 && (
           <div className="ml-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
