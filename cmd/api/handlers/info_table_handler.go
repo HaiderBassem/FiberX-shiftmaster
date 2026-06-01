@@ -165,6 +165,17 @@ func (h *InfoTableHandler) UpdateTableRow(c *gin.Context) {
 	}
 	req.ID = rowID
 
+	tableID, err := uuid.Parse(c.Param("id"))
+	if err == nil {
+		req.TableID = tableID
+	} else {
+		// Try tableId if id fails (depends on route definitions)
+		tableID, err = uuid.Parse(c.Param("tableId"))
+		if err == nil {
+			req.TableID = tableID
+		}
+	}
+
 	updated, err := h.svc.UpdateTableRow(c.Request.Context(), &req, empID, role, depID)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})

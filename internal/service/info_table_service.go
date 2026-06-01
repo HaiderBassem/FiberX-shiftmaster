@@ -35,12 +35,16 @@ func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid
 	if err != nil {
 		return nil, err
 	}
-	
+	var filteredTables []models.InfoTable
 	for i := range tables {
-		tables[i].MyAccessLevel = s.computeAccessLevel(ctx, &tables[i], employeeID, role, departmentID)
+		accessLevel := s.computeAccessLevel(ctx, &tables[i], employeeID, role, departmentID)
+		if accessLevel != "none" {
+			tables[i].MyAccessLevel = accessLevel
+			filteredTables = append(filteredTables, tables[i])
+		}
 	}
 	
-	return tables, nil
+	return filteredTables, nil
 }
 
 func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) (*models.InfoTable, error) {
