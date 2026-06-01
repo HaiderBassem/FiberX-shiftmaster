@@ -21,6 +21,7 @@ type Config struct {
 	Logging  LoggingConfig
 	CORS     CORSConfig
 	Upload   UploadConfig
+	SMTP     SMTPConfig
 }
 
 // DatabaseConfig holds database connection and pool settings.
@@ -95,6 +96,15 @@ type UploadConfig struct {
 	AllowedTypes []string
 }
 
+// SMTPConfig holds SMTP server settings for sending emails.
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
@@ -107,6 +117,7 @@ func Load() (*Config, error) {
 		Logging:  loadLoggingConfig(),
 		CORS:     loadCORSConfig(),
 		Upload:   loadUploadConfig(),
+		SMTP:     loadSMTPConfig(),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -195,6 +206,16 @@ func loadUploadConfig() UploadConfig {
 	}
 }
 
+func loadSMTPConfig() SMTPConfig {
+	return SMTPConfig{
+		Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+		Port:     getEnvInt("SMTP_PORT", 587),
+		User:     getEnv("SMTP_USER", ""),
+		Password: getEnv("SMTP_PASSWORD", ""),
+		From:     getEnv("SMTP_FROM", "noreply@shiftmaster.com"),
+	}
+}
+
 // Validate checks all configuration values.
 func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {
@@ -211,6 +232,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Upload.Validate(); err != nil {
 		return fmt.Errorf("upload: %w", err)
+	}
+	if err := c.SMTP.Validate(); err != nil {
+		return fmt.Errorf("smtp: %w", err)
 	}
 	return nil
 }
@@ -290,6 +314,16 @@ func (s *SecurityConfig) Validate() error {
 func (u *UploadConfig) Validate() error {
 	if u.MaxSizeMB < 1 || u.MaxSizeMB > 100 {
 		return fmt.Errorf("max_size_mb must be between 1 and 100")
+	}
+	return nil
+}
+
+// Validate checks SMTP configuration.
+func (s *SMTPConfig) Validate() error {
+	// SMTP validation is somewhat optional since it might not be configured in some environments
+	// but if it is used, it should have a host and port.
+	if s.Host != "" && s.Port <= 0 {
+		return fmt.Errorf("smtp port must be valid if host is provided")
 	}
 	return nil
 }

@@ -17,6 +17,7 @@ type LeaveService struct {
 	employeeRepo repository.EmployeeRepository
 	scheduleRepo repository.ScheduleRepository
 	notifService *NotificationService
+	emailService *EmailService
 }
 
 func NewLeaveService(
@@ -24,12 +25,14 @@ func NewLeaveService(
 	employeeRepo repository.EmployeeRepository,
 	scheduleRepo repository.ScheduleRepository,
 	notifService *NotificationService,
+	emailService *EmailService,
 ) *LeaveService {
 	return &LeaveService{
 		leaveRepo:    leaveRepo,
 		employeeRepo: employeeRepo,
 		scheduleRepo: scheduleRepo,
 		notifService: notifService,
+		emailService: emailService,
 	}
 }
 
@@ -95,6 +98,15 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 			}); err != nil {
 				fmt.Printf("Failed to send leave notification to manager: %v\n", err)
 			}
+			
+			// Send email to manager
+			if mgr.Email != "" {
+				s.emailService.SendEmailAsync(
+					[]string{mgr.Email},
+					"New Leave Request (Team Leader)",
+					msg+"\n\nPlease review it in the Approval Center.",
+				)
+			}
 		}
 		return nil
 	}
@@ -122,6 +134,15 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 			ActionUrl:         &actionUrl,
 		}); err != nil {
 			fmt.Printf("Failed to send new leave notification: %v\n", err)
+		}
+
+		// Send email to team leader
+		if tl.Email != "" {
+			s.emailService.SendEmailAsync(
+				[]string{tl.Email},
+				"New Leave Request",
+				msg+"\n\nPlease review it in the Approval Center.",
+			)
 		}
 	}
 
@@ -182,6 +203,16 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		fmt.Printf("Failed to send employee approval notification: %v\n", err)
 	}
 
+	// Send email to employee
+	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if emp != nil && emp.Email != "" {
+		s.emailService.SendEmailAsync(
+			[]string{emp.Email},
+			"Leave Request Approved",
+			fmt.Sprintf("Hello %s,\n\n%s has approved your leave request. Your leave is now fully approved!", emp.FirstName, tlName),
+		)
+	}
+
 	return nil
 }
 
@@ -224,6 +255,16 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		Priority:          "high",
 	}); err != nil {
 		fmt.Printf("Failed to send manager approval notification: %v\n", err)
+	}
+
+	// Send email to employee
+	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if emp != nil && emp.Email != "" {
+		s.emailService.SendEmailAsync(
+			[]string{emp.Email},
+			"Leave Request Approved",
+			fmt.Sprintf("Hello %s,\n\nYour leave request has been fully approved by a manager!", emp.FirstName),
+		)
 	}
 
 	return nil
@@ -316,6 +357,16 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		Priority:          "high",
 	}); err != nil {
 		fmt.Printf("Failed to send rejection notification: %v\n", err)
+	}
+
+	// Send email to employee
+	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if emp != nil && emp.Email != "" {
+		s.emailService.SendEmailAsync(
+			[]string{emp.Email},
+			"Leave Request Rejected",
+			fmt.Sprintf("Hello %s,\n\nYour leave request has been rejected.\nReason: %s", emp.FirstName, reason),
+		)
 	}
 
 	return nil
