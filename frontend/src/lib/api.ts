@@ -17,8 +17,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Send the selected department header so the backend can scope responses.
     if (store.user?.role === 'admin' && store.adminSelectedDepartmentId) {
       config.headers['X-Department-ID'] = store.adminSelectedDepartmentId;
+    } else if (store.user?.role === 'manager' && store.managerSelectedDepartmentId) {
+      config.headers['X-Department-ID'] = store.managerSelectedDepartmentId;
     }
 
     return config;

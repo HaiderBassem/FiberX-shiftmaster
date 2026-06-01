@@ -18,9 +18,11 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   adminSelectedDepartmentId: string | null;
+  managerSelectedDepartmentId: string | null;
   setAuth: (token: string, user: User, refreshToken?: string) => void;
   setTokens: (token: string, refreshToken: string) => void;
   setAdminSelectedDepartmentId: (id: string | null) => void;
+  setManagerSelectedDepartmentId: (id: string | null) => void;
   logout: () => void;
 }
 
@@ -32,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       isAuthenticated: false,
       adminSelectedDepartmentId: null,
+      managerSelectedDepartmentId: null,
       setAuth: (token, user, refreshToken) =>
         set({
           token,
@@ -43,8 +46,17 @@ export const useAuthStore = create<AuthState>()(
         set({ token, refreshToken }),
       setAdminSelectedDepartmentId: (id) =>
         set({ adminSelectedDepartmentId: id }),
+      setManagerSelectedDepartmentId: (id) =>
+        set({ managerSelectedDepartmentId: id }),
       logout: () =>
-        set({ token: null, refreshToken: null, user: null, isAuthenticated: false, adminSelectedDepartmentId: null }),
+        set({
+          token: null,
+          refreshToken: null,
+          user: null,
+          isAuthenticated: false,
+          adminSelectedDepartmentId: null,
+          managerSelectedDepartmentId: null,
+        }),
     }),
     {
       name: 'shiftmaster-auth',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
@@ -9,12 +9,20 @@ import { useNavigate } from 'react-router-dom';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
-  const { user, logout, adminSelectedDepartmentId, setAdminSelectedDepartmentId } = useAuthStore();
+  const {
+    user,
+    logout,
+    adminSelectedDepartmentId,
+    setAdminSelectedDepartmentId,
+    managerSelectedDepartmentId,
+    setManagerSelectedDepartmentId,
+  } = useAuthStore();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [showChangePassword, setShowChangePassword] = useState(false);
 
-  const { data: departments } = useQuery({
+  // ── Admin: all departments ──────────────────────────────────
+  const { data: allDepartments } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
@@ -22,6 +30,28 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     },
     enabled: user?.role === 'admin',
   });
+
+  // ── Manager: only their managed departments ─────────────────
+  const { data: managedDepartments } = useQuery({
+    queryKey: ['my-managed-departments'],
+    queryFn: async () => {
+      const res = await api.get('/departments/my-managed');
+      return res.data?.data || [];
+    },
+    enabled: user?.role === 'manager',
+  });
+
+  // Auto-select first managed department for managers on first load
+  useEffect(() => {
+    if (
+      user?.role === 'manager' &&
+      managedDepartments &&
+      managedDepartments.length > 0 &&
+      !managerSelectedDepartmentId
+    ) {
+      setManagerSelectedDepartmentId(managedDepartments[0].id);
+    }
+  }, [managedDepartments, managerSelectedDepartmentId, user?.role, setManagerSelectedDepartmentId]);
 
   const handleLogout = () => {
     logout();
@@ -46,18 +76,40 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {user?.role?.replace('_', ' ')}
         </span>
-        {user?.role === 'admin' && departments && departments.length > 0 && (
+
+        {/* ── Admin department selector ── */}
+        {user?.role === 'admin' && allDepartments && allDepartments.length > 0 && (
           <div className="ml-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               value={adminSelectedDepartmentId || ''}
               onChange={(e) => {
                 setAdminSelectedDepartmentId(e.target.value || null);
-                window.location.reload(); // Reload to fetch context with new department
+                window.location.reload();
               }}
             >
               <option value="">All Departments</option>
-              {departments.map((d: any) => (
+              {allDepartments.map((d: any) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* ── Manager department selector ── */}
+        {user?.role === 'manager' && managedDepartments && managedDepartments.length > 1 && (
+          <div className="ml-4 hidden md:flex items-center">
+            <select
+              className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              value={managerSelectedDepartmentId || ''}
+              onChange={(e) => {
+                setManagerSelectedDepartmentId(e.target.value || null);
+                window.location.reload();
+              }}
+            >
+              {managedDepartments.map((d: any) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
