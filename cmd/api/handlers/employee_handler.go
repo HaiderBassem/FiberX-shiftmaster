@@ -38,14 +38,26 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
 			return
 		}
-		if me.DepartmentID == nil {
+
+		// For managers, honour the X-Department-ID header so they can switch
+		// between departments they manage. For other roles, always use their own
+		// department_id from the JWT.
+		var targetDeptID *uuid.UUID
+		if role == "manager" {
+			targetDeptID = getDepartmentID(c)
+		}
+		if targetDeptID == nil {
+			targetDeptID = me.DepartmentID
+		}
+
+		if targetDeptID == nil {
 			employees = []models.Employee{}
 			c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": 0}})
 			return
 		}
 
 		// Employees can only ever see people in their own department.
-		deptEmployees, err := h.employeeService.GetByDepartment(ctx, *me.DepartmentID)
+		deptEmployees, err := h.employeeService.GetByDepartment(ctx, *targetDeptID)
 		if err == nil {
 			// Role-based visibility filtering within the department:
 			filtered := make([]models.Employee, 0, len(deptEmployees))
@@ -126,7 +138,18 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
 				return
 			}
-			if me.DepartmentID == nil || emp.DepartmentID == nil || *me.DepartmentID != *emp.DepartmentID {
+
+			// For managers use the selected department (X-Department-ID header if present,
+			// otherwise fall back to the manager's own department_id).
+			var scopeDeptID *uuid.UUID
+			if role == "manager" {
+				scopeDeptID = getDepartmentID(c)
+			}
+			if scopeDeptID == nil {
+				scopeDeptID = me.DepartmentID
+			}
+
+			if scopeDeptID == nil || emp.DepartmentID == nil || *scopeDeptID != *emp.DepartmentID {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
 				return
 			}
