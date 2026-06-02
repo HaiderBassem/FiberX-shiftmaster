@@ -29,6 +29,7 @@ type EmployeeRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	ForceDelete(ctx context.Context, id uuid.UUID) error
 	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
+	UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error
 }
 
 type employeeRepo struct {
@@ -292,5 +293,12 @@ func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 func (r *employeeRepo) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
 	query := `UPDATE employees SET can_manage_help_docs = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, canManage)
+	return err
+}
+
+
+func (r *employeeRepo) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
+	query := `UPDATE employees SET can_create_tables = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id, canCreate)
 	return err
 }

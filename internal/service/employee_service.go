@@ -165,3 +165,8 @@ func (s *EmployeeService) DeleteEmployee(ctx context.Context, id uuid.UUID) erro
 func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
 	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManage)
 }
+
+
+func (s *EmployeeService) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
+	return s.employeeRepo.UpdateTablePermission(ctx, id, canCreate)
+}

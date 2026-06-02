@@ -7,18 +7,21 @@ import {
   MoreVertical, 
   FileText,
   Lock,
-  Globe
+  Globe,
+  Shield
 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import type { InfoTable } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
 import CreateTableModal from './CreateTableModal';
+import { TablePermissionsModal } from './TablePermissionsModal';
 
 const InfoTableHub: React.FC = () => {
   const [tables, setTables] = useState<InfoTable[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const { user } = useAuthStore();
   const navigate = useNavigate();
 
@@ -46,6 +49,7 @@ const InfoTableHub: React.FC = () => {
   // can create table?
   // Only admin, manager, team_leader or employee with can_create_tables
   const canCreate = ['admin', 'manager', 'team_leader'].includes(user?.role || '') || user?.can_create_tables;
+  const canManagePermissions = user?.role === 'manager' || user?.role === 'admin';
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -60,15 +64,26 @@ const InfoTableHub: React.FC = () => {
           </p>
         </div>
         
-        {canCreate && (
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Create Table
-          </button>
-        )}
+        <div className="flex gap-2">
+          {canManagePermissions && (
+            <button
+              onClick={() => setIsPermissionsModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-colors shadow-sm"
+            >
+              <Shield className="w-4 h-4" />
+              <span className="hidden sm:inline">Manage Permissions</span>
+            </button>
+          )}
+          {canCreate && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Create Table
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
@@ -154,9 +169,12 @@ const InfoTableHub: React.FC = () => {
         onCreated={(newTable) => {
           setTables([newTable, ...tables]);
           setIsCreateModalOpen(false);
-          // Optional: navigate straight to it
-          // navigate(`/info-tables/${newTable.id}`);
         }}
+      />
+      
+      <TablePermissionsModal
+        isOpen={isPermissionsModalOpen}
+        onClose={() => setIsPermissionsModalOpen(false)}
       />
     </div>
   );

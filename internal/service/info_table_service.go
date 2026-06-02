@@ -31,13 +31,15 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 }
 
 func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid.UUID, role string, departmentID *uuid.UUID) ([]models.InfoTable, error) {
-	tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
+		tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
 	if err != nil {
 		return nil, err
 	}
+	emp, _ := s.employeeRepo.GetByID(ctx, employeeID)
 	var filteredTables []models.InfoTable
 	for i := range tables {
-		accessLevel := s.computeAccessLevel(ctx, &tables[i], employeeID, role, departmentID)
+		accessLevel := s.computeAccessLevel(ctx, &tables[i], employeeID, role, departmentID, emp != nil && emp.CanCreateTables)
+
 		if accessLevel != "none" {
 			tables[i].MyAccessLevel = accessLevel
 			filteredTables = append(filteredTables, tables[i])
@@ -48,13 +50,16 @@ func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid
 }
 
 func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) (*models.InfoTable, error) {
-	table, err := s.repo.GetTableByID(ctx, tableID)
+		table, err := s.repo.GetTableByID(ctx, tableID)
 	if err != nil {
 		return nil, err
 	}
 
+	emp, _ := s.employeeRepo.GetByID(ctx, reqEmployeeID)
+	canCreate := emp != nil && emp.CanCreateTables
+
 	if reqRole == "admin" || (table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID) {
-		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
+		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID, canCreate)
 		return table, nil
 	}
 
@@ -70,7 +75,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 
 	// Check department matching
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
-		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
+		table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID, canCreate)
 		return table, nil
 	}
 
@@ -79,7 +84,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	if err == nil {
 		for _, da := range depAccesses {
 			if reqDepID != nil && da.DepartmentID == *reqDepID {
-				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
+				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID, canCreate)
 				return table, nil
 			}
 		}
@@ -89,7 +94,7 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	if err == nil {
 		for _, ea := range empAccesses {
 			if ea.EmployeeID == reqEmployeeID {
-				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID)
+				table.MyAccessLevel = s.computeAccessLevel(ctx, table, reqEmployeeID, reqRole, reqDepID, canCreate)
 				return table, nil
 			}
 		}
@@ -98,8 +103,13 @@ func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, 
 	return nil, errors.New("unauthorized access to table")
 }
 
-func (s *InfoTableService) computeAccessLevel(ctx context.Context, table *models.InfoTable, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) string {
+func (s *InfoTableService) computeAccessLevel(ctx context.Context, table *models.InfoTable, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID, canCreateTables bool) string {
 	if reqRole == "admin" || (table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID) {
+		return "manage"
+	}
+
+	// If employee has global permission to create tables, grant manage access
+	if canCreateTables {
 		return "manage"
 	}
 
@@ -141,6 +151,11 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 	if reqRole == "admin" {
 		return true
 	}
+	emp, _ := s.employeeRepo.GetByID(ctx, reqEmployeeID)
+	if emp != nil && emp.CanCreateTables {
+		return true
+	}
+
 	table, err := s.repo.GetTableByID(ctx, tableID)
 	if err != nil {
 		return false
@@ -191,6 +206,11 @@ func (s *InfoTableService) HasManageAccessRight(ctx context.Context, tableID uui
 	if reqRole == "admin" {
 		return true
 	}
+	emp, _ := s.employeeRepo.GetByID(ctx, reqEmployeeID)
+	if emp != nil && emp.CanCreateTables {
+		return true
+	}
+
 	table, err := s.repo.GetTableByID(ctx, tableID)
 	if err != nil {
 		return false
