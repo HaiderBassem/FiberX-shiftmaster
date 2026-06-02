@@ -10,6 +10,7 @@ interface User {
   role: 'employee' | 'team_leader' | 'manager' | 'admin';
   department_id: string | null;
   can_create_tables?: boolean;
+  can_manage_help_docs?: boolean;
 }
 
 interface AuthState {

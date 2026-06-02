@@ -22,16 +22,28 @@ func (s *HelpDocumentService) GetVisibleDocuments(ctx context.Context, departmen
 	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")
 	}
-	return s.repo.GetVisibleDocuments(ctx, *departmentID, employeeID, role)
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetVisibleDocuments(ctx, *departmentID, employeeID, role, emp.CanManageHelpDocs)
 }
 
 func (s *HelpDocumentService) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) (*models.HelpDocument, error) {
-	return s.repo.GetDocumentByID(ctx, id, employeeID, role)
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetDocumentByID(ctx, id, employeeID, role, emp.CanManageHelpDocs)
 }
 
 func (s *HelpDocumentService) CreateDocument(ctx context.Context, doc *models.HelpDocument, role string) (*models.HelpDocument, error) {
-	if role != "manager" && role != "team_leader" && role != "admin" {
-		return nil, errors.New("only managers and team leaders can create help documents")
+	emp, err := s.empRepo.GetByID(ctx, doc.CreatedBy)
+	if err != nil {
+		return nil, err
+	}
+	if role != "manager" && role != "team_leader" && role != "admin" && !emp.CanManageHelpDocs {
+		return nil, errors.New("only managers, team leaders, and authorized employees can create help documents")
 	}
 	if doc.DepartmentID == uuid.Nil {
 		return nil, errors.New("department ID is required")
@@ -40,7 +52,11 @@ func (s *HelpDocumentService) CreateDocument(ctx context.Context, doc *models.He
 }
 
 func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.HelpDocument, employeeID uuid.UUID, role string) (*models.HelpDocument, error) {
-	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, employeeID, role)
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, employeeID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +73,11 @@ func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.He
 }
 
 func (s *HelpDocumentService) DeleteDocument(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) error {
-	existing, err := s.repo.GetDocumentByID(ctx, id, employeeID, role)
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return err
+	}
+	existing, err := s.repo.GetDocumentByID(ctx, id, employeeID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return err
 	}
@@ -72,8 +92,12 @@ func (s *HelpDocumentService) DeleteDocument(ctx context.Context, id uuid.UUID, 
 }
 
 func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID, targetEmployeeID uuid.UUID, accessLevel string, employeeID uuid.UUID, role string) error {
-	if role != "manager" && role != "team_leader" && role != "admin" {
-		return errors.New("only managers and team leaders can manage access")
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return err
+	}
+	if role != "manager" && role != "team_leader" && role != "admin" && !emp.CanManageHelpDocs {
+		return errors.New("only managers, team leaders, and authorized employees can manage access")
 	}
 
 	// Verify the document belongs to the same department as the manager/TL
@@ -83,7 +107,7 @@ func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID,
 		return err
 	}
 	
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return err
 	}
@@ -99,11 +123,15 @@ func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID,
 }
 
 func (s *HelpDocumentService) GetDocumentAccessList(ctx context.Context, documentID uuid.UUID, employeeID uuid.UUID, role string) ([]models.HelpDocumentAccess, error) {
-	if role != "manager" && role != "team_leader" && role != "admin" {
-		return nil, errors.New("only managers and team leaders can view access lists")
+	emp, err := s.empRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	if role != "manager" && role != "team_leader" && role != "admin" && !emp.CanManageHelpDocs {
+		return nil, errors.New("only managers, team leaders, and authorized employees can view access lists")
 	}
 	// Verify doc exists and they have access
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return nil, err
 	}

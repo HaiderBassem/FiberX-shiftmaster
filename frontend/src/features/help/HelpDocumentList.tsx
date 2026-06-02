@@ -14,7 +14,7 @@ export function HelpDocumentList() {
     queryFn: helpDocumentService.getVisibleDocuments,
   });
 
-  const canCreate = user?.role === 'manager' || user?.role === 'team_leader' || user?.role === 'admin';
+  const canCreate = user?.role === 'manager' || user?.role === 'team_leader' || user?.role === 'admin' || user?.can_manage_help_docs;
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">Loading...</div>;

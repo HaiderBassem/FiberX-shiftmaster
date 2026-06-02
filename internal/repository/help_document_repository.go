@@ -19,21 +19,21 @@ func NewHelpDocumentRepository(db *database.DB) *HelpDocumentRepository {
 }
 
 // Get accessible documents for a user in a department
-func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string) ([]models.HelpDocument, error) {
+func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageHelpDocs bool) ([]models.HelpDocument, error) {
 	var docs []models.HelpDocument
 	
 	query := `
 		SELECT 
 			d.id, d.department_id, d.title, d.content, d.created_by, d.created_at, d.updated_at,
-			COALESCE(a.access_level, 'hide') as access_level
+			COALESCE(a.access_level, 'read') as access_level
 		FROM help_documents d
 		LEFT JOIN help_document_access a ON a.document_id = d.id AND a.employee_id = $2
 		WHERE d.department_id = $1
 	`
 	
-	// If not manager/team_leader, only show docs with explicit read/write access
-	if role != "manager" && role != "team_leader" && role != "admin" {
-		query += ` AND a.access_level IN ('read', 'write') `
+	// If not manager/team_leader/admin and not global manager, only show docs with explicit read/write or default read (not hide)
+	if role != "manager" && role != "team_leader" && role != "admin" && !canManageHelpDocs {
+		query += ` AND COALESCE(a.access_level, 'read') != 'hide' `
 	}
 	
 	query += ` ORDER BY d.created_at DESC`
@@ -55,8 +55,8 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 			return nil, err
 		}
 		
-		// If manager/tl, and no explicit access, default to write
-		if (role == "manager" || role == "team_leader" || role == "admin") && accLevel == "hide" {
+		// If manager/tl or has can_manage_help_docs, grant 'write' access globally unless it's explicitly 'hide' (though even if hidden, maybe they should see it as write, but let's just make it write)
+		if (role == "manager" || role == "team_leader" || role == "admin" || canManageHelpDocs) {
 			accLevel = "write"
 		}
 		
@@ -67,11 +67,11 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 	return docs, nil
 }
 
-func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) (*models.HelpDocument, error) {
+func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string, canManageHelpDocs bool) (*models.HelpDocument, error) {
 	query := `
 		SELECT 
 			d.id, d.department_id, d.title, d.content, d.created_by, d.created_at, d.updated_at,
-			COALESCE(a.access_level, 'hide') as access_level
+			COALESCE(a.access_level, 'read') as access_level
 		FROM help_documents d
 		LEFT JOIN help_document_access a ON a.document_id = d.id AND a.employee_id = $2
 		WHERE d.id = $1
@@ -91,7 +91,7 @@ func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UU
 		return nil, err
 	}
 
-	if (role == "manager" || role == "team_leader" || role == "admin") && accLevel == "hide" {
+	if (role == "manager" || role == "team_leader" || role == "admin" || canManageHelpDocs) {
 		accLevel = "write"
 	}
 

@@ -43,6 +43,7 @@ type Employee struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 	CreatedBy          *uuid.UUID `json:"created_by"`
 	CanCreateTables    bool      `json:"can_create_tables"`
+	CanManageHelpDocs  bool      `json:"can_manage_help_docs"`
 }
 
 type Shift struct {

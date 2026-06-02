@@ -25,6 +25,7 @@ interface Employee {
   default_shift_id: string | null;
   weekly_off_days: number;
   can_cover_night_shift: boolean;
+  can_manage_help_docs: boolean;
   status: string;
   secondary_phone: string | null;
   secondary_email: string | null;
@@ -79,6 +80,7 @@ export const EmployeeList = () => {
   const [createPosition, setCreatePosition] = useState('');
   const [createOffDays, setCreateOffDays] = useState(1);
   const [createNight, setCreateNight] = useState(false);
+  const [createCanManageHelpDocs, setCreateCanManageHelpDocs] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
   const [createSecPhone, setCreateSecPhone] = useState('');
   const [createSecEmail, setCreateSecEmail] = useState('');
@@ -96,6 +98,7 @@ export const EmployeeList = () => {
   const [editPosition, setEditPosition] = useState('');
   const [editOffDays, setEditOffDays] = useState(1);
   const [editNight, setEditNight] = useState(false);
+  const [editCanManageHelpDocs, setEditCanManageHelpDocs] = useState(false);
   const [editSecPhone, setEditSecPhone] = useState('');
   const [editSecEmail, setEditSecEmail] = useState('');
 
@@ -154,6 +157,7 @@ export const EmployeeList = () => {
         position: createPosition || null,
         weekly_off_days: createOffDays,
         can_cover_night_shift: createNight,
+        can_manage_help_docs: createCanManageHelpDocs,
         password: createPassword,
         secondary_phone: createSecPhone || null,
         secondary_email: createSecEmail || null,
@@ -189,6 +193,7 @@ export const EmployeeList = () => {
         position: editPosition || null,
         weekly_off_days: editOffDays,
         can_cover_night_shift: editNight,
+        can_manage_help_docs: editCanManageHelpDocs,
         secondary_phone: editSecPhone || null,
         secondary_email: editSecEmail || null,
       });
@@ -223,6 +228,7 @@ export const EmployeeList = () => {
     setEditPosition(emp.position || '');
     setEditOffDays(emp.weekly_off_days);
     setEditNight(emp.can_cover_night_shift);
+    setEditCanManageHelpDocs(emp.can_manage_help_docs);
     setEditSecPhone(emp.secondary_phone || '');
     setEditSecEmail(emp.secondary_email || '');
   };
@@ -415,6 +421,10 @@ export const EmployeeList = () => {
                 <input id="create-night" type="checkbox" checked={createNight} onChange={(e) => setCreateNight(e.target.checked)} />
                 <Label htmlFor="create-night">Can cover night shifts</Label>
               </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input id="create-help" type="checkbox" checked={createCanManageHelpDocs} onChange={(e) => setCreateCanManageHelpDocs(e.target.checked)} />
+                <Label htmlFor="create-help">Can manage Help Docs</Label>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
@@ -455,6 +465,7 @@ export const EmployeeList = () => {
                     <div className="space-y-1"><Label className="text-xs">Sec. Email <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecEmail} onChange={(e) => setEditSecEmail(e.target.value)} className="h-9" placeholder="Secondary email" /></div>
                     <div className="space-y-1"><Label className="text-xs">Phone</Label><Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1"><Label className="text-xs">Sec. Phone <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecPhone} onChange={(e) => setEditSecPhone(e.target.value)} className="h-9" placeholder="Secondary phone" /></div>
+                    <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-help" type="checkbox" checked={editCanManageHelpDocs} onChange={(e) => setEditCanManageHelpDocs(e.target.checked)} /><Label htmlFor="edit-help" className="text-xs">Can manage Help Docs</Label></div>
                     <div className="space-y-1"><Label className="text-xs">Department</Label>
                       <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
                         <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
