@@ -40,7 +40,7 @@ CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o "$APP_DIR/shiftmaster-api"
 # ── 3. Build Frontend ──
 echo "→ Building frontend..."
 cd "$PROJECT_DIR/frontend"
-npm install --production=false
+npm install --production=false --legacy-peer-deps
 npx vite build
 cp -r dist/* "$APP_DIR/frontend/dist/" 2>/dev/null || cp -r dist "$APP_DIR/frontend/"
 
