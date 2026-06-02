@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -90,21 +90,18 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
   // Initialize layout if empty or sync with items
   const normalizedLayout = useMemo(() => {
     if (!layout || !layout.order) {
-      return { folders: {}, order: items.map(i => i.id) };
+      return { folders: {} as Record<string, LayoutFolder>, order: items.map(i => i.id) };
     }
     
     const existingIds = new Set(items.map(i => i.id));
     const newOrder = [...layout.order];
-    const newFolders = { ...layout.folders };
-    let changed = false;
+    const newFolders: Record<string, LayoutFolder> = { ...layout.folders };
 
     // Remove deleted items from order and folders
     const orderWithoutDeleted = newOrder.filter(id => {
       if (newFolders[id]) return true; // Keep folders
       return existingIds.has(id); // Keep existing items
     });
-    
-    if (orderWithoutDeleted.length !== newOrder.length) changed = true;
 
     // Clean up folders
     for (const fId in newFolders) {
@@ -112,11 +109,9 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
       const validItems = folder.itemIds.filter(id => existingIds.has(id));
       if (validItems.length !== folder.itemIds.length) {
         newFolders[fId] = { ...folder, itemIds: validItems };
-        changed = true;
       }
       if (validItems.length === 0) {
         delete newFolders[fId];
-        changed = true;
         const idx = orderWithoutDeleted.indexOf(fId);
         if (idx !== -1) orderWithoutDeleted.splice(idx, 1);
       }
@@ -135,7 +130,6 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     items.forEach(item => {
       if (!itemsInLayout.has(item.id)) {
         orderWithoutDeleted.push(item.id);
-        changed = true;
       }
     });
 
