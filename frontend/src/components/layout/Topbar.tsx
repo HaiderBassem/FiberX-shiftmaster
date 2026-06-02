@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
-import { LogOut, Sun, Moon, User, Menu, Key } from 'lucide-react';
+import { LogOut, Sun, Moon, User, Menu, Key, Bell } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
@@ -40,6 +40,18 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     },
     enabled: user?.role === 'manager',
   });
+
+  // ── Notifications ───────────────────────────────────────────
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: async () => {
+      const res = await api.get('/notifications');
+      return res.data?.data || [];
+    },
+    enabled: !!user,
+  });
+  
+  const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
 
   // Auto-select first managed department for managers on first load
   useEffect(() => {
@@ -148,6 +160,22 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             {user?.last_name}
           </span>
         </div>
+
+        {/* Notifications */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate('/notifications')}
+          className="relative text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
+          title="Notifications"
+        >
+          <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 sm:min-w-[18px] sm:h-[18px] px-1 text-[9px] sm:text-[10px] font-bold text-white bg-destructive rounded-full border border-card shadow-sm">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </Button>
 
         {/* Change Password */}
         <Button

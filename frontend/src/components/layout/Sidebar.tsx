@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
-  ArrowLeftRight, ShieldCheck, Bell, ClipboardList, Building2, Columns3,
+  ArrowLeftRight, ShieldCheck, ClipboardList, Building2, Columns3,
   Clock, History, X, MapPin, ExternalLink, Ticket, Table, BookOpen
 } from 'lucide-react';
 
@@ -11,7 +11,6 @@ const navItems = [
   { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/leaves', label: 'Leaves', icon: CalendarOff, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/swaps', label: 'Swaps', icon: ArrowLeftRight, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/notifications', label: 'Notifications', icon: Bell, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/task-management', label: 'Tasks Management', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'] },
@@ -19,8 +18,8 @@ const navItems = [
   { to: '/task-history', label: 'Task History', icon: History, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
   { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
-  { to: '/info-tables', label: 'Information Tables', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/help', label: 'Help', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/info-tables', label: 'Reference', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
