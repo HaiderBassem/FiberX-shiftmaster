@@ -6,7 +6,8 @@ import { helpDocumentService } from '../../services/api/helpDocumentService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
 import { HelpPermissionsModal } from './HelpPermissionsModal';
-import { DraggableGrid, GridLayout } from '../../components/ui/DraggableGrid';
+import { DraggableGrid } from '../../components/ui/DraggableGrid';
+import type { GridLayout } from '../../components/ui/DraggableGrid';
 import { Search } from 'lucide-react';
 import api from '@/lib/api';
 

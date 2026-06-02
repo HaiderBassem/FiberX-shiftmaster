@@ -15,7 +15,8 @@ import type { InfoTable } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
 import CreateTableModal from './CreateTableModal';
 import { TablePermissionsModal } from './TablePermissionsModal';
-import { DraggableGrid, GridLayout } from '../../components/ui/DraggableGrid';
+import { DraggableGrid } from '../../components/ui/DraggableGrid';
+import type { GridLayout } from '../../components/ui/DraggableGrid';
 import api from '@/lib/api';
 
 const InfoTableHub: React.FC = () => {
