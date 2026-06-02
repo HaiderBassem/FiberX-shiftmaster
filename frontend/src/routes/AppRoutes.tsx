@@ -22,13 +22,17 @@ import InfoTableView from '../features/infotables/InfoTableView';
 import { HelpDocumentList } from '../features/help/HelpDocumentList';
 import { HelpDocumentView } from '../features/help/HelpDocumentView';
 import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    if (allowHelpDocsAccess && (user as any).can_manage_help_docs) {
+      // allow
+    } else {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
   
   return <>{children}</>;
@@ -103,7 +107,7 @@ export const AppRoutes = () => {
           <Route 
             path="help/new" 
             element={
-              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']} allowHelpDocsAccess={true}>
                 <HelpDocumentEditor />
               </ProtectedRoute>
             } 
@@ -119,7 +123,7 @@ export const AppRoutes = () => {
           <Route 
             path="help/:id/edit" 
             element={
-              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']} allowHelpDocsAccess={true}>
                 <HelpDocumentEditor />
               </ProtectedRoute>
             } 
