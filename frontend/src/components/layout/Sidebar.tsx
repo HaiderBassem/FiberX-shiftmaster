@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
   ArrowLeftRight, ShieldCheck, Bell, ClipboardList, Building2, Columns3,
-  Clock, History, X, MapPin, ExternalLink, Ticket, Table
+  Clock, History, X, MapPin, ExternalLink, Ticket, Table, BookOpen
 } from 'lucide-react';
 
 const navItems = [
@@ -20,6 +20,7 @@ const navItems = [
   { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
   { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
   { to: '/info-tables', label: 'Information Tables', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/help', label: 'Help Documents', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {

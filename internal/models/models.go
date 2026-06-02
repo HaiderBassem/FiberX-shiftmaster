@@ -390,3 +390,24 @@ type TaskBoardStats struct {
 	CompletionPct   float64   `json:"completion_pct"`
 }
 
+type HelpDocument struct {
+	ID           uuid.UUID  `json:"id"`
+	DepartmentID uuid.UUID  `json:"department_id"`
+	Title        string     `json:"title"`
+	Content      string     `json:"content"`
+	CreatedBy    *uuid.UUID `json:"created_by"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	
+	// Virtual field for frontend
+	AccessLevel *string `json:"access_level,omitempty"`
+}
+
+type HelpDocumentAccess struct {
+	ID          uuid.UUID  `json:"id"`
+	DocumentID  uuid.UUID  `json:"document_id"`
+	EmployeeID  uuid.UUID  `json:"employee_id"`
+	AccessLevel string     `json:"access_level"`
+	GrantedBy   *uuid.UUID `json:"granted_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+}

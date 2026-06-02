@@ -23,6 +23,7 @@ func SetupRouter(
 	auditH *handlers.AuditHandler,
 	leaveTypeH *handlers.LeaveTypeHandler,
 	infoTableH *handlers.InfoTableHandler,
+	helpDocH *handlers.HelpDocumentHandler,
 ) {
 	api := r.Group("/api")
 
@@ -153,6 +154,20 @@ func SetupRouter(
 			infoTables.POST("/:id/access", infoTableH.AddEmployeeAccess)
 			infoTables.DELETE("/:id/access/employee/:employeeId", infoTableH.RemoveEmployeeAccess)
 			infoTables.POST("/:id/department-access", infoTableH.ShareWithDepartment)
+		}
+
+		// Help Documents
+		helpDocs := protected.Group("/help-docs")
+		{
+			helpDocs.GET("", helpDocH.GetVisibleDocuments)
+			helpDocs.GET("/:id", helpDocH.GetDocument)
+			helpDocs.POST("", helpDocH.CreateDocument)
+			helpDocs.PUT("/:id", helpDocH.UpdateDocument)
+			helpDocs.DELETE("/:id", helpDocH.DeleteDocument)
+			
+			// Access Management
+			helpDocs.GET("/:id/access", helpDocH.GetAccessList)
+			helpDocs.POST("/:id/access", helpDocH.SetEmployeeAccess)
 		}
 
 		// --- Supervisor routes (manager + admin + team_leader) ---

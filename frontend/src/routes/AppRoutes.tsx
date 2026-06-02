@@ -19,7 +19,9 @@ import { DepartmentDetail } from '../features/departments/DepartmentDetail';
 import { EmployeeDetail } from '../features/employees/EmployeeDetail';
 import InfoTableHub from '../features/infotables/InfoTableHub';
 import InfoTableView from '../features/infotables/InfoTableView';
-
+import { HelpDocumentList } from '../features/help/HelpDocumentList';
+import { HelpDocumentView } from '../features/help/HelpDocumentView';
+import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -87,6 +89,38 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
                 <InfoTableView />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="help" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <HelpDocumentList />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="help/new" 
+            element={
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+                <HelpDocumentEditor />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="help/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <HelpDocumentView />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="help/:id/edit" 
+            element={
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+                <HelpDocumentEditor />
               </ProtectedRoute>
             } 
           />
