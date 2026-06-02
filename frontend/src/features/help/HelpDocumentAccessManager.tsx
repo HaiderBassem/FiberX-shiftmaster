@@ -53,18 +53,18 @@ export function HelpDocumentAccessManager({ documentId }: { documentId: string }
     <div className="space-y-6">
       <div className="flex items-center gap-2 border-b border-gray-100 pb-4">
         <Shield className="w-5 h-5 text-indigo-600" />
-        <h3 className="text-lg font-bold text-gray-900">إدارة صلاحيات الموظفين</h3>
+        <h3 className="text-lg font-bold text-gray-900">Manage Employee Access</h3>
       </div>
 
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h4 className="text-sm font-medium text-gray-700 mb-3">منح صلاحية لموظف جديد:</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Grant access to an employee:</h4>
         <div className="flex flex-col sm:flex-row gap-3">
           <select
             value={selectedEmployee}
             onChange={(e) => setSelectedEmployee(e.target.value)}
             className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           >
-            <option value="">اختر موظفاً...</option>
+            <option value="">Select an employee...</option>
             {employees.map(emp => {
               // Don't show if they already have an explicit record
               const hasAccess = accessList.find(a => a.employee_id === emp.id);
@@ -82,9 +82,9 @@ export function HelpDocumentAccessManager({ documentId }: { documentId: string }
             onChange={(e) => setSelectedAccess(e.target.value)}
             className="w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           >
-            <option value="read">قراءة فقط</option>
-            <option value="write">قراءة وكتابة</option>
-            <option value="hide">إخفاء المستند</option>
+            <option value="read">Read Only</option>
+            <option value="write">Read & Write</option>
+            <option value="hide">Hide Document</option>
           </select>
 
           <button
@@ -92,17 +92,17 @@ export function HelpDocumentAccessManager({ documentId }: { documentId: string }
             disabled={!selectedEmployee || setAccessMutation.isPending}
             className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 whitespace-nowrap"
           >
-            حفظ
+            Save
           </button>
         </div>
       </div>
 
       <div>
-        <h4 className="text-sm font-medium text-gray-700 mb-3">الموظفون الذين لديهم صلاحيات مخصصة:</h4>
+        <h4 className="text-sm font-medium text-gray-700 mb-3">Employees with custom access:</h4>
         
         {accessList.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4 border border-dashed rounded-lg">
-            لا توجد صلاحيات مخصصة. المستند مخفي عن جميع الموظفين (ما عدا المدراء).
+            No custom access records. This document is hidden from all employees (except managers).
           </p>
         ) : (
           <div className="space-y-3">
@@ -116,7 +116,7 @@ export function HelpDocumentAccessManager({ documentId }: { documentId: string }
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">
-                        {emp ? `${emp.first_name} ${emp.last_name}` : 'موظف غير معروف'}
+                        {emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown Employee'}
                       </p>
                       <p className="text-xs text-gray-500">{emp?.employee_code}</p>
                     </div>
@@ -132,9 +132,9 @@ export function HelpDocumentAccessManager({ documentId }: { documentId: string }
                           access.access_level === 'read' ? 'bg-green-50 text-green-700' : 
                           'bg-red-50 text-red-700'}`}
                     >
-                      <option value="read">قراءة فقط</option>
-                      <option value="write">قراءة وكتابة</option>
-                      <option value="hide">إخفاء</option>
+                      <option value="read">Read Only</option>
+                      <option value="write">Read & Write</option>
+                      <option value="hide">Hidden</option>
                     </select>
                   </div>
                 </div>

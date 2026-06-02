@@ -1,30 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import { ArrowRight, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { helpDocumentService } from '../../services/api/helpDocumentService';
-
-const modules = {
-  toolbar: [
-    [{ 'header': [1, 2, 3, false] }],
-    ['bold', 'italic', 'underline', 'strike'],
-    [{ 'color': [] }, { 'background': [] }],
-    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-    [{ 'align': [] }],
-    [{ 'direction': 'rtl' }],
-    ['clean']
-  ],
-};
-
-const formats = [
-  'header',
-  'bold', 'italic', 'underline', 'strike',
-  'color', 'background',
-  'list', 'bullet',
-  'align', 'direction'
-];
 
 export function HelpDocumentEditor() {
   const { id } = useParams();
@@ -71,25 +49,25 @@ export function HelpDocumentEditor() {
 
   const handleSave = () => {
     if (!title.trim()) {
-      alert('الرجاء إدخال عنوان المستند');
+      alert('Please enter a document title');
       return;
     }
     saveMutation.mutate();
   };
 
   const handleDelete = () => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المستند؟')) {
+    if (window.confirm('Are you sure you want to delete this document?')) {
       deleteMutation.mutate();
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">جاري التحميل...</div>;
+  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading...</div>;
 
   // Enforce write access check if editing
   if (isEditing && document && document.access_level !== 'write') {
     return (
       <div className="p-8 text-center text-red-500">
-        عذراً، ليس لديك صلاحية تعديل هذا المستند.
+        Sorry, you do not have permission to edit this document.
       </div>
     );
   }
@@ -102,10 +80,10 @@ export function HelpDocumentEditor() {
             onClick={() => navigate('/help')}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
           >
-            <ArrowRight className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEditing ? 'تعديل المستند' : 'إنشاء مستند جديد'}
+            {isEditing ? 'Edit Document' : 'Create New Document'}
           </h1>
         </div>
         
@@ -117,7 +95,7 @@ export function HelpDocumentEditor() {
               className="flex items-center gap-2 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              <span>حذف</span>
+              <span>Delete</span>
             </button>
           )}
           <button
@@ -126,47 +104,34 @@ export function HelpDocumentEditor() {
             className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
           >
             <Save className="w-4 h-4" />
-            <span>{saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ المستند'}</span>
+            <span>{saveMutation.isPending ? 'Saving...' : 'Save Document'}</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[70vh]">
         <div className="p-6 border-b border-gray-100">
           <input
             type="text"
-            placeholder="عنوان المستند..."
+            placeholder="Document Title..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-300 outline-none"
+            className="w-full text-2xl font-bold bg-transparent border-none focus:ring-0 p-0 text-gray-900 placeholder:text-gray-300 outline-none font-sans"
             dir="auto"
           />
         </div>
         
-        <div className="bg-white min-h-[500px]" dir="auto">
-          <ReactQuill
-            theme="snow"
+        <div className="flex-1 p-0">
+          <textarea
             value={content}
-            onChange={setContent}
-            modules={modules}
-            formats={formats}
-            className="h-full min-h-[450px]"
-            placeholder="ابدأ الكتابة هنا..."
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full h-full p-6 resize-none border-none focus:ring-0 text-gray-800 text-lg leading-relaxed outline-none"
+            style={{ fontFamily: "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
+            placeholder="Start typing your content here... (Supports Arabic and English seamlessly)"
+            dir="auto"
           />
         </div>
       </div>
-      
-      {/* Add custom CSS to fix ReactQuill RTL alignment if needed */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .ql-editor {
-          min-height: 450px;
-          font-size: 16px;
-          line-height: 1.6;
-        }
-        .ql-editor[dir="rtl"] {
-          text-align: right;
-        }
-      `}} />
     </div>
   );
 }
