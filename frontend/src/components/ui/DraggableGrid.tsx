@@ -17,7 +17,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Folder as FolderIcon, X, Edit2, ChevronDown, ChevronRight, GripHorizontal } from 'lucide-react';
+import { Folder as FolderIcon, X, Edit2, ChevronDown, ChevronUp, GripHorizontal } from 'lucide-react';
 
 export interface LayoutFolder {
   id: string;
