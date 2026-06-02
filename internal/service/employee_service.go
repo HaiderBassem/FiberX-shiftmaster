@@ -160,3 +160,8 @@ func (s *EmployeeService) ChangePassword(ctx context.Context, id uuid.UUID, oldP
 func (s *EmployeeService) DeleteEmployee(ctx context.Context, id uuid.UUID) error {
 	return s.employeeRepo.ForceDelete(ctx, id)
 }
+
+
+func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
+	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManage)
+}

@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, ShieldAlert } from 'lucide-react';
 import { helpDocumentService } from '../../services/api/helpDocumentService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
+import { HelpPermissionsModal } from './HelpPermissionsModal';
 
 export function HelpDocumentList() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['help-docs'],
@@ -15,6 +18,7 @@ export function HelpDocumentList() {
   });
 
   const canCreate = user?.role === 'manager' || user?.role === 'team_leader' || user?.role === 'admin' || user?.can_manage_help_docs;
+  const canManagePermissions = user?.role === 'manager' || user?.role === 'admin';
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">Loading...</div>;
@@ -28,16 +32,32 @@ export function HelpDocumentList() {
           <p className="text-gray-500 text-sm mt-1">Quick access to guides and instructions for your department</p>
         </div>
         
-        {canCreate && (
-          <button
-            onClick={() => navigate('/help/new')}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span>New Document</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {canManagePermissions && (
+            <button
+              onClick={() => setIsPermissionsModalOpen(true)}
+              className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>Manage Permissions</span>
+            </button>
+          )}
+          {canCreate && (
+            <button
+              onClick={() => navigate('/help/new')}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Document</span>
+            </button>
+          )}
+        </div>
       </div>
+      
+      <HelpPermissionsModal 
+        isOpen={isPermissionsModalOpen} 
+        onClose={() => setIsPermissionsModalOpen(false)} 
+      />
 
       {documents.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">

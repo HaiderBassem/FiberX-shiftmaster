@@ -51,6 +51,7 @@ func SetupRouter(
 			employees.GET("", empH.List)
 			employees.GET("/:id", empH.GetByID)
 			employees.PUT("/:id/password", empH.UpdatePassword)
+			employees.PUT("/:id/help-permission", empH.UpdateHelpPermission)
 		}
 
 		// Departments (read)

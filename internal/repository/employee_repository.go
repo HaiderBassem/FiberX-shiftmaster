@@ -28,6 +28,7 @@ type EmployeeRepository interface {
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ForceDelete(ctx context.Context, id uuid.UUID) error
+	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
 }
 
 type employeeRepo struct {
@@ -282,4 +283,14 @@ func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 		}
 		return nil
 	})
+}
+
+
+
+
+
+func (r *employeeRepo) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
+	query := `UPDATE employees SET can_manage_help_docs = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id, canManage)
+	return err
 }

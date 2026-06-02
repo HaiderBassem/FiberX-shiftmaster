@@ -483,3 +483,49 @@ func (h *EmployeeHandler) UpdatePassword(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "password updated successfully"}})
 }
+
+
+type updateHelpPermissionRequest struct {
+	CanManageHelpDocs bool `json:"can_manage_help_docs"`
+}
+
+func (h *EmployeeHandler) UpdateHelpPermission(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	var req updateHelpPermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+
+	// Only admins and managers can do this
+	if role != "admin" && role != "manager" {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+		return
+	}
+
+	if role == "manager" {
+		requesterStr, _ := c.Get("employee_id")
+		requesterID, _ := uuid.Parse(requesterStr.(string))
+		me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+		target, _ := h.employeeService.GetByID(c.Request.Context(), id)
+		if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+			return
+		}
+	}
+
+	if err := h.employeeService.UpdateHelpPermission(c.Request.Context(), id, req.CanManageHelpDocs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
