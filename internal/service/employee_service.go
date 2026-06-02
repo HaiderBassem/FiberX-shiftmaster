@@ -170,3 +170,8 @@ func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID
 func (s *EmployeeService) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
 	return s.employeeRepo.UpdateTablePermission(ctx, id, canCreate)
 }
+
+func (s *EmployeeService) UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error {
+	return s.employeeRepo.UpdatePreferences(ctx, id, prefs)
+}
+

@@ -44,6 +44,7 @@ type Employee struct {
 	CreatedBy          *uuid.UUID `json:"created_by"`
 	CanCreateTables    bool      `json:"can_create_tables"`
 	CanManageHelpDocs  bool      `json:"can_manage_help_docs"`
+	UIPreferences      map[string]interface{} `json:"ui_preferences"`
 }
 
 type Shift struct {

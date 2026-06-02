@@ -15,6 +15,8 @@ import type { InfoTable } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
 import CreateTableModal from './CreateTableModal';
 import { TablePermissionsModal } from './TablePermissionsModal';
+import { DraggableGrid, GridLayout } from '../../components/ui/DraggableGrid';
+import api from '@/lib/api';
 
 const InfoTableHub: React.FC = () => {
   const [tables, setTables] = useState<InfoTable[]>([]);
@@ -22,8 +24,28 @@ const InfoTableHub: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
-  const { user } = useAuthStore();
+  const { user, updateUserPreferences } = useAuthStore();
   const navigate = useNavigate();
+  const [layout, setLayout] = useState<GridLayout>({ folders: {}, order: [] });
+
+  useEffect(() => {
+    if (user?.ui_preferences?.reference_layout) {
+      setLayout(user.ui_preferences.reference_layout);
+    }
+  }, [user]);
+
+  const handleLayoutChange = async (newLayout: GridLayout) => {
+    setLayout(newLayout);
+    const newPrefs = { reference_layout: newLayout };
+    updateUserPreferences(newPrefs);
+    if (user?.id) {
+      try {
+        await api.put(`/employees/${user.id}/preferences`, { ui_preferences: { ...user?.ui_preferences, ...newPrefs } });
+      } catch (e) {
+        console.error("Failed to save layout", e);
+      }
+    }
+  };
 
   const fetchTables = async () => {
     try {
@@ -112,11 +134,14 @@ const InfoTableHub: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTables.map((table) => (
+        <DraggableGrid
+          items={filteredTables}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+          isSearchActive={searchTerm.length > 0}
+          onItemClick={(table) => navigate(`/info-tables/${table.id}`)}
+          renderItem={(table) => (
             <div 
-              key={table.id}
-              onClick={() => navigate(`/info-tables/${table.id}`)}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-primary-300 dark:hover:border-primary-700 transition-all cursor-pointer group flex flex-col h-full"
             >
               <div className="flex justify-between items-start mb-4">
@@ -126,7 +151,6 @@ const InfoTableHub: React.FC = () => {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Optional: open a small popover for Edit/Delete if admin
                   }}
                   className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 opacity-0 group-hover:opacity-100 transition-opacity"
                 >
@@ -149,7 +173,6 @@ const InfoTableHub: React.FC = () => {
                   </span>
                 </div>
                 
-                {/* Access indicator */}
                 <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 gap-1">
                   {table.department_id ? (
                     <><Lock className="w-3 h-3" /> Dept Restricted</>
@@ -159,8 +182,8 @@ const InfoTableHub: React.FC = () => {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       <CreateTableModal

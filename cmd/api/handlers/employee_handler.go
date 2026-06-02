@@ -574,3 +574,39 @@ func (h *EmployeeHandler) UpdateTablePermission(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
+
+type updatePreferencesRequest struct {
+	UIPreferences map[string]interface{} `json:"ui_preferences"`
+}
+
+func (h *EmployeeHandler) UpdatePreferences(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	var req updatePreferencesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+	requesterStr, _ := c.Get("employee_id")
+	requesterID, _ := uuid.Parse(requesterStr.(string))
+
+	if role != "admin" && requesterID != id {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "you can only update your own preferences"})
+		return
+	}
+
+	if err := h.employeeService.UpdatePreferences(c.Request.Context(), id, req.UIPreferences); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+

@@ -11,6 +11,7 @@ interface User {
   department_id: string | null;
   can_create_tables?: boolean;
   can_manage_help_docs?: boolean;
+  ui_preferences?: Record<string, any>;
 }
 
 interface AuthState {
@@ -24,6 +25,7 @@ interface AuthState {
   setTokens: (token: string, refreshToken: string) => void;
   setAdminSelectedDepartmentId: (id: string | null) => void;
   setManagerSelectedDepartmentId: (id: string | null) => void;
+  updateUserPreferences: (prefs: Record<string, any>) => void;
   logout: () => void;
 }
 
@@ -49,6 +51,10 @@ export const useAuthStore = create<AuthState>()(
         set({ adminSelectedDepartmentId: id }),
       setManagerSelectedDepartmentId: (id) =>
         set({ managerSelectedDepartmentId: id }),
+      updateUserPreferences: (prefs) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ui_preferences: { ...state.user.ui_preferences, ...prefs } } : null
+        })),
       logout: () =>
         set({
           token: null,

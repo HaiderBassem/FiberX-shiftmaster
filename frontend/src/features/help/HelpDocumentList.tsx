@@ -6,11 +6,35 @@ import { helpDocumentService } from '../../services/api/helpDocumentService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
 import { HelpPermissionsModal } from './HelpPermissionsModal';
+import { DraggableGrid, GridLayout } from '../../components/ui/DraggableGrid';
+import { Search } from 'lucide-react';
+import api from '@/lib/api';
 
 export function HelpDocumentList() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, updateUserPreferences } = useAuthStore();
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [layout, setLayout] = useState<GridLayout>({ folders: {}, order: [] });
+
+  useEffect(() => {
+    if (user?.ui_preferences?.info_bank_layout) {
+      setLayout(user.ui_preferences.info_bank_layout);
+    }
+  }, [user]);
+
+  const handleLayoutChange = async (newLayout: GridLayout) => {
+    setLayout(newLayout);
+    const newPrefs = { info_bank_layout: newLayout };
+    updateUserPreferences(newPrefs);
+    if (user?.id) {
+      try {
+        await api.put(`/employees/${user.id}/preferences`, { ui_preferences: { ...user?.ui_preferences, ...newPrefs } });
+      } catch (e) {
+        console.error("Failed to save layout", e);
+      }
+    }
+  };
   
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['help-docs'],
@@ -23,6 +47,10 @@ export function HelpDocumentList() {
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500">Loading...</div>;
   }
+
+  const filteredDocuments = documents.filter(doc => 
+    doc.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -59,6 +87,19 @@ export function HelpDocumentList() {
         onClose={() => setIsPermissionsModalOpen(false)} 
       />
 
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search documents..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+          />
+        </div>
+      </div>
+
       {documents.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -70,12 +111,15 @@ export function HelpDocumentList() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {documents.map((doc) => (
+        <DraggableGrid
+          items={filteredDocuments}
+          layout={layout}
+          onLayoutChange={handleLayoutChange}
+          isSearchActive={searchTerm.length > 0}
+          onItemClick={(doc) => navigate(`/help/${doc.id}`)}
+          renderItem={(doc) => (
             <div 
-              key={doc.id}
-              onClick={() => navigate(`/help/${doc.id}`)}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
+              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group h-full flex flex-col"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
@@ -89,14 +133,14 @@ export function HelpDocumentList() {
                 )}
               </div>
               
-              <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-1">{doc.title}</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 flex-grow">{doc.title}</h3>
               
               <div className="text-xs text-gray-500 mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
                 <span>Created at: {format(new Date(doc.created_at), 'yyyy-MM-dd')}</span>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
     </div>
   );
