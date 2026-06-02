@@ -23,7 +23,7 @@ export interface HelpDocumentAccess {
 export const helpDocumentService = {
   getVisibleDocuments: async (): Promise<HelpDocument[]> => {
     const response = await api.get('/help-docs');
-    return response.data.data;
+    return response.data.data || [];
   },
 
   getDocument: async (id: string): Promise<HelpDocument> => {
@@ -47,7 +47,7 @@ export const helpDocumentService = {
 
   getAccessList: async (id: string): Promise<HelpDocumentAccess[]> => {
     const response = await api.get(`/help-docs/${id}/access`);
-    return response.data.data;
+    return response.data.data || [];
   },
 
   setEmployeeAccess: async (id: string, employee_id: string, access_level: string): Promise<void> => {
