@@ -7,6 +7,7 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
+  useDroppable,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import {
@@ -59,6 +60,21 @@ const SortableItem = ({ id, children }: { id: string, children: React.ReactNode 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="relative group cursor-grab active:cursor-grabbing h-full">
       {children}
+    </div>
+  );
+};
+
+const EmptyFolderDropZone = ({ id }: { id: string }) => {
+  const { isOver, setNodeRef } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`text-center py-8 text-sm border-2 border-dashed rounded-lg transition-colors ${
+        isOver ? 'bg-indigo-50 border-indigo-400 text-indigo-700' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-400 border-gray-200 dark:border-gray-700'
+      }`}
+    >
+      Drop items here to add them to this folder
     </div>
   );
 };
@@ -151,7 +167,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     if (!over) return;
 
     const activeIdStr = active.id as string;
-    const overIdStr = over.id as string;
+    let overIdStr = over.id as string;
 
     if (activeIdStr === overIdStr) return;
 
@@ -159,7 +175,6 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     newLayout.folders = { ...newLayout.folders };
     newLayout.order = [...newLayout.order];
 
-    const isFolder = (id: string) => !!newLayout.folders[id];
     const isItemInFolder = (id: string) => {
       for (const fId in newLayout.folders) {
         if (newLayout.folders[fId].itemIds.includes(id)) return fId;
@@ -167,21 +182,21 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
       return null;
     };
 
-    const activeParent = isItemInFolder(activeIdStr);
-    const overParent = isItemInFolder(overIdStr);
+    let targetFolderId: string | null = null;
+    let isDroppingIntoEmptyFolder = false;
 
-    // Simplification for merging (creating a folder by dropping one item onto another)
-    // dnd-kit normally swaps them. But if we want to merge, we need a special action.
-    // For now, let's just do standard reordering. 
-    // To create folders, we'll provide a button. OR, if dropped over an item, we can group them 
-    // if the user holds a key, or we just rely on the UI button to group.
-    // Since building robust drag-to-merge with sortable in one file is very hard without custom sensors,
-    // let's do reordering here.
-    
-    // Check if dropping inside the same parent
-    if (activeParent === overParent) {
+    if (overIdStr.endsWith('-empty-dropzone')) {
+      targetFolderId = overIdStr.replace('-empty-dropzone', '');
+      isDroppingIntoEmptyFolder = true;
+    }
+
+    const activeParent = isItemInFolder(activeIdStr);
+    const overParent = isDroppingIntoEmptyFolder ? targetFolderId : isItemInFolder(overIdStr);
+
+    // If moving within the SAME parent
+    if (activeParent === overParent && !isDroppingIntoEmptyFolder) {
       if (activeParent) {
-        // Reorder inside a folder
+        // Reorder inside folder
         const folder = newLayout.folders[activeParent];
         const oldIndex = folder.itemIds.indexOf(activeIdStr);
         const newIndex = folder.itemIds.indexOf(overIdStr);
@@ -190,7 +205,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
           itemIds: arrayMove(folder.itemIds, oldIndex, newIndex)
         };
       } else {
-        // Reorder at root level
+        // Reorder at root
         const oldIndex = newLayout.order.indexOf(activeIdStr);
         const newIndex = newLayout.order.indexOf(overIdStr);
         newLayout.order = arrayMove(newLayout.order, oldIndex, newIndex);
@@ -199,20 +214,42 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
       return;
     }
 
-    // Move between folder and root, or folder to folder is not fully supported in this simple grid without multiple droppables.
-    // We will stick to simple reordering at root or within the same folder.
-    // For dropping an item onto a folder (to add it to the folder):
-    if (isFolder(overIdStr) && !activeParent) {
-        // Move item from root to folder
-        const oldIndex = newLayout.order.indexOf(activeIdStr);
-        newLayout.order.splice(oldIndex, 1);
-        newLayout.folders[overIdStr] = {
-            ...newLayout.folders[overIdStr],
-            itemIds: [...newLayout.folders[overIdStr].itemIds, activeIdStr]
-        };
-        onLayoutChange(newLayout);
-        return;
+    // Moving ACROSS parents
+    // Remove active from old parent
+    if (activeParent) {
+      const folder = newLayout.folders[activeParent];
+      newLayout.folders[activeParent] = {
+        ...folder,
+        itemIds: folder.itemIds.filter(id => id !== activeIdStr)
+      };
+    } else {
+      newLayout.order = newLayout.order.filter(id => id !== activeIdStr);
     }
+
+    // Add active to new parent
+    if (overParent) {
+      // Adding to a folder
+      const folder = newLayout.folders[overParent];
+      const newItems = [...folder.itemIds];
+      if (isDroppingIntoEmptyFolder) {
+        newItems.push(activeIdStr);
+      } else {
+        const overIndex = folder.itemIds.indexOf(overIdStr);
+        newItems.splice(overIndex >= 0 ? overIndex : newItems.length, 0, activeIdStr);
+      }
+      newLayout.folders[overParent] = {
+        ...folder,
+        itemIds: newItems
+      };
+    } else {
+      // Adding to root
+      const newOrder = [...newLayout.order];
+      const overIndex = newOrder.indexOf(overIdStr);
+      newOrder.splice(overIndex >= 0 ? overIndex : newOrder.length, 0, activeIdStr);
+      newLayout.order = newOrder;
+    }
+
+    onLayoutChange(newLayout);
   };
 
   const createFolder = () => {
@@ -354,11 +391,9 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
                         </div>
                         
                         {isExpanded && (
-                          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/30">
+                          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
                             {folder.itemIds.length === 0 ? (
-                              <div className="text-center py-4 text-sm text-gray-500 border border-dashed border-gray-300 rounded-lg">
-                                Drag items here
-                              </div>
+                              <EmptyFolderDropZone id={`${id}-empty-dropzone`} />
                             ) : (
                               <SortableContext items={folder.itemIds} strategy={rectSortingStrategy}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
