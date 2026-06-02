@@ -20,7 +20,7 @@ const navItems = [
   { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
   { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
   { to: '/info-tables', label: 'Information Tables', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/help', label: 'Help Documents', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/help', label: 'Help', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {

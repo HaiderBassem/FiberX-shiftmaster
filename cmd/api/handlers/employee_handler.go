@@ -184,6 +184,7 @@ type createEmployeeRequest struct {
 	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
 	WeeklyOffDays      int        `json:"weekly_off_days"`
 	CanCoverNightShift bool       `json:"can_cover_night_shift"`
+	CanManageHelpDocs  bool       `json:"can_manage_help_docs"`
 	Status             string     `json:"status"`
 	ProfileImage       *string    `json:"profile_image"`
 	SecondaryPhone     *string    `json:"secondary_phone"`
@@ -267,6 +268,7 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 		DefaultShiftID:     req.DefaultShiftID,
 		WeeklyOffDays:      req.WeeklyOffDays,
 		CanCoverNightShift: req.CanCoverNightShift,
+		CanManageHelpDocs:  req.CanManageHelpDocs,
 		Status:             req.Status,
 		ProfileImage:       req.ProfileImage,
 		SecondaryPhone:     req.SecondaryPhone,
@@ -294,6 +296,7 @@ type updateEmployeeRequest struct {
 	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
 	WeeklyOffDays      int        `json:"weekly_off_days"`
 	CanCoverNightShift bool       `json:"can_cover_night_shift"`
+	CanManageHelpDocs  bool       `json:"can_manage_help_docs"`
 	Status             string     `json:"status"`
 	ProfileImage       *string    `json:"profile_image"`
 	SecondaryPhone     *string    `json:"secondary_phone"`
@@ -384,6 +387,7 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		DefaultShiftID:     req.DefaultShiftID,
 		WeeklyOffDays:      req.WeeklyOffDays,
 		CanCoverNightShift: req.CanCoverNightShift,
+		CanManageHelpDocs:  req.CanManageHelpDocs,
 		Status:             req.Status,
 		ProfileImage:       req.ProfileImage,
 		SecondaryPhone:     req.SecondaryPhone,
