@@ -68,7 +68,7 @@ const InfoTableHub: React.FC = () => {
           {canManagePermissions && (
             <button
               onClick={() => setIsPermissionsModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-secondary-600 text-white rounded-lg hover:bg-secondary-700 transition-colors shadow-sm"
+              className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
             >
               <Shield className="w-4 h-4" />
               <span className="hidden sm:inline">Manage Permissions</span>
@@ -77,7 +77,7 @@ const InfoTableHub: React.FC = () => {
           {canCreate && (
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm"
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Create Table
