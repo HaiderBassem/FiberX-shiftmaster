@@ -11,10 +11,10 @@ import (
 
 type HelpDocumentService struct {
 	repo    *repository.HelpDocumentRepository
-	empRepo *repository.EmployeeRepository
+	empRepo repository.EmployeeRepository
 }
 
-func NewHelpDocumentService(repo *repository.HelpDocumentRepository, empRepo *repository.EmployeeRepository) *HelpDocumentService {
+func NewHelpDocumentService(repo *repository.HelpDocumentRepository, empRepo repository.EmployeeRepository) *HelpDocumentService {
 	return &HelpDocumentService{repo: repo, empRepo: empRepo}
 }
 

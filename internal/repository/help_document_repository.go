@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"shiftmaster-backend/internal/models"
+	"shiftmaster-backend/pkg/database"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type HelpDocumentRepository struct {
-	db *pgxpool.Pool
+	db *database.DB
 }
 
-func NewHelpDocumentRepository(db *pgxpool.Pool) *HelpDocumentRepository {
+func NewHelpDocumentRepository(db *database.DB) *HelpDocumentRepository {
 	return &HelpDocumentRepository{db: db}
 }
 
