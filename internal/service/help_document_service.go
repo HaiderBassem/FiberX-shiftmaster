@@ -38,7 +38,10 @@ func (s *HelpDocumentService) GetDocumentByID(ctx context.Context, id uuid.UUID,
 }
 
 func (s *HelpDocumentService) CreateDocument(ctx context.Context, doc *models.HelpDocument, role string) (*models.HelpDocument, error) {
-	emp, err := s.empRepo.GetByID(ctx, doc.CreatedBy)
+	if doc.CreatedBy == nil {
+		return nil, errors.New("creator ID is missing")
+	}
+	emp, err := s.empRepo.GetByID(ctx, *doc.CreatedBy)
 	if err != nil {
 		return nil, err
 	}
