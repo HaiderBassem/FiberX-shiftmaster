@@ -23,13 +23,7 @@ func (h *HelpDocumentHandler) GetVisibleDocuments(c *gin.Context) {
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
 
-	var depID *uuid.UUID
-	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
-		id, err := uuid.Parse(depStr.(string))
-		if err == nil {
-			depID = &id
-		}
-	}
+	depID := getDepartmentID(c)
 
 	docs, err := h.svc.GetVisibleDocuments(c.Request.Context(), depID, empID, role)
 	if err != nil {
@@ -71,13 +65,7 @@ func (h *HelpDocumentHandler) CreateDocument(c *gin.Context) {
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
 
-	var depID *uuid.UUID
-	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
-		id, err := uuid.Parse(depStr.(string))
-		if err == nil {
-			depID = &id
-		}
-	}
+	depID := getDepartmentID(c)
 
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user must belong to a department"})
