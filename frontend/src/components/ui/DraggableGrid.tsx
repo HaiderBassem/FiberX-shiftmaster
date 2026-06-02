@@ -106,14 +106,9 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     // Clean up folders
     for (const fId in newFolders) {
       const folder = newFolders[fId];
-      const validItems = folder.itemIds.filter(id => existingIds.has(id));
-      if (validItems.length !== folder.itemIds.length) {
+      const validItems = folder.itemIds ? folder.itemIds.filter(id => existingIds.has(id)) : [];
+      if (validItems.length !== (folder.itemIds?.length || 0)) {
         newFolders[fId] = { ...folder, itemIds: validItems };
-      }
-      if (validItems.length === 0) {
-        delete newFolders[fId];
-        const idx = orderWithoutDeleted.indexOf(fId);
-        if (idx !== -1) orderWithoutDeleted.splice(idx, 1);
       }
     }
 
