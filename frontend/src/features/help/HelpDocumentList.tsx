@@ -1,7 +1,7 @@
-import React from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, ShieldAlert } from 'lucide-react';
+import { FileText, Plus, ShieldAlert } from 'lucide-react';
 import { helpDocumentService } from '../../services/api/helpDocumentService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';

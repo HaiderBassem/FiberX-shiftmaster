@@ -1,17 +1,27 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { helpDocumentService } from '../../services/api/helpDocumentService';
-import { employeeService } from '../../services/api/employeeService';
-import { Shield, Eye, EyeOff, Edit3, Loader2 } from 'lucide-react';
+import api from '../../lib/api';
+import { Shield, Loader2 } from 'lucide-react';
+
+interface Employee {
+  id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+}
 
 export function HelpDocumentAccessManager({ documentId }: { documentId: string }) {
   const queryClient = useQueryClient();
   const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedAccess, setSelectedAccess] = useState('read');
 
-  const { data: employees = [], isLoading: loadingEmps } = useQuery({
+  const { data: employees = [], isLoading: loadingEmps } = useQuery<Employee[]>({
     queryKey: ['employees'],
-    queryFn: employeeService.getEmployees,
+    queryFn: async () => {
+      const res = await api.get('/employees');
+      return res.data?.data || [];
+    },
   });
 
   const { data: accessList = [], isLoading: loadingAccess } = useQuery({
