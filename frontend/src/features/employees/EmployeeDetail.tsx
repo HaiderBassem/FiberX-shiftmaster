@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Key, ArrowLeft, Mail, Phone, Briefcase, Building2, CalendarDays, Users, Edit3, Save, X, PhoneCall, AtSign } from 'lucide-react';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
+import { EmployeeLeaveBalances } from './EmployeeLeaveBalances';
 
 type Employee = {
   id: string;
@@ -192,6 +193,11 @@ export const EmployeeDetail = () => {
             <DetailBlock label="Last Login" value={employee.last_login?.split('T')[0] || '—'} />
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Admin / Manager Leave Balances View ── */}
+      {!isEditing && canEdit && id && (
+        <EmployeeLeaveBalances employeeId={id} />
       )}
 
       {/* ── Edit Mode ── */}

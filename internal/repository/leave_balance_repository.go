@@ -16,6 +16,8 @@ type LeaveBalanceRepository interface {
 	GetByEmployeeLeaveTypeAndYear(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int) (*models.EmployeeLeaveBalance, error)
 	UpsertBalance(ctx context.Context, balance *models.EmployeeLeaveBalance) error
 	IncrementUsedDays(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int, days float64) error
+	SyncAllocatedDays(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error
+	UpdateAllocatedDays(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error
 }
 
 type leaveBalanceRepo struct {
@@ -98,6 +100,34 @@ func (r *leaveBalanceRepo) IncrementUsedDays(ctx context.Context, employeeID, le
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("leave balance record not found to increment")
+	}
+	return nil
+}
+
+func (r *leaveBalanceRepo) SyncAllocatedDays(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error {
+	query := `
+		INSERT INTO employee_leave_balances (employee_id, leave_type_id, year, allocated_days, used_days)
+		VALUES ($1, $2, $3, $4, 0)
+		ON CONFLICT (employee_id, leave_type_id, year)
+		DO UPDATE SET allocated_days = EXCLUDED.allocated_days, updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := r.db.Exec(ctx, query, employeeID, leaveTypeID, year, allocatedDays)
+	return err
+}
+
+func (r *leaveBalanceRepo) UpdateAllocatedDays(ctx context.Context, employeeID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error {
+	query := `
+		UPDATE employee_leave_balances
+		SET allocated_days = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE employee_id = $2 AND leave_type_id = $3 AND year = $4
+	`
+	tag, err := r.db.Exec(ctx, query, allocatedDays, employeeID, leaveTypeID, year)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		// If no record exists yet, insert it with 0 used days
+		return r.SyncAllocatedDays(ctx, employeeID, leaveTypeID, year, allocatedDays)
 	}
 	return nil
 }

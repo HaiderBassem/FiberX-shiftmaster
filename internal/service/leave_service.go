@@ -42,6 +42,45 @@ func NewLeaveService(
 	}
 }
 
+func (s *LeaveService) GetEmployeeLeaveBalances(ctx context.Context, empID uuid.UUID, year int) ([]models.EmployeeLeaveBalance, error) {
+	return s.leaveBalanceRepo.GetByEmployeeAndYear(ctx, empID, year)
+}
+
+func (s *LeaveService) UpdateEmployeeLeaveBalance(ctx context.Context, empID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error {
+	return s.leaveBalanceRepo.UpdateAllocatedDays(ctx, empID, leaveTypeID, year, allocatedDays)
+}
+
+// SyncLeaveBalances assigns the days_per_year from all active leave types to all active employees for the specified year.
+func (s *LeaveService) SyncLeaveBalances(ctx context.Context, year int) error {
+	// Get all active employees
+	employees, err := s.employeeRepo.GetActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active employees: %w", err)
+	}
+
+	// Get all active leave types
+	leaveTypes, err := s.leaveTypeRepo.GetActive(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active leave types: %w", err)
+	}
+
+	// For each employee and leave type, sync allocated days
+	for _, emp := range employees {
+		for _, lt := range leaveTypes {
+			// Only sync if days_per_year > 0 to avoid creating unnecessary zero-balance records
+			if lt.DaysPerYear > 0 {
+				err := s.leaveBalanceRepo.SyncAllocatedDays(ctx, emp.ID, lt.ID, year, float64(lt.DaysPerYear))
+				if err != nil {
+					// Log the error but continue with others
+					fmt.Printf("Error syncing balance for emp %s and type %s: %v\n", emp.ID, lt.ID, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // RequestLeave creates a new leave request.
 // - If the requester is a team_leader → notifies managers directly (skips TL step).
 // - If the requester is an employee → notifies all team leaders in the same department.

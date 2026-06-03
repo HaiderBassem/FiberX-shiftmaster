@@ -62,6 +62,18 @@ export const LeaveTypeManager = () => {
     setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false });
   };
 
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/leave-balances/sync', { year: new Date().getFullYear() });
+    },
+    onSuccess: () => {
+      alert('Leave balances synchronized successfully for all active employees!');
+    },
+    onError: () => {
+      alert('Failed to sync leave balances.');
+    }
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -69,9 +81,23 @@ export const LeaveTypeManager = () => {
           <h2 className="text-2xl font-bold text-foreground">Leave Types Configuration</h2>
           <p className="text-sm text-muted-foreground">Manage the types of leave available to employees.</p>
         </div>
-        <Button onClick={handleAddNew} disabled={editingId === 'new'} className="gap-2">
-          <Plus className="w-4 h-4" /> Add New
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              if (confirm('This will assign the default annual days to all active employees. Are you sure?')) {
+                syncMutation.mutate();
+              }
+            }}
+            disabled={syncMutation.isPending}
+            className="gap-2 border-primary/20 text-primary hover:bg-primary/10"
+          >
+            {syncMutation.isPending ? 'Syncing...' : 'Sync Balances'}
+          </Button>
+          <Button onClick={handleAddNew} disabled={editingId === 'new'} className="gap-2">
+            <Plus className="w-4 h-4" /> Add New
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

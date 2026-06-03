@@ -101,6 +101,14 @@ func SetupRouter(
 			leaves.GET("/pending", leaveH.PendingForApproval)
 		}
 
+		// Leave Balances (Admin only for sync/update)
+		leaveBalances := protected.Group("/leave-balances")
+		{
+			leaveBalances.POST("/sync", middleware.RequireRole("admin"), leaveH.SyncBalances)
+			leaveBalances.GET("/employee/:id", middleware.RequireRole("admin", "manager", "team_leader"), leaveH.GetEmployeeBalances)
+			leaveBalances.PUT("/employee/:id/:leave_type_id", middleware.RequireRole("admin"), leaveH.UpdateEmployeeBalance)
+		}
+
 		// Leave Types (read)
 		leaveTypes := protected.Group("/leave-types")
 		{
