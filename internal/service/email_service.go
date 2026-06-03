@@ -35,13 +35,44 @@ func (s *EmailService) SendEmailAsync(to []string, subject, body string) {
 	}()
 }
 
+type loginAuth struct {
+	username, password string
+}
+
+func LoginAuth(username, password string) smtp.Auth {
+	return &loginAuth{username, password}
+}
+
+func (a *loginAuth) Start(server *smtp.ServerInfo) (string, []byte, error) {
+	return "LOGIN", []byte{}, nil
+}
+
+func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
+	if more {
+		switch string(fromServer) {
+		case "Username:":
+			return []byte(a.username), nil
+		case "Password:":
+			return []byte(a.password), nil
+		default:
+			return nil, fmt.Errorf("unknown fromServer: %s", string(fromServer))
+		}
+	}
+	return nil, nil
+}
+
 func (s *EmailService) sendEmail(to []string, subject, body string) error {
 	addr := fmt.Sprintf("%s:%d", s.cfg.Host, s.cfg.Port)
 
 	var auth smtp.Auth
-	// Only use authentication if user/password are provided
+	// Use LoginAuth for Office365/Outlook, otherwise PlainAuth
 	if s.cfg.User != "" && s.cfg.Password != "" {
-		auth = smtp.PlainAuth("", s.cfg.User, s.cfg.Password, s.cfg.Host)
+		hostLower := strings.ToLower(s.cfg.Host)
+		if strings.Contains(hostLower, "office365") || strings.Contains(hostLower, "outlook") || strings.Contains(hostLower, "hotmail") {
+			auth = LoginAuth(s.cfg.User, s.cfg.Password)
+		} else {
+			auth = smtp.PlainAuth("", s.cfg.User, s.cfg.Password, s.cfg.Host)
+		}
 	}
 
 	msg := []byte("To: " + strings.Join(to, ",") + "\r\n" +
