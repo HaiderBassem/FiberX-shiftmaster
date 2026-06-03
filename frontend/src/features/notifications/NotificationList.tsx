@@ -59,9 +59,9 @@ export const NotificationList = () => {
         <div className="flex justify-center py-16">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
-      ) : notifications?.length > 0 ? (
+      ) : unreadCount > 0 ? (
         <div className="space-y-3">
-          {notifications.map((notification: any) => {
+          {notifications.filter((n: any) => !n.is_read).map((notification: any) => {
             const isUnread = !notification.is_read;
             const colorClass = getNotifColor(notification);
 
