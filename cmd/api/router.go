@@ -257,7 +257,7 @@ func SetupRouter(
 		// Audit Logs (Admin only)
 		audit := protected.Group("/audit")
 		{
-			audit.GET("", auditH.List)
+			audit.GET("", auditH.ListActivity)
 		}
 
 		// --- Admin only routes (manager + admin) ---

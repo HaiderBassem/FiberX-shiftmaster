@@ -14,6 +14,7 @@ import (
 
 	"shiftmaster-backend/cmd/api/handlers"
 	"shiftmaster-backend/internal/config"
+	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
 	"shiftmaster-backend/pkg/database"
@@ -62,8 +63,8 @@ func main() {
 	leaveTypeService := service.NewLeaveTypeService(leaveTypeRepo)
 	infoTableService := service.NewInfoTableService(infoTableRepo, employeeRepo)
 	helpDocService := service.NewHelpDocumentService(helpDocRepo, employeeRepo)
-	announcementService := service.NewAnnouncementService(announcementRepo, employeeRepo, emailService)
 	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
+	announcementService := service.NewAnnouncementService(announcementRepo, employeeRepo, emailService, pushService)
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
