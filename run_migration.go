@@ -22,7 +22,7 @@ func main() {
 	}
 	defer db.Close()
 
-	sqlBytes, err := ioutil.ReadFile("internal/database/migrations/022_add_employee_ui_preferences.sql")
+	sqlBytes, err := ioutil.ReadFile("internal/database/migrations/023_add_announcements.sql")
 	if err != nil {
 		log.Fatalf("Failed to read migration: %v", err)
 	}
@@ -32,5 +32,5 @@ func main() {
 		log.Fatalf("Migration failed: %v", err)
 	}
 
-	fmt.Println("Migration 022 applied successfully.")
+	fmt.Println("Migration 023 applied successfully.")
 }

@@ -170,25 +170,26 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 }
 
 type createEmployeeRequest struct {
-	EmployeeCode       string     `json:"employee_code"`
-	FirstName          string     `json:"first_name" binding:"required"`
-	LastName           string     `json:"last_name" binding:"required"`
-	Gender             string     `json:"gender" binding:"required"`
-	Phone              *string    `json:"phone"`
-	Email              string     `json:"email" binding:"required,email"`
-	Password           string     `json:"password" binding:"required,min=8"`
-	HireDate           string     `json:"hire_date" binding:"required"`
-	Role               string     `json:"role" binding:"required"`
-	DepartmentID       *uuid.UUID `json:"department_id"`
-	Position           *string    `json:"position"`
-	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
-	WeeklyOffDays      int        `json:"weekly_off_days"`
-	CanCoverNightShift bool       `json:"can_cover_night_shift"`
-	CanManageHelpDocs  bool       `json:"can_manage_help_docs"`
-	Status             string     `json:"status"`
-	ProfileImage       *string    `json:"profile_image"`
-	SecondaryPhone     *string    `json:"secondary_phone"`
-	SecondaryEmail     *string    `json:"secondary_email"`
+	EmployeeCode         string     `json:"employee_code"`
+	FirstName            string     `json:"first_name" binding:"required"`
+	LastName             string     `json:"last_name" binding:"required"`
+	Gender               string     `json:"gender" binding:"required"`
+	Phone                *string    `json:"phone"`
+	Email                string     `json:"email" binding:"required,email"`
+	Password             string     `json:"password" binding:"required,min=8"`
+	HireDate             string     `json:"hire_date" binding:"required"`
+	Role                 string     `json:"role" binding:"required"`
+	DepartmentID         *uuid.UUID `json:"department_id"`
+	Position             *string    `json:"position"`
+	DefaultShiftID       *uuid.UUID `json:"default_shift_id"`
+	WeeklyOffDays        int        `json:"weekly_off_days"`
+	CanCoverNightShift   bool       `json:"can_cover_night_shift"`
+	CanManageHelpDocs    bool       `json:"can_manage_help_docs"`
+	CanPostAnnouncements bool       `json:"can_post_announcements"`
+	Status               string     `json:"status"`
+	ProfileImage         *string    `json:"profile_image"`
+	SecondaryPhone       *string    `json:"secondary_phone"`
+	SecondaryEmail       *string    `json:"secondary_email"`
 }
 
 // Create creates a new employee.
@@ -255,25 +256,26 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 	createdBy, _ := uuid.Parse(createdByStr.(string))
 
 	emp := &models.Employee{
-		EmployeeCode:       req.EmployeeCode,
-		FirstName:          req.FirstName,
-		LastName:           req.LastName,
-		Gender:             req.Gender,
-		Phone:              req.Phone,
-		Email:              req.Email,
-		HireDate:           hireDate,
-		Role:               req.Role,
-		DepartmentID:       req.DepartmentID,
-		Position:           req.Position,
-		DefaultShiftID:     req.DefaultShiftID,
-		WeeklyOffDays:      req.WeeklyOffDays,
-		CanCoverNightShift: req.CanCoverNightShift,
-		CanManageHelpDocs:  req.CanManageHelpDocs,
-		Status:             req.Status,
-		ProfileImage:       req.ProfileImage,
-		SecondaryPhone:     req.SecondaryPhone,
-		SecondaryEmail:     req.SecondaryEmail,
-		CreatedBy:          &createdBy,
+		EmployeeCode:         req.EmployeeCode,
+		FirstName:            req.FirstName,
+		LastName:             req.LastName,
+		Gender:               req.Gender,
+		Phone:                req.Phone,
+		Email:                req.Email,
+		HireDate:             hireDate,
+		Role:                 req.Role,
+		DepartmentID:         req.DepartmentID,
+		Position:             req.Position,
+		DefaultShiftID:       req.DefaultShiftID,
+		WeeklyOffDays:        req.WeeklyOffDays,
+		CanCoverNightShift:   req.CanCoverNightShift,
+		CanManageHelpDocs:    req.CanManageHelpDocs,
+		CanPostAnnouncements: req.CanPostAnnouncements,
+		Status:               req.Status,
+		ProfileImage:         req.ProfileImage,
+		SecondaryPhone:       req.SecondaryPhone,
+		SecondaryEmail:       req.SecondaryEmail,
+		CreatedBy:            &createdBy,
 	}
 
 	if err := h.employeeService.CreateEmployee(c.Request.Context(), emp, req.Password); err != nil {
@@ -285,22 +287,23 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 }
 
 type updateEmployeeRequest struct {
-	FirstName          string     `json:"first_name"`
-	LastName           string     `json:"last_name"`
-	Gender             string     `json:"gender"`
-	Phone              *string    `json:"phone"`
-	Email              string     `json:"email"`
-	Role               string     `json:"role"`
-	DepartmentID       *uuid.UUID `json:"department_id"`
-	Position           *string    `json:"position"`
-	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
-	WeeklyOffDays      int        `json:"weekly_off_days"`
-	CanCoverNightShift bool       `json:"can_cover_night_shift"`
-	CanManageHelpDocs  *bool      `json:"can_manage_help_docs"`
-	Status             string     `json:"status"`
-	ProfileImage       *string    `json:"profile_image"`
-	SecondaryPhone     *string    `json:"secondary_phone"`
-	SecondaryEmail     *string    `json:"secondary_email"`
+	FirstName            string     `json:"first_name"`
+	LastName             string     `json:"last_name"`
+	Gender               string     `json:"gender"`
+	Phone                *string    `json:"phone"`
+	Email                string     `json:"email"`
+	Role                 string     `json:"role"`
+	DepartmentID         *uuid.UUID `json:"department_id"`
+	Position             *string    `json:"position"`
+	DefaultShiftID       *uuid.UUID `json:"default_shift_id"`
+	WeeklyOffDays        int        `json:"weekly_off_days"`
+	CanCoverNightShift   bool       `json:"can_cover_night_shift"`
+	CanManageHelpDocs    *bool      `json:"can_manage_help_docs"`
+	CanPostAnnouncements *bool      `json:"can_post_announcements"`
+	Status               string     `json:"status"`
+	ProfileImage         *string    `json:"profile_image"`
+	SecondaryPhone       *string    `json:"secondary_phone"`
+	SecondaryEmail       *string    `json:"secondary_email"`
 }
 
 // Update updates an employee.
@@ -391,6 +394,7 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		// Preserve permissions and preferences since they are managed by separate endpoints
 		// or omitted from the update payload
 		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
+		CanPostAnnouncements: func() bool { if req.CanPostAnnouncements != nil { return *req.CanPostAnnouncements }; return current.CanPostAnnouncements }(),
 		CanCreateTables:    current.CanCreateTables,
 		UIPreferences:      current.UIPreferences,
 		Status:             req.Status,

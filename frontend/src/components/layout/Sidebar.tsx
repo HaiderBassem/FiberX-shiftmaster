@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2,
-  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox
+  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone
 } from 'lucide-react';
 
 const navItems = [
@@ -17,15 +17,28 @@ const navItems = [
   { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
   { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements' },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
 
-  const visibleItems = navItems.filter(
-    (item) => user && item.roles.includes(user.role)
-  );
+  const visibleItems = navItems.filter((item) => {
+    if (!user) return false;
+    
+    // Check role
+    let hasAccess = item.roles.includes(user.role);
+    
+    // Additional permission checks
+    if (!hasAccess && (item as any).permission) {
+      if ((item as any).permission === 'can_post_announcements' && (user as any).can_post_announcements) {
+        hasAccess = true;
+      }
+    }
+    
+    return hasAccess;
+  });
 
   return (
     <aside className="w-64 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">

@@ -44,6 +44,7 @@ type Employee struct {
 	CreatedBy          *uuid.UUID `json:"created_by"`
 	CanCreateTables    bool      `json:"can_create_tables"`
 	CanManageHelpDocs  bool      `json:"can_manage_help_docs"`
+	CanPostAnnouncements bool    `json:"can_post_announcements"`
 	UIPreferences      map[string]interface{} `json:"ui_preferences"`
 }
 

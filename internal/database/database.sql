@@ -117,7 +117,8 @@ CREATE TABLE employees (
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID REFERENCES employees(id)
+    created_by UUID REFERENCES employees(id),
+    can_post_announcements BOOLEAN DEFAULT false
 );
 
 COMMENT ON TABLE employees IS 'Core employee data with authentication';
@@ -442,6 +443,23 @@ CREATE TABLE task_boards (
 COMMENT ON TABLE task_boards IS 'Custom task boards created by team leaders';
 COMMENT ON COLUMN task_boards.recurrence_type IS 'daily = tasks repeat every day, weekly = tasks on specific days of the week';
 
+-- =====================================================
+-- 19. Announcements Table
+-- =====================================================
+CREATE TABLE announcements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    message TEXT NOT NULL,
+    priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('info', 'normal', 'important', 'critical')),
+    is_active BOOLEAN DEFAULT false,
+    created_by UUID REFERENCES employees(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE announcements IS 'Department announcements';
+
 -- Add board_id to task_schedules
 ALTER TABLE task_schedules ADD COLUMN board_id UUID REFERENCES task_boards(id) ON DELETE CASCADE;
 
@@ -450,13 +468,13 @@ ALTER TABLE task_schedules DROP CONSTRAINT IF EXISTS task_schedules_schedule_typ
 ALTER TABLE task_schedules ALTER COLUMN schedule_type DROP NOT NULL;
 
 -- =====================================================
--- 19. Link default_shift_id
+-- 20. Link default_shift_id
 -- =====================================================
 ALTER TABLE employees ADD CONSTRAINT fk_employees_default_shift
     FOREIGN KEY (default_shift_id) REFERENCES shifts(id);
 
 -- =====================================================
--- 20. Indexes
+-- 21. Indexes
 -- =====================================================
 
 -- employee_shifts indexes
@@ -499,8 +517,12 @@ CREATE INDEX idx_schedule_templates_dates ON schedule_templates(valid_from, vali
 -- shift_swaps indexes
 CREATE INDEX idx_shift_swaps_date ON shift_swaps(shift_date);
 
+-- announcements indexes
+CREATE INDEX idx_announcements_department ON announcements(department_id);
+CREATE INDEX idx_announcements_active ON announcements(is_active);
+
 -- =====================================================
--- 21. Uniqueness Constraints
+-- 22. Uniqueness Constraints
 -- =====================================================
 
 -- Ensure email is unique (case-insensitive)
@@ -522,7 +544,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_departments_name_ci
 ON departments (LOWER(name));
 
 -- =====================================================
--- 22. Views
+-- 23. Views
 -- =====================================================
 
 -- Weekly schedule view with employee and shift names
@@ -672,7 +694,7 @@ WHERE ta.assigned_date = CURRENT_DATE
   AND ts.is_active = true;
 
 -- =====================================================
--- 23. Functions
+-- 24. Functions
 -- =====================================================
 
 -- Automatically update the updated_at field

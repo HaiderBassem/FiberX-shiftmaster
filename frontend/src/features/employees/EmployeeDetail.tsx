@@ -25,6 +25,7 @@ type Employee = {
   default_shift_id: string | null;
   weekly_off_days: number;
   can_cover_night_shift: boolean;
+  can_post_announcements: boolean;
   status: string;
   last_login: string | null;
   secondary_phone: string | null;
@@ -102,6 +103,7 @@ export const EmployeeDetail = () => {
       default_shift_id: employee.default_shift_id,
       weekly_off_days: employee.weekly_off_days,
       can_cover_night_shift: employee.can_cover_night_shift,
+      can_post_announcements: employee.can_post_announcements,
       status: employee.status,
       secondary_phone: employee.secondary_phone,
       secondary_email: employee.secondary_email,
@@ -288,11 +290,19 @@ export const EmployeeDetail = () => {
                   <option value="6">Saturday</option>
                 </select>
               </div>
-              <div className="flex items-center gap-3 pt-6">
-                <input type="checkbox" id="nightShift" checked={editData.can_cover_night_shift || false}
-                  onChange={(e) => setEditData({...editData, can_cover_night_shift: e.target.checked})}
-                  className="w-4 h-4 rounded border-input" />
-                <Label htmlFor="nightShift">Can Cover Night Shift</Label>
+              <div className="flex flex-col justify-end gap-3 pt-6">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="nightShift" checked={editData.can_cover_night_shift || false}
+                    onChange={(e) => setEditData({...editData, can_cover_night_shift: e.target.checked})}
+                    className="w-4 h-4 rounded border-input" />
+                  <Label htmlFor="nightShift">Can Cover Night Shift</Label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" id="postAnnouncements" checked={editData.can_post_announcements || false}
+                    onChange={(e) => setEditData({...editData, can_post_announcements: e.target.checked})}
+                    className="w-4 h-4 rounded border-input" />
+                  <Label htmlFor="postAnnouncements">Can Post Announcements</Label>
+                </div>
               </div>
             </div>
 

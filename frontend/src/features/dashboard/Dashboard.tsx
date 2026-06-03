@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
 import { fmtDateTime } from '@/lib/dateUtils';
+import { AnnouncementBanner } from '../announcements/AnnouncementBanner';
 
 // ───────────────────────────────────────────────────────────
 // Dashboard
@@ -71,6 +72,8 @@ const EmployeeDashboard = () => {
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </div>
+
+      <AnnouncementBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -273,6 +276,8 @@ const LeaderDashboard = () => {
           {format(new Date(), 'EEEE, MMMM d, yyyy')} · Welcome, {user?.first_name}
         </p>
       </div>
+
+      <AnnouncementBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">

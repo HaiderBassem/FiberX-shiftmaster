@@ -24,6 +24,7 @@ func SetupRouter(
 	leaveTypeH *handlers.LeaveTypeHandler,
 	infoTableH *handlers.InfoTableHandler,
 	helpDocH *handlers.HelpDocumentHandler,
+	announcementH *handlers.AnnouncementHandler,
 ) {
 	api := r.Group("/api")
 
@@ -278,5 +279,16 @@ func SetupRouter(
 				adminDept.DELETE("/:id/managers/:manager_id", deptH.RemoveManager)
 			}
 		}
+
+		// Announcements
+		announcements := protected.Group("/announcements")
+		{
+			announcements.GET("/active", announcementH.GetActive)
+			announcements.GET("", announcementH.GetAll)
+			announcements.POST("", announcementH.Create)
+			announcements.DELETE("/:id", announcementH.Delete)
+			announcements.PUT("/:id/activate", announcementH.SetActive)
+		}
+
 	}
 }

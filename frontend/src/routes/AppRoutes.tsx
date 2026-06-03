@@ -19,13 +19,16 @@ import InfoTableView from '../features/infotables/InfoTableView';
 import { HelpDocumentList } from '../features/help/HelpDocumentList';
 import { HelpDocumentView } from '../features/help/HelpDocumentView';
 import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
-const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean }) => {
+import { AnnouncementManager } from '../features/announcements/AnnouncementManager';
+const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     if (allowHelpDocsAccess && (user as any).can_manage_help_docs) {
+      // allow
+    } else if (allowAnnouncementsAccess && (user as any).can_post_announcements) {
       // allow
     } else {
       return <Navigate to="/unauthorized" replace />;
@@ -147,7 +150,15 @@ export const AppRoutes = () => {
             } 
           />
 
-          {/* ── Admin routes (admin only) ── */}
+          {/* ── Admin / Manager / Approver routes ── */}
+          <Route 
+            path="announcements/manage" 
+            element={
+              <ProtectedRoute allowedRoles={['manager', 'admin']} allowAnnouncementsAccess={true}>
+                <AnnouncementManager />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="departments" 
             element={

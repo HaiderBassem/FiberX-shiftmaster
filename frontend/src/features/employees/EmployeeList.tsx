@@ -26,6 +26,7 @@ interface Employee {
   weekly_off_days: number;
   can_cover_night_shift: boolean;
   can_manage_help_docs: boolean;
+  can_post_announcements: boolean;
   status: string;
   secondary_phone: string | null;
   secondary_email: string | null;
@@ -81,6 +82,7 @@ export const EmployeeList = () => {
   const [createOffDays, setCreateOffDays] = useState(1);
   const [createNight, setCreateNight] = useState(false);
   const [createCanManageHelpDocs, setCreateCanManageHelpDocs] = useState(false);
+  const [createCanPostAnnouncements, setCreateCanPostAnnouncements] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
   const [createSecPhone, setCreateSecPhone] = useState('');
   const [createSecEmail, setCreateSecEmail] = useState('');
@@ -99,6 +101,7 @@ export const EmployeeList = () => {
   const [editOffDays, setEditOffDays] = useState(1);
   const [editNight, setEditNight] = useState(false);
   const [editCanManageHelpDocs, setEditCanManageHelpDocs] = useState(false);
+  const [editCanPostAnnouncements, setEditCanPostAnnouncements] = useState(false);
   const [editSecPhone, setEditSecPhone] = useState('');
   const [editSecEmail, setEditSecEmail] = useState('');
 
@@ -158,6 +161,7 @@ export const EmployeeList = () => {
         weekly_off_days: createOffDays,
         can_cover_night_shift: createNight,
         can_manage_help_docs: createCanManageHelpDocs,
+        can_post_announcements: createCanPostAnnouncements,
         password: createPassword,
         secondary_phone: createSecPhone || null,
         secondary_email: createSecEmail || null,
@@ -194,6 +198,7 @@ export const EmployeeList = () => {
         weekly_off_days: editOffDays,
         can_cover_night_shift: editNight,
         can_manage_help_docs: editCanManageHelpDocs,
+        can_post_announcements: editCanPostAnnouncements,
         secondary_phone: editSecPhone || null,
         secondary_email: editSecEmail || null,
       });
@@ -229,6 +234,7 @@ export const EmployeeList = () => {
     setEditOffDays(emp.weekly_off_days);
     setEditNight(emp.can_cover_night_shift);
     setEditCanManageHelpDocs(emp.can_manage_help_docs);
+    setEditCanPostAnnouncements(emp.can_post_announcements);
     setEditSecPhone(emp.secondary_phone || '');
     setEditSecEmail(emp.secondary_email || '');
   };
@@ -425,6 +431,10 @@ export const EmployeeList = () => {
                 <input id="create-help" type="checkbox" checked={createCanManageHelpDocs} onChange={(e) => setCreateCanManageHelpDocs(e.target.checked)} />
                 <Label htmlFor="create-help">Can manage Help Docs</Label>
               </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input id="create-announcements" type="checkbox" checked={createCanPostAnnouncements} onChange={(e) => setCreateCanPostAnnouncements(e.target.checked)} />
+                <Label htmlFor="create-announcements">Can post Announcements</Label>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
@@ -466,6 +476,7 @@ export const EmployeeList = () => {
                     <div className="space-y-1"><Label className="text-xs">Phone</Label><Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="h-9" /></div>
                     <div className="space-y-1"><Label className="text-xs">Sec. Phone <span className="text-muted-foreground">(opt)</span></Label><Input value={editSecPhone} onChange={(e) => setEditSecPhone(e.target.value)} className="h-9" placeholder="Secondary phone" /></div>
                     <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-help" type="checkbox" checked={editCanManageHelpDocs} onChange={(e) => setEditCanManageHelpDocs(e.target.checked)} /><Label htmlFor="edit-help" className="text-xs">Can manage Help Docs</Label></div>
+                    <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-announcements" type="checkbox" checked={editCanPostAnnouncements} onChange={(e) => setEditCanPostAnnouncements(e.target.checked)} /><Label htmlFor="edit-announcements" className="text-xs">Can post Announcements</Label></div>
                     <div className="space-y-1"><Label className="text-xs">Department</Label>
                       <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
                         <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}

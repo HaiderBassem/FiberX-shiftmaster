@@ -31,6 +31,7 @@ type EmployeeRepository interface {
 	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
 	UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
+	GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error)
 }
 
 type employeeRepo struct {
@@ -46,7 +47,7 @@ func (r *employeeRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Emplo
 	err := r.db.QueryRow(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE id = $1`, id,
 	).Scan(
@@ -54,7 +55,7 @@ func (r *employeeRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Emplo
 		&emp.Phone, &emp.Email, &emp.PasswordHash,
 		&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 		&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.UIPreferences,
+		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.CanPostAnnouncements, &emp.UIPreferences,
 		&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 	)
 	if err != nil {
@@ -71,7 +72,7 @@ func (r *employeeRepo) GetByEmail(ctx context.Context, email string) (*models.Em
 	err := r.db.QueryRow(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE email = $1`, email,
 	).Scan(
@@ -79,7 +80,7 @@ func (r *employeeRepo) GetByEmail(ctx context.Context, email string) (*models.Em
 		&emp.Phone, &emp.Email, &emp.PasswordHash,
 		&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 		&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.UIPreferences,
+		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.CanPostAnnouncements, &emp.UIPreferences,
 		&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 	)
 	if err != nil {
@@ -96,7 +97,7 @@ func (r *employeeRepo) GetByCode(ctx context.Context, code string) (*models.Empl
 	err := r.db.QueryRow(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE employee_code = $1`, code,
 	).Scan(
@@ -104,7 +105,7 @@ func (r *employeeRepo) GetByCode(ctx context.Context, code string) (*models.Empl
 		&emp.Phone, &emp.Email, &emp.PasswordHash,
 		&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 		&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.UIPreferences,
+		&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.CanPostAnnouncements, &emp.UIPreferences,
 		&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 	)
 	if err != nil {
@@ -125,7 +126,7 @@ func (r *employeeRepo) scanEmployees(rows pgx.Rows) ([]models.Employee, error) {
 			&emp.Phone, &emp.Email, &emp.PasswordHash,
 			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
-			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.UIPreferences,
+			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail, &emp.CanCreateTables, &emp.CanManageHelpDocs, &emp.CanPostAnnouncements, &emp.UIPreferences,
 			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 		)
 		if err != nil {
@@ -140,7 +141,7 @@ func (r *employeeRepo) GetAll(ctx context.Context) ([]models.Employee, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees ORDER BY first_name, last_name`)
 	if err != nil {
@@ -153,7 +154,7 @@ func (r *employeeRepo) GetByShiftID(ctx context.Context, shiftID uuid.UUID) ([]m
 	rows, err := r.db.Query(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE default_shift_id = $1 ORDER BY first_name, last_name`, shiftID)
 	if err != nil {
@@ -167,7 +168,7 @@ func (r *employeeRepo) GetActive(ctx context.Context) ([]models.Employee, error)
 	rows, err := r.db.Query(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE status = 'active' ORDER BY first_name, last_name`)
 	if err != nil {
@@ -181,7 +182,7 @@ func (r *employeeRepo) GetByDepartment(ctx context.Context, departmentID uuid.UU
 	rows, err := r.db.Query(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE department_id = $1 ORDER BY first_name, last_name`, departmentID)
 	if err != nil {
@@ -195,7 +196,7 @@ func (r *employeeRepo) GetByRole(ctx context.Context, role string) ([]models.Emp
 	rows, err := r.db.Query(ctx,
 		`SELECT id, employee_code, first_name, last_name, gender, phone, email, password_hash,
 				hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences,
+				can_cover_night_shift, status, profile_image, remember_token, last_login, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences,
 				created_at, updated_at, created_by
 		 FROM employees WHERE role = $1 ORDER BY first_name, last_name`, role)
 	if err != nil {
@@ -209,12 +210,12 @@ func (r *employeeRepo) Create(ctx context.Context, emp *models.Employee) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO employees (employee_code, first_name, last_name, gender, phone, email, password_hash,
 			hire_date, role, department_id, position, default_shift_id, weekly_off_days,
-			can_cover_night_shift, status, profile_image, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, ui_preferences, created_by)
+			can_cover_night_shift, status, profile_image, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences, created_by)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 		 RETURNING id, created_at, updated_at`,
 		emp.EmployeeCode, emp.FirstName, emp.LastName, emp.Gender, emp.Phone, emp.Email, emp.PasswordHash,
 		emp.HireDate, emp.Role, emp.DepartmentID, emp.Position, emp.DefaultShiftID, emp.WeeklyOffDays,
-		emp.CanCoverNightShift, emp.Status, emp.ProfileImage, emp.SecondaryPhone, emp.SecondaryEmail, emp.CanCreateTables, emp.CanManageHelpDocs, emp.UIPreferences, emp.CreatedBy,
+		emp.CanCoverNightShift, emp.Status, emp.ProfileImage, emp.SecondaryPhone, emp.SecondaryEmail, emp.CanCreateTables, emp.CanManageHelpDocs, emp.CanPostAnnouncements, emp.UIPreferences, emp.CreatedBy,
 	).Scan(&emp.ID, &emp.CreatedAt, &emp.UpdatedAt)
 }
 
@@ -228,7 +229,7 @@ func (r *employeeRepo) Update(ctx context.Context, emp *models.Employee) error {
 		emp.FirstName, emp.LastName, emp.Gender, emp.Phone, emp.Email,
 		emp.Role, emp.DepartmentID, emp.Position, emp.DefaultShiftID, emp.WeeklyOffDays,
 		emp.CanCoverNightShift, emp.Status, emp.ProfileImage,
-		emp.SecondaryPhone, emp.SecondaryEmail, emp.CanCreateTables, emp.CanManageHelpDocs, emp.UIPreferences, emp.ID,
+		emp.SecondaryPhone, emp.SecondaryEmail, emp.CanCreateTables, emp.CanManageHelpDocs, emp.CanPostAnnouncements, emp.UIPreferences, emp.ID,
 	)
 	return err
 }
@@ -308,4 +309,25 @@ func (r *employeeRepo) UpdatePreferences(ctx context.Context, id uuid.UUID, pref
 	query := `UPDATE employees SET ui_preferences = COALESCE(ui_preferences, '{}'::jsonb) || $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, prefs)
 	return err
+}
+
+
+func (r *employeeRepo) GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT email FROM employees WHERE department_id = $1 AND status = 'active' AND email IS NOT NULL`, departmentID)
+	if err != nil {
+		return nil, fmt.Errorf("get emails by department: %w", err)
+	}
+	defer rows.Close()
+
+	var emails []string
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, err
+		}
+		if email != "" {
+			emails = append(emails, email)
+		}
+	}
+	return emails, nil
 }
