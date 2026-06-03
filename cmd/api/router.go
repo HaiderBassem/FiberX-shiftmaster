@@ -51,6 +51,7 @@ func SetupRouter(
 		employees := protected.Group("/employees")
 		{
 			employees.GET("", empH.List)
+			employees.GET("/me/profile-stats", empH.GetProfileStats)
 			employees.GET("/:id", empH.GetByID)
 			employees.PUT("/:id/password", empH.UpdatePassword)
 			employees.PUT("/:id/help-permission", empH.UpdateHelpPermission)

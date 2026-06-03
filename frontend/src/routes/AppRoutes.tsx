@@ -14,6 +14,7 @@ import { NotificationList } from '../features/notifications/NotificationList';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { DepartmentDetail } from '../features/departments/DepartmentDetail';
 import { EmployeeDetail } from '../features/employees/EmployeeDetail';
+import { UserProfile } from '../features/employees/UserProfile';
 import InfoTableHub from '../features/infotables/InfoTableHub';
 import InfoTableView from '../features/infotables/InfoTableView';
 import { HelpDocumentList } from '../features/help/HelpDocumentList';
@@ -48,6 +49,7 @@ export const AppRoutes = () => {
         
         <Route path="/" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
+          <Route path="profile" element={<UserProfile />} />
 
           {/* ── Employee self-service routes (all roles) ── */}
           <Route 

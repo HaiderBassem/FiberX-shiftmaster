@@ -13,26 +13,32 @@ import (
 
 // LeaveService handles leave request business logic with approval chain.
 type LeaveService struct {
-	leaveRepo    repository.LeaveRepository
-	employeeRepo repository.EmployeeRepository
-	scheduleRepo repository.ScheduleRepository
-	notifService *NotificationService
-	emailService *EmailService
+	leaveRepo        repository.LeaveRepository
+	employeeRepo     repository.EmployeeRepository
+	scheduleRepo     repository.ScheduleRepository
+	leaveBalanceRepo repository.LeaveBalanceRepository
+	leaveTypeRepo    repository.LeaveTypeRepository
+	notifService     *NotificationService
+	emailService     *EmailService
 }
 
 func NewLeaveService(
 	leaveRepo repository.LeaveRepository,
 	employeeRepo repository.EmployeeRepository,
 	scheduleRepo repository.ScheduleRepository,
+	leaveBalanceRepo repository.LeaveBalanceRepository,
+	leaveTypeRepo repository.LeaveTypeRepository,
 	notifService *NotificationService,
 	emailService *EmailService,
 ) *LeaveService {
 	return &LeaveService{
-		leaveRepo:    leaveRepo,
-		employeeRepo: employeeRepo,
-		scheduleRepo: scheduleRepo,
-		notifService: notifService,
-		emailService: emailService,
+		leaveRepo:        leaveRepo,
+		employeeRepo:     employeeRepo,
+		scheduleRepo:     scheduleRepo,
+		leaveBalanceRepo: leaveBalanceRepo,
+		leaveTypeRepo:    leaveTypeRepo,
+		notifService:     notifService,
+		emailService:     emailService,
 	}
 }
 
@@ -46,6 +52,35 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	}
 	if leave.StartDate.Before(time.Now().Truncate(24 * time.Hour)) {
 		return fmt.Errorf("cannot request leave for past dates")
+	}
+
+	// Calculate requested days
+	requestedDays := 0.0
+	if leave.StartTime != nil && leave.EndTime != nil {
+		// Just a simple abstraction for hourly leaves, assume 1 day for quota
+		requestedDays = 1.0
+	} else {
+		// Count days inclusive (as per user approval of plan assumptions)
+		for d := leave.StartDate.UTC().Truncate(24 * time.Hour); !d.After(leave.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
+			requestedDays += 1.0
+		}
+	}
+
+	if leave.LeaveTypeID != uuid.Nil {
+		leaveType, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+		if err == nil && leaveType.DaysPerYear > 0 {
+			year := leave.StartDate.Year()
+			balance, err := s.leaveBalanceRepo.GetByEmployeeLeaveTypeAndYear(ctx, leave.EmployeeID, leave.LeaveTypeID, year)
+			var allocated float64 = float64(leaveType.DaysPerYear)
+			var used float64 = 0
+			if err == nil && balance != nil {
+				allocated = balance.AllocatedDays
+				used = balance.UsedDays
+			}
+			if used+requestedDays > allocated {
+				return fmt.Errorf("insufficient leave balance. You have %.1f days remaining", allocated-used)
+			}
+		}
 	}
 
 	// Validate employee exists
@@ -407,6 +442,36 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			fmt.Printf("[LEAVE] Failed to upsert employee shift for %s on %s: %v\n", leave.EmployeeID, d.Format("2006-01-02"), upsertErr)
 		}
 	}
+
+	// Increment used days in leave balances
+	if leave.LeaveTypeID != uuid.Nil {
+		// Calculate days taken
+		daysTaken := 0.0
+		if leave.StartTime != nil && leave.EndTime != nil {
+			daysTaken = 1.0
+		} else {
+			for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+				daysTaken += 1.0
+			}
+		}
+		
+		year := start.Year()
+		err := s.leaveBalanceRepo.IncrementUsedDays(ctx, leave.EmployeeID, leave.LeaveTypeID, year, daysTaken)
+		if err != nil {
+			// If not found, create it with the allocated amount based on leaveType
+			leaveType, ltErr := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+			if ltErr == nil && leaveType != nil {
+				_ = s.leaveBalanceRepo.UpsertBalance(ctx, &models.EmployeeLeaveBalance{
+					EmployeeID:    leave.EmployeeID,
+					LeaveTypeID:   leave.LeaveTypeID,
+					Year:          year,
+					AllocatedDays: float64(leaveType.DaysPerYear),
+					UsedDays:      daysTaken,
+				})
+			}
+		}
+	}
+
 	return nil
 }
 

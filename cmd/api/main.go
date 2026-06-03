@@ -45,6 +45,7 @@ func main() {
 	boardRepo := repository.NewBoardRepository(db)
 	notifRepo := repository.NewNotificationRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
+	leaveBalanceRepo := repository.NewLeaveBalanceRepository(db)
 	leaveTypeRepo := repository.NewLeaveTypeRepository(db)
 	infoTableRepo := repository.NewInfoTableRepository(db)
 	helpDocRepo := repository.NewHelpDocumentRepository(db)
@@ -56,7 +57,7 @@ func main() {
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, notifService, db)
-	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, notifService, emailService)
+	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
@@ -68,7 +69,7 @@ func main() {
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
-	empHandler := handlers.NewEmployeeHandler(employeeService)
+	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo)
 	deptHandler := handlers.NewDepartmentHandler(departmentRepo, employeeRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftRepo)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)

@@ -45,6 +45,7 @@ type TaskRepository interface {
 	// Task Assignments
 	GetAssignmentsByDate(ctx context.Context, date time.Time) ([]models.TaskAssignment, error)
 	GetAssignmentsByEmployee(ctx context.Context, employeeID uuid.UUID, date time.Time) ([]models.TaskAssignment, error)
+	GetTasksByAssignee(ctx context.Context, employeeID uuid.UUID) ([]models.TaskExecution, error)
 	CountAssignmentsByScheduleAndDate(ctx context.Context, scheduleID uuid.UUID, date time.Time) (int, error)
 	CountAssignmentsByScheduleDateAndShift(ctx context.Context, scheduleID uuid.UUID, date time.Time, shiftID uuid.UUID) (int, error)
 	CreateAssignment(ctx context.Context, ta *models.TaskAssignment) error
@@ -470,6 +471,29 @@ func (r *taskRepo) GetAssignmentsByEmployee(ctx context.Context, employeeID uuid
 		assignments = append(assignments, ta)
 	}
 	return assignments, rows.Err()
+}
+
+func (r *taskRepo) GetTasksByAssignee(ctx context.Context, employeeID uuid.UUID) ([]models.TaskExecution, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT te.id, te.assignment_id, te.status, te.started_at, te.completed_at, te.notes, te.attachments, te.created_at, te.updated_at
+		 FROM task_executions te
+		 JOIN task_assignments ta ON ta.id = te.assignment_id
+		 WHERE ta.employee_id = $1`, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("get tasks by assignee: %w", err)
+	}
+	defer rows.Close()
+
+	var executions []models.TaskExecution
+	for rows.Next() {
+		var te models.TaskExecution
+		if err := rows.Scan(&te.ID, &te.AssignmentID, &te.Status, &te.StartedAt, &te.CompletedAt,
+			&te.Notes, &te.Attachments, &te.CreatedAt, &te.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan task execution: %w", err)
+		}
+		executions = append(executions, te)
+	}
+	return executions, rows.Err()
 }
 
 func (r *taskRepo) CountAssignmentsByScheduleAndDate(ctx context.Context, scheduleID uuid.UUID, date time.Time) (int, error) {

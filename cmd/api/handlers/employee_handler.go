@@ -6,17 +6,33 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"time"
+
 	"shiftmaster-backend/internal/models"
+	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
 )
 
 // EmployeeHandler handles employee CRUD endpoints.
 type EmployeeHandler struct {
-	employeeService *service.EmployeeService
+	employeeService  *service.EmployeeService
+	leaveBalanceRepo repository.LeaveBalanceRepository
+	taskRepo         repository.TaskRepository
+	leaveRepo        repository.LeaveRepository
 }
 
-func NewEmployeeHandler(empSvc *service.EmployeeService) *EmployeeHandler {
-	return &EmployeeHandler{employeeService: empSvc}
+func NewEmployeeHandler(
+	empSvc *service.EmployeeService,
+	leaveBalanceRepo repository.LeaveBalanceRepository,
+	taskRepo repository.TaskRepository,
+	leaveRepo repository.LeaveRepository,
+) *EmployeeHandler {
+	return &EmployeeHandler{
+		employeeService:  empSvc,
+		leaveBalanceRepo: leaveBalanceRepo,
+		taskRepo:         taskRepo,
+		leaveRepo:        leaveRepo,
+	}
 }
 
 // List returns employees with optional filters.
@@ -664,3 +680,58 @@ func (h *EmployeeHandler) UpdatePreferences(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// GetProfileStats returns statistics and leave balances for the authenticated employee
+func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
+	ctx := c.Request.Context()
+	requesterStr, _ := c.Get("employee_id")
+	empID, err := uuid.Parse(requesterStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid user"})
+		return
+	}
+
+	year := time.Now().Year()
+
+	// 1. Get Leave Balances
+	balances, err := h.leaveBalanceRepo.GetByEmployeeAndYear(ctx, empID, year)
+	if err != nil {
+		balances = []models.EmployeeLeaveBalance{}
+	}
+
+	// 2. Get Task Stats
+	// Count completed tasks vs active tasks assigned to this employee
+	tasks, err := h.taskRepo.GetTasksByAssignee(ctx, empID)
+	completedTasks := 0
+	activeTasks := 0
+	if err == nil {
+		for _, t := range tasks {
+			if t.Status == "completed" {
+				completedTasks++
+			} else if t.Status != "cancelled" {
+				activeTasks++
+			}
+		}
+	}
+
+	// 3. Get total approved leaves count
+	totalLeavesTaken := 0
+	leaves, err := h.leaveRepo.GetByEmployee(ctx, empID)
+	if err == nil {
+		for _, l := range leaves {
+			if l.Status == "approved" || l.Status == "approved_by_manager" {
+				totalLeavesTaken++
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"leave_balances":     balances,
+			"completed_tasks":    completedTasks,
+			"active_tasks":       activeTasks,
+			"total_leaves_taken": totalLeavesTaken,
+			"worked_hours":       0, // Could calculate from schedule/check-in times if implemented
+		},
+	})
+}

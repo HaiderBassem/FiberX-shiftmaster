@@ -15,6 +15,8 @@ type LeaveType struct {
 	ColorCode        string    `json:"color_code"`
 	IsActive         bool      `json:"is_active"`
 	RequiresApproval bool      `json:"requires_approval"`
+	DaysPerYear      int       `json:"days_per_year"`
+	CarriesForward   bool      `json:"carries_forward"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
