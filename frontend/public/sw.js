@@ -1,3 +1,11 @@
+self.addEventListener('install', function(event) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', function(event) {
   let data = {};
   if (event.data) {
@@ -10,8 +18,6 @@ self.addEventListener('push', function(event) {
 
   const options = {
     body: data.body || 'You have a new update.',
-    icon: data.icon || '/icon-192x192.png',
-    badge: '/icon-192x192.png',
     data: {
       url: data.url || '/'
     },

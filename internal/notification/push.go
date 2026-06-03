@@ -66,7 +66,8 @@ func (s *pushService) send(ctx context.Context, subs []models.PushSubscription, 
 			Subscriber:      s.config.Subject,
 			VAPIDPublicKey:  s.config.PublicKey,
 			VAPIDPrivateKey: s.config.PrivateKey,
-			TTL:             30, // 30 seconds TTL for fast delivery
+			TTL:             86400, // 24 hours TTL
+			Urgency:         webpush.UrgencyHigh,
 		})
 
 		if err != nil {
