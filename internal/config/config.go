@@ -23,6 +23,7 @@ type Config struct {
 	Upload   UploadConfig
 	SMTP     SMTPConfig
 	GraphAPI GraphAPIConfig
+	VAPID    VAPIDConfig
 }
 
 // DatabaseConfig holds database connection and pool settings.
@@ -114,6 +115,13 @@ type GraphAPIConfig struct {
 	SenderEmail  string
 }
 
+// VAPIDConfig holds the VAPID keys for Web Push Notifications.
+type VAPIDConfig struct {
+	PublicKey  string
+	PrivateKey string
+	Subject    string
+}
+
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
@@ -128,6 +136,7 @@ func Load() (*Config, error) {
 		Upload:   loadUploadConfig(),
 		SMTP:     loadSMTPConfig(),
 		GraphAPI: loadGraphAPIConfig(),
+		VAPID:    loadVAPIDConfig(),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -232,6 +241,14 @@ func loadGraphAPIConfig() GraphAPIConfig {
 		ClientID:     getEnv("GRAPH_CLIENT_ID", ""),
 		ClientSecret: getEnv("GRAPH_CLIENT_SECRET", ""),
 		SenderEmail:  getEnv("GRAPH_SENDER_EMAIL", "support@fiberx.iq"),
+	}
+}
+
+func loadVAPIDConfig() VAPIDConfig {
+	return VAPIDConfig{
+		PublicKey:  getEnv("VAPID_PUBLIC_KEY", ""),
+		PrivateKey: getEnv("VAPID_PRIVATE_KEY", ""),
+		Subject:    getEnv("VAPID_SUBJECT", "mailto:support@fiberx.iq"),
 	}
 }
 

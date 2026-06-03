@@ -19,6 +19,13 @@ type NotificationRepository interface {
 	MarkAsRead(ctx context.Context, id uuid.UUID) error
 	MarkAllAsRead(ctx context.Context, recipientID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	
+	// Web Push Subscriptions
+	SavePushSubscription(ctx context.Context, sub *models.PushSubscription) error
+	GetPushSubscriptionsByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]models.PushSubscription, error)
+	GetPushSubscriptionsByDepartmentID(ctx context.Context, departmentID uuid.UUID) ([]models.PushSubscription, error)
+	GetAllPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error)
+	DeletePushSubscription(ctx context.Context, endpoint string) error
 }
 
 type notificationRepo struct {
@@ -98,5 +105,91 @@ func (r *notificationRepo) MarkAllAsRead(ctx context.Context, recipientID uuid.U
 
 func (r *notificationRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM notifications WHERE id=$1`, id)
+	return err
+}
+
+// ── Web Push Subscriptions ──
+
+func (r *notificationRepo) SavePushSubscription(ctx context.Context, sub *models.PushSubscription) error {
+	query := `
+		INSERT INTO push_subscriptions (employee_id, endpoint, p256dh, auth)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (employee_id, endpoint) DO UPDATE 
+		SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := r.db.Exec(ctx, query, sub.EmployeeID, sub.Endpoint, sub.P256dh, sub.Auth)
+	return err
+}
+
+func (r *notificationRepo) GetPushSubscriptionsByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]models.PushSubscription, error) {
+	query := `SELECT id, employee_id, endpoint, p256dh, auth, created_at, updated_at FROM push_subscriptions WHERE employee_id = $1`
+	rows, err := r.db.Query(ctx, query, employeeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var s models.PushSubscription
+		if err := rows.Scan(&s.ID, &s.EmployeeID, &s.Endpoint, &s.P256dh, &s.Auth, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
+}
+
+func (r *notificationRepo) GetPushSubscriptionsByDepartmentID(ctx context.Context, departmentID uuid.UUID) ([]models.PushSubscription, error) {
+	query := `
+		SELECT ps.id, ps.employee_id, ps.endpoint, ps.p256dh, ps.auth, ps.created_at, ps.updated_at 
+		FROM push_subscriptions ps
+		JOIN employees e ON ps.employee_id = e.id
+		WHERE e.department_id = $1 AND e.status = 'active'
+	`
+	rows, err := r.db.Query(ctx, query, departmentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var s models.PushSubscription
+		if err := rows.Scan(&s.ID, &s.EmployeeID, &s.Endpoint, &s.P256dh, &s.Auth, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
+}
+
+func (r *notificationRepo) GetAllPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error) {
+	query := `
+		SELECT ps.id, ps.employee_id, ps.endpoint, ps.p256dh, ps.auth, ps.created_at, ps.updated_at 
+		FROM push_subscriptions ps
+		JOIN employees e ON ps.employee_id = e.id
+		WHERE e.status = 'active'
+	`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var s models.PushSubscription
+		if err := rows.Scan(&s.ID, &s.EmployeeID, &s.Endpoint, &s.P256dh, &s.Auth, &s.CreatedAt, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
+}
+
+func (r *notificationRepo) DeletePushSubscription(ctx context.Context, endpoint string) error {
+	query := `DELETE FROM push_subscriptions WHERE endpoint = $1`
+	_, err := r.db.Exec(ctx, query, endpoint)
 	return err
 }

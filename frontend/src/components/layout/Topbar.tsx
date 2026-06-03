@@ -7,8 +7,10 @@ import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
+import { useNotification } from '@/providers/NotificationProvider';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
+  const { requestPermission, permission } = useNotification();
   const {
     user,
     logout,
@@ -162,6 +164,17 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         </div>
 
         {/* Notifications */}
+        {permission === 'default' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={requestPermission}
+            className="hidden sm:flex text-primary bg-primary/10 hover:bg-primary/20 rounded-lg h-9 animate-pulse"
+            title="Enable Push Notifications"
+          >
+            Enable Notifications
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

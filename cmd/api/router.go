@@ -25,6 +25,7 @@ func SetupRouter(
 	infoTableH *handlers.InfoTableHandler,
 	helpDocH *handlers.HelpDocumentHandler,
 	announcementH *handlers.AnnouncementHandler,
+	pushH *handlers.PushHandler,
 ) {
 	api := r.Group("/api")
 
@@ -245,6 +246,19 @@ func SetupRouter(
 		}
 
 
+
+		// Push Notifications
+		push := protected.Group("/push")
+		{
+			push.GET("/public-key", pushH.GetPublicKey)
+			push.POST("/subscribe", pushH.Subscribe)
+		}
+
+		// Audit Logs (Admin only)
+		audit := protected.Group("/audit")
+		{
+			audit.GET("", auditH.List)
+		}
 
 		// --- Admin only routes (manager + admin) ---
 		// These are for CRUD and system management
