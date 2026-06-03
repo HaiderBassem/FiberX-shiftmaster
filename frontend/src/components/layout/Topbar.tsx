@@ -169,7 +169,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             variant="ghost"
             size="sm"
             onClick={requestPermission}
-            className="hidden sm:flex text-primary bg-primary/10 hover:bg-primary/20 rounded-lg h-9 animate-pulse"
+            className="flex text-primary bg-primary/10 hover:bg-primary/20 rounded-lg h-8 sm:h-9 text-xs sm:text-sm animate-pulse px-2 sm:px-3"
             title="Enable Push Notifications"
           >
             Enable Notifications
