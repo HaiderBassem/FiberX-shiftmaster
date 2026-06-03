@@ -51,11 +51,11 @@ func main() {
 	// --- Initialize Services ---
 	authService := service.NewAuthService(employeeRepo, cfg.JWT.BcryptCost)
 	notifService := service.NewNotificationService(notifRepo)
-	emailService := service.NewEmailService(cfg.SMTP)
+	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, notifService, db)
 	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, notifService, emailService)
-	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, db)
+	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
 	leaveTypeService := service.NewLeaveTypeService(leaveTypeRepo)

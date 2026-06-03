@@ -219,6 +219,27 @@ func (h *LeaveHandler) Reject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "leave rejected"}})
 }
 
+// CancelApproval cancels an already approved leave.
+func (h *LeaveHandler) CancelApproval(c *gin.Context) {
+	leaveID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid leave ID"})
+		return
+	}
+
+	cancelledByStr, _ := c.Get("employee_id")
+	cancelledByID, _ := uuid.Parse(cancelledByStr.(string))
+	roleVal, _ := c.Get("role")
+	roleStr, _ := roleVal.(string)
+
+	if err := h.leaveSvc.CancelApprovedLeave(c.Request.Context(), leaveID, cancelledByID, roleStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "leave approval cancelled successfully"}})
+}
+
 // LeaveHistory returns all leaves with approval details for supervisors, optionally filtered by department.
 func (h *LeaveHandler) LeaveHistory(c *gin.Context) {
 	deptID := getDepartmentID(c)

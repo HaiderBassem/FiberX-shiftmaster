@@ -22,6 +22,7 @@ type Config struct {
 	CORS     CORSConfig
 	Upload   UploadConfig
 	SMTP     SMTPConfig
+	GraphAPI GraphAPIConfig
 }
 
 // DatabaseConfig holds database connection and pool settings.
@@ -105,6 +106,14 @@ type SMTPConfig struct {
 	From     string
 }
 
+// GraphAPIConfig holds Microsoft Graph API settings for sending emails.
+type GraphAPIConfig struct {
+	TenantID     string
+	ClientID     string
+	ClientSecret string
+	SenderEmail  string
+}
+
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
@@ -118,6 +127,7 @@ func Load() (*Config, error) {
 		CORS:     loadCORSConfig(),
 		Upload:   loadUploadConfig(),
 		SMTP:     loadSMTPConfig(),
+		GraphAPI: loadGraphAPIConfig(),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -216,6 +226,15 @@ func loadSMTPConfig() SMTPConfig {
 	}
 }
 
+func loadGraphAPIConfig() GraphAPIConfig {
+	return GraphAPIConfig{
+		TenantID:     getEnv("GRAPH_TENANT_ID", ""),
+		ClientID:     getEnv("GRAPH_CLIENT_ID", ""),
+		ClientSecret: getEnv("GRAPH_CLIENT_SECRET", ""),
+		SenderEmail:  getEnv("GRAPH_SENDER_EMAIL", "support@fiberx.iq"),
+	}
+}
+
 // Validate checks all configuration values.
 func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {
@@ -235,6 +254,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.SMTP.Validate(); err != nil {
 		return fmt.Errorf("smtp: %w", err)
+	}
+	if err := c.GraphAPI.Validate(); err != nil {
+		return fmt.Errorf("graphapi: %w", err)
 	}
 	return nil
 }
@@ -324,6 +346,14 @@ func (s *SMTPConfig) Validate() error {
 	// but if it is used, it should have a host and port.
 	if s.Host != "" && s.Port <= 0 {
 		return fmt.Errorf("smtp port must be valid if host is provided")
+	}
+	return nil
+}
+
+// Validate checks Graph API configuration.
+func (g *GraphAPIConfig) Validate() error {
+	if g.ClientID != "" && (g.TenantID == "" || g.ClientSecret == "") {
+		return fmt.Errorf("tenant_id and client_secret are required if client_id is set")
 	}
 	return nil
 }

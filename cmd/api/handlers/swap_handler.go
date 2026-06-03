@@ -126,6 +126,23 @@ func (h *SwapHandler) PendingForManager(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": swaps, "meta": gin.H{"count": len(swaps)}})
 }
 
+// SwapHistory returns swap history for the manager's department.
+func (h *SwapHandler) SwapHistory(c *gin.Context) {
+	approverStr, _ := c.Get("employee_id")
+	approverID, _ := uuid.Parse(approverStr.(string))
+
+	swaps, err := h.swapSvc.GetSwapHistory(c.Request.Context(), approverID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if swaps == nil {
+		swaps = []models.ShiftSwap{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": swaps, "meta": gin.H{"count": len(swaps)}})
+}
+
 // EligibleTargets returns employees in the requester's department for a target date.
 func (h *SwapHandler) EligibleTargets(c *gin.Context) {
 	date, err := parseTime(c.Query("date"))
@@ -225,7 +242,7 @@ func (h *SwapHandler) Reject(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "swap rejected"}})
 }
 
-// Cancel cancels a swap request.
+// Cancel cancels a swap request (by requester).
 func (h *SwapHandler) Cancel(c *gin.Context) {
 	swapID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -242,4 +259,25 @@ func (h *SwapHandler) Cancel(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "swap cancelled"}})
+}
+
+// CancelApproval cancels an already approved swap request (by manager/TL).
+func (h *SwapHandler) CancelApproval(c *gin.Context) {
+	swapID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid swap ID"})
+		return
+	}
+
+	cancelledByStr, _ := c.Get("employee_id")
+	cancelledByID, _ := uuid.Parse(cancelledByStr.(string))
+	roleVal, _ := c.Get("role")
+	roleStr, _ := roleVal.(string)
+
+	if err := h.swapSvc.CancelApprovedSwap(c.Request.Context(), swapID, cancelledByID, roleStr); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "swap approval cancelled successfully"}})
 }

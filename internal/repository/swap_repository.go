@@ -23,6 +23,7 @@ type SwapRepository interface {
 	ManagerApprove(ctx context.Context, id uuid.UUID, approverID uuid.UUID, approverRole string) error
 	Reject(ctx context.Context, id uuid.UUID, approverID uuid.UUID, approverRole string) error
 	Cancel(ctx context.Context, id uuid.UUID) error
+	GetHistoryForManager(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.ShiftSwap, error)
 }
 
 type swapRepo struct {
@@ -149,6 +150,31 @@ func (r *swapRepo) GetPendingForManager(ctx context.Context, approverRole string
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("get pending swaps for manager: %w", err)
+	}
+	defer rows.Close()
+	return r.scanSwaps(rows)
+}
+
+// GetHistoryForManager returns all swap requests for the manager's department.
+func (r *swapRepo) GetHistoryForManager(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.ShiftSwap, error) {
+	query := `SELECT ` + swapColumnsWithNames + `
+		 FROM shift_swaps ss
+		 JOIN employees r ON r.id = ss.requester_id
+		 JOIN employees t ON t.id = ss.target_employee_id`
+	args := []interface{}{}
+
+	if approverRole != "admin" {
+		if approverDeptID == nil {
+			return []models.ShiftSwap{}, nil
+		}
+		query += ` WHERE r.department_id = $1`
+		args = append(args, *approverDeptID)
+	}
+	query += ` ORDER BY ss.updated_at DESC LIMIT 100`
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get swap history for manager: %w", err)
 	}
 	defer rows.Close()
 	return r.scanSwaps(rows)

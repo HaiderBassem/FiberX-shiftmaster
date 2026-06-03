@@ -115,6 +115,7 @@ const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (e
 const LeaveHistory = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
+  const queryClient = useQueryClient();
   const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
 
   const { data: history, isLoading } = useQuery({
@@ -128,12 +129,14 @@ const LeaveHistory = () => {
       approved_by_team_leader: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
       approved_by_manager: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
       rejected: 'bg-destructive/10 text-destructive border-destructive/20',
+      cancelled: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
     };
     const labels: Record<string, string> = {
       pending: 'Pending',
       approved_by_team_leader: 'TL Approved',
       approved_by_manager: 'Fully Approved',
       rejected: 'Rejected',
+      cancelled: 'Cancelled',
     };
     return (
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${map[status] || 'bg-muted text-muted-foreground'}`}>
@@ -141,6 +144,11 @@ const LeaveHistory = () => {
       </span>
     );
   };
+
+  const cancelLeave = useMutation({
+    mutationFn: async (leaveId: string) => { await api.post(`/leaves/${leaveId}/cancel-approval`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); },
+  });
 
   if (isLoading) return <div className="space-y-3">{[1,2,3].map(i => <Card key={i} className="animate-pulse h-24" />)}</div>;
 
@@ -221,9 +229,124 @@ const LeaveHistory = () => {
                   ) : (
                     <p className="text-xs text-muted-foreground italic">No approval actions recorded yet.</p>
                   )}
+                  {/* Cancel Approval Button */}
+                  {(item.status === 'approved_by_manager' || item.status === 'approved_by_team_leader' || item.status === 'approved') && (
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+                        onClick={() => {
+                          if (confirm("Are you sure you want to cancel this approved leave? This will revert the schedule.")) {
+                            cancelLeave.mutate(item.leave_id);
+                          }
+                        }}
+                        disabled={cancelLeave.isPending}
+                      >
+                        <XCircle className="w-4 h-4" /> Cancel Approval
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             )}
+          </Card>
+        ))
+      )}
+    </div>
+  );
+};
+
+// ─── Swap History Tab ──────────────────────────────────────────────────────────
+const SwapHistory = () => {
+  const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
+  const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
+  const queryClient = useQueryClient();
+
+  const { data: history, isLoading } = useQuery({
+    queryKey: ['swaps', 'history', selectedDeptId],
+    queryFn: async () => { const res = await api.get('/swaps/history'); return res.data?.data || []; },
+  });
+
+  const cancelSwap = useMutation({
+    mutationFn: async (swapId: string) => { await api.post(`/swaps/${swapId}/cancel-approval`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); },
+  });
+
+  const statusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      pending: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+      employee_accepted: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+      approved: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+      rejected: 'bg-destructive/10 text-destructive border-destructive/20',
+      cancelled: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
+    };
+    const labels: Record<string, string> = {
+      pending: 'Pending',
+      employee_accepted: 'Emp Accepted',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      cancelled: 'Cancelled',
+    };
+    return (
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${map[status] || 'bg-muted text-muted-foreground'}`}>
+        {labels[status] || status}
+      </span>
+    );
+  };
+
+  if (isLoading) return <div className="space-y-3">{[1,2].map(i => <Card key={i} className="animate-pulse h-24" />)}</div>;
+
+  return (
+    <div className="space-y-3">
+      {history?.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
+            <ArrowLeftRight className="w-10 h-10 mb-3 opacity-20" />
+            <p>No swap history yet.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        history?.map((swap: any) => (
+          <Card key={swap.id}>
+            <CardHeader className="pb-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    Shift Swap · {fmtDate(swap.shift_date)}
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Requester {swap.requester_name} ↔ Target {swap.target_employee_name}
+                  </CardDescription>
+                </div>
+                {statusBadge(swap.status)}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {swap.reason && <p className="text-sm text-muted-foreground italic mb-2">"{swap.reason}"</p>}
+              <div className="text-xs text-muted-foreground mt-2">
+                Created: {fmtDate(swap.created_at)}
+                {swap.approval_date && ` · Approved: ${fmtDate(swap.approval_date)}`}
+              </div>
+
+              {swap.status === 'approved' && (
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to cancel this approved swap? This will swap the shifts back.")) {
+                        cancelSwap.mutate(swap.id);
+                      }
+                    }}
+                    disabled={cancelSwap.isPending}
+                  >
+                    <XCircle className="w-4 h-4" /> Cancel Approval
+                  </Button>
+                </div>
+              )}
+            </CardContent>
           </Card>
         ))
       )}
@@ -313,7 +436,24 @@ export const ApprovalDashboard = () => {
         <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{swapError}</div>
       )}
 
-      {activeTab === 'history' && <LeaveHistory />}
+      {activeTab === 'history' && (
+        <div className="grid lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
+              <History className="w-5 h-5 text-muted-foreground" />
+              Leave History
+            </h3>
+            <LeaveHistory />
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
+              <History className="w-5 h-5 text-muted-foreground" />
+              Swap History
+            </h3>
+            <SwapHistory />
+          </div>
+        </div>
+      )}
 
       {activeTab === 'pending' && (
         <div className="grid lg:grid-cols-2 gap-6">

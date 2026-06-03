@@ -22,6 +22,7 @@ type SwapService struct {
 	employeeRepo repository.EmployeeRepository
 	taskRepo     repository.TaskRepository
 	notifService *NotificationService
+	emailService *EmailService
 	db           *database.DB
 }
 
@@ -31,6 +32,7 @@ func NewSwapService(
 	employeeRepo repository.EmployeeRepository,
 	taskRepo repository.TaskRepository,
 	notifService *NotificationService,
+	emailService *EmailService,
 	db *database.DB,
 ) *SwapService {
 	return &SwapService{
@@ -39,6 +41,7 @@ func NewSwapService(
 		employeeRepo: employeeRepo,
 		taskRepo:     taskRepo,
 		notifService: notifService,
+		emailService: emailService,
 		db:           db,
 	}
 }
@@ -356,6 +359,108 @@ func (s *SwapService) ApproveSwap(ctx context.Context, swapID uuid.UUID, approve
 	return nil
 }
 
+// CancelApprovedSwap cancels an already approved swap and reverts the shifts and tasks back to original.
+func (s *SwapService) CancelApprovedSwap(ctx context.Context, swapID uuid.UUID, cancelledBy uuid.UUID, role string) error {
+	swap, err := s.swapRepo.GetByID(ctx, swapID)
+	if err != nil {
+		return err
+	}
+
+	if swap.Status != "approved" {
+		return fmt.Errorf("swap is not in an approved state: %s", swap.Status)
+	}
+
+	if role != "manager" && role != "admin" {
+		// If it's a team leader swap, maybe TL shouldn't cancel it?
+		// But let's allow TL to cancel if they have access.
+		if role != "team_leader" {
+			return fmt.Errorf("only managers or team leaders can cancel a swap")
+		}
+	}
+
+	err = s.db.ExecTx(ctx, func(txCtx context.Context, tx pgx.Tx) error {
+		// Change status to cancelled
+		// Update status directly
+		if _, dbErr := s.db.Exec(txCtx, `UPDATE shift_swaps SET status='cancelled', updated_at=CURRENT_TIMESTAMP WHERE id=$1`, swapID); dbErr != nil {
+			return dbErr
+		}
+
+		// Revert shifts:
+		// Just swap them back again!
+		requesterShift, reqErr := s.scheduleRepo.GetEmployeeShift(txCtx, swap.RequesterID, swap.ShiftDate)
+		targetShift, trgErr := s.scheduleRepo.GetEmployeeShift(txCtx, swap.TargetEmployeeID, swap.ShiftDate)
+
+		if reqErr == nil && trgErr == nil && requesterShift != nil && targetShift != nil {
+			// Swap shift identity + status back
+			tempStatus := requesterShift.ShiftStatus
+			requesterShift.ShiftStatus = targetShift.ShiftStatus
+			targetShift.ShiftStatus = tempStatus
+
+			tempReason := requesterShift.LeaveReason
+			requesterShift.LeaveReason = targetShift.LeaveReason
+			targetShift.LeaveReason = tempReason
+
+			tempShiftID := requesterShift.ShiftID
+			requesterShift.ShiftID = targetShift.ShiftID
+			targetShift.ShiftID = tempShiftID
+
+			if updateErr := s.scheduleRepo.UpdateEmployeeShift(txCtx, requesterShift); updateErr != nil {
+				return updateErr
+			}
+			if updateErr := s.scheduleRepo.UpdateEmployeeShift(txCtx, targetShift); updateErr != nil {
+				return updateErr
+			}
+
+			// Swap task assignments back
+			if taskErr := s.taskRepo.SwapAssignmentsBetweenEmployees(txCtx, swap.RequesterID, swap.TargetEmployeeID, swap.ShiftDate); taskErr != nil {
+				return taskErr
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Notify both employees
+	msg := fmt.Sprintf("Your approved shift swap for %s has been cancelled by management. Please check your schedule.", swap.ShiftDate.Format("2006-01-02"))
+	
+	_ = s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       swap.RequesterID,
+		SenderID:          &cancelledBy,
+		Type:              "shift_change",
+		Title:             "Swap Cancelled",
+		Message:           strPtr(msg),
+		RelatedEntityType: strPtr("swap"),
+		RelatedEntityID:   &swapID,
+		Priority:          "high",
+	})
+	_ = s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       swap.TargetEmployeeID,
+		SenderID:          &cancelledBy,
+		Type:              "shift_change",
+		Title:             "Swap Cancelled",
+		Message:           strPtr(msg),
+		RelatedEntityType: strPtr("swap"),
+		RelatedEntityID:   &swapID,
+		Priority:          "high",
+	})
+
+	// Send emails
+	reqEmp, _ := s.employeeRepo.GetByID(ctx, swap.RequesterID)
+	if reqEmp != nil && reqEmp.Email != "" {
+		s.emailService.SendEmailAsync([]string{reqEmp.Email}, "Swap Cancelled", fmt.Sprintf("Hello %s,\n\n%s", reqEmp.FirstName, msg))
+	}
+	trgEmp, _ := s.employeeRepo.GetByID(ctx, swap.TargetEmployeeID)
+	if trgEmp != nil && trgEmp.Email != "" {
+		s.emailService.SendEmailAsync([]string{trgEmp.Email}, "Swap Cancelled", fmt.Sprintf("Hello %s,\n\n%s", trgEmp.FirstName, msg))
+	}
+
+	return nil
+}
+
 // RejectSwap rejects a swap request.
 // - Employee swaps: rejected by team_leader.
 // - Team leader swaps: rejected by manager.
@@ -424,6 +529,15 @@ func (s *SwapService) GetPendingSwapsForManager(ctx context.Context, approverID 
 		return nil, fmt.Errorf("approver not found: %w", err)
 	}
 	return s.swapRepo.GetPendingForManager(ctx, approver.Role, approver.DepartmentID)
+}
+
+// GetSwapHistory returns swap history for the manager's department.
+func (s *SwapService) GetSwapHistory(ctx context.Context, approverID uuid.UUID) ([]models.ShiftSwap, error) {
+	approver, err := s.employeeRepo.GetByID(ctx, approverID)
+	if err != nil {
+		return nil, fmt.Errorf("approver not found: %w", err)
+	}
+	return s.swapRepo.GetHistoryForManager(ctx, approver.Role, approver.DepartmentID)
 }
 
 // GetEligibleSwapTargets returns eligible employees in the same department across all shifts, indicating their 'off' status.

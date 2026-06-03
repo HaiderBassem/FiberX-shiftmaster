@@ -270,6 +270,88 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 	return nil
 }
 
+// CancelApprovedLeave cancels an already approved leave and reverts its effects.
+func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUID, cancelledBy uuid.UUID, role string) error {
+	// Only Managers can cancel manager-approved leaves. Team leaders can cancel TL-approved leaves (which are technically still pending final approval but have their shifts applied or wait).
+	// Actually, wait, leave status: "approved_by_team_leader", "approved_by_manager", "approved".
+	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
+	if err != nil {
+		return fmt.Errorf("leave not found: %w", err)
+	}
+
+	if leave.Status != "approved_by_manager" && leave.Status != "approved_by_team_leader" && leave.Status != "approved" {
+		return fmt.Errorf("leave is not in an approved state: %s", leave.Status)
+	}
+
+	if leave.Status == "approved_by_manager" || leave.Status == "approved" {
+		if role != "manager" && role != "admin" {
+			return fmt.Errorf("only managers can cancel a fully approved leave")
+		}
+	}
+
+	// Change status to cancelled
+	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "cancelled", cancelledBy, role); err != nil {
+		return fmt.Errorf("failed to update leave status to cancelled: %w", err)
+	}
+
+	// Revert employee_shifts back to template defaults
+	start := leave.StartDate.UTC().Truncate(24 * time.Hour)
+	end := leave.EndDate.UTC().Truncate(24 * time.Hour)
+
+	templates, err := s.scheduleRepo.GetTemplatesByEmployee(ctx, leave.EmployeeID)
+	if err == nil {
+		tmplMap := make(map[int]*models.ScheduleTemplate)
+		for i := range templates {
+			tmplMap[templates[i].DayOfWeek] = &templates[i]
+		}
+
+		for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+			es, err := s.scheduleRepo.GetEmployeeShift(ctx, leave.EmployeeID, d)
+			if err == nil && es != nil {
+				// Revert to template
+				tmpl := tmplMap[int(d.Weekday())]
+				if tmpl != nil {
+					status := "working"
+					if tmpl.IsOff {
+						status = "off"
+					}
+					es.ShiftStatus = status
+					es.ShiftID = tmpl.ShiftID
+					es.LeaveReason = nil
+					_ = s.scheduleRepo.UpdateEmployeeShift(ctx, es)
+				} else {
+					// Fallback to delete if no template
+					_ = s.scheduleRepo.DeleteEmployeeShift(ctx, es.ID)
+				}
+			}
+		}
+	}
+
+	// Notify employee
+	_ = s.notifService.SendNotification(ctx, &models.Notification{
+		RecipientID:       leave.EmployeeID,
+		SenderID:          &cancelledBy,
+		Type:              "shift_change",
+		Title:             "Leave Cancelled",
+		Message:           strPtr("Your approved leave request has been cancelled by management."),
+		RelatedEntityType: strPtr("leave"),
+		RelatedEntityID:   &leaveID,
+		Priority:          "high",
+	})
+
+	// Send Email
+	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if emp != nil && emp.Email != "" {
+		s.emailService.SendEmailAsync(
+			[]string{emp.Email},
+			"Leave Cancelled",
+			fmt.Sprintf("Hello %s,\n\nYour approved leave request (from %s to %s) has been cancelled by management. Please check your schedule for updates.", emp.FirstName, start.Format("2006-01-02"), end.Format("2006-01-02")),
+		)
+	}
+
+	return nil
+}
+
 // applyLeaveToShifts upserts employee_shifts rows to shift_status='leave' for every
 // day in the leave date range. This is shared between TL and manager approval paths.
 func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Leave, approverID uuid.UUID) error {

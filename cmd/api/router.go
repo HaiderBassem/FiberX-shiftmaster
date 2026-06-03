@@ -183,11 +183,14 @@ func SetupRouter(
 			supervisor.POST("/leaves/:id/approve/team-leader", leaveH.ApproveByTeamLeader)
 			supervisor.POST("/leaves/:id/approve/manager", leaveH.ApproveByManager)
 			supervisor.POST("/leaves/:id/reject", leaveH.Reject)
+			supervisor.POST("/leaves/:id/cancel-approval", leaveH.CancelApproval)
 
 			// Swap approvals (all supervisors can approve/reject)
 			supervisor.GET("/swaps/pending/manager", swapH.PendingForManager)
 			supervisor.POST("/swaps/:id/approve", swapH.Approve)
 			supervisor.POST("/swaps/:id/reject", swapH.Reject)
+			supervisor.POST("/swaps/:id/cancel-approval", swapH.CancelApproval)
+			supervisor.GET("/swaps/history", swapH.SwapHistory)
 
 			// Task history (read — all supervisors can view)
 			supervisor.GET("/tasks/history", taskH.TaskHistory)
