@@ -54,7 +54,11 @@ export const UserProfile = () => {
           onClick={() => fileInputRef.current?.click()}
         >
           {user?.profile_image ? (
-            <img src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8080'}${user.profile_image.startsWith('/api') ? user.profile_image : '/api' + user.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+            <img 
+              src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${user.profile_image.startsWith('/api') ? user.profile_image : '/api' + user.profile_image}`} 
+              alt="Profile" 
+              className="w-full h-full object-cover" 
+            />
           ) : (
             <User className="w-8 h-8 text-primary" />
           )}
