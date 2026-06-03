@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -85,8 +84,8 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "notification updated"}})
 }
 
-// StreamSSE handles Server-Sent Events connection for real-time notifications
-func (h *NotificationHandler) StreamSSE(c *gin.Context) {
+// ServeWS handles WebSocket connection for real-time notifications
+func (h *NotificationHandler) ServeWS(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, err := uuid.Parse(empIDStr.(string))
 	if err != nil {
@@ -94,31 +93,7 @@ func (h *NotificationHandler) StreamSSE(c *gin.Context) {
 		return
 	}
 
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache, no-transform")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
-
-	clientChan := make(chan string, 10)
-	
-	notification.DefaultSSEHub.AddClient(empID, clientChan)
-	defer notification.DefaultSSEHub.RemoveClient(empID, clientChan)
-
-	// Send an initial connected message immediately and flush
-	c.Writer.Write([]byte("data: connected\n\n"))
-	c.Writer.Flush()
-
-	notifyCtx := c.Request.Context()
-
-	for {
-		select {
-		case <-notifyCtx.Done():
-			return
-		case msg := <-clientChan:
-			fmt.Fprintf(c.Writer, "data: %s\n\n", msg)
-			c.Writer.Flush()
-		}
-	}
+	notification.ServeWS(c.Writer, c.Request, empID)
 }
 
 // MarkAllAsRead marks all notifications as read.

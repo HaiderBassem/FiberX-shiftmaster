@@ -153,50 +153,67 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // Set up SSE connection for guaranteed in-app notifications
+  // Set up WebSocket connection for guaranteed in-app notifications
   React.useEffect(() => {
     if (!isAuthenticated) return;
 
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const eventSource = new EventSource(`/api/notifications/stream?token=${token}`);
+    let ws: WebSocket;
+    let reconnectTimeout: NodeJS.Timeout;
 
-    eventSource.onmessage = (event) => {
-      if (event.data === 'connected') return;
+    const connectWS = () => {
+      // Use wss:// for https, ws:// for http
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/notifications/ws?token=${token}`;
+      
+      ws = new WebSocket(wsUrl);
 
-      try {
-        const data = JSON.parse(event.data);
-        
-        // Ensure we don't duplicate if Service Worker already fired it
-        // (We can just trigger the ding and toast, sonner handles duplicates if ids are used, 
-        // but for safety we just play it. Since SW postMessage might be delayed or blocked, this is the primary.)
-        playSound();
-        toast(data.title || 'ShiftMaster', {
-          description: data.body || 'You have a new update.',
-          action: {
-            label: 'View',
-            onClick: () => {
-              if (data.url) {
-                window.location.href = data.url;
-              }
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.type === 'connected') return;
+
+          playSound();
+          toast(data.title || 'ShiftMaster', {
+            description: data.body || 'You have a new update.',
+            action: {
+              label: 'View',
+              onClick: () => {
+                if (data.url) {
+                  window.location.href = data.url;
+                }
+              },
             },
-          },
-          duration: 6000,
-        });
-      } catch (err) {
-        console.error('Failed to parse SSE notification:', err);
-      }
+            duration: 6000,
+          });
+        } catch (err) {
+          console.error('Failed to parse WS notification:', err);
+        }
+      };
+
+      ws.onclose = (event) => {
+        // Automatically reconnect after 3 seconds if disconnected abnormally
+        if (!event.wasClean) {
+          reconnectTimeout = setTimeout(connectWS, 3000);
+        }
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket error:', err);
+        ws.close();
+      };
     };
 
-    eventSource.onerror = (err) => {
-      console.error('SSE connection error:', err);
-      eventSource.close();
-      // Optional: implement reconnect logic or let it stay closed
-    };
+    connectWS();
 
     return () => {
-      eventSource.close();
+      clearTimeout(reconnectTimeout);
+      if (ws) {
+        ws.close();
+      }
     };
   }, [isAuthenticated]);
 
