@@ -50,6 +50,7 @@ func main() {
 	infoTableRepo := repository.NewInfoTableRepository(db)
 	helpDocRepo := repository.NewHelpDocumentRepository(db)
 	announcementRepo := repository.NewAnnouncementRepository(db.Pool())
+	handoverRepo := repository.NewHandoverRepository(db)
 
 	// --- Initialize Services ---
 	authService := service.NewAuthService(employeeRepo, cfg.JWT.BcryptCost)
@@ -83,6 +84,7 @@ func main() {
 	helpDocHandler := handlers.NewHelpDocumentHandler(helpDocService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService)
 	pushHandler := handlers.NewPushHandler(notifRepo, cfg.VAPID)
+	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, notifService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -114,7 +116,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler,
 	)
 
 	// --- Start HTTP Server ---

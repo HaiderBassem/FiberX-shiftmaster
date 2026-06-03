@@ -23,6 +23,7 @@ import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
 import { AnnouncementManager } from '../features/announcements/AnnouncementManager';
 import InteractiveCalendar from '../features/calendar/InteractiveCalendar';
 import { LeaveTypeManager } from '../features/leaves/LeaveTypeManager';
+import HandoverBoard from '../features/handovers/HandoverBoard';
 
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -161,6 +162,16 @@ export const AppRoutes = () => {
                 </div>
               </ProtectedRoute>
             } 
+          />
+
+          {/* Handovers */}
+          <Route
+            path="handovers"
+            element={
+              <ProtectedRoute>
+                <HandoverBoard />
+              </ProtectedRoute>
+            }
           />
 
           {/* ── Admin / Manager / Approver routes ── */}

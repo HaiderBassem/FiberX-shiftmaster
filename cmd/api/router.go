@@ -26,6 +26,7 @@ func SetupRouter(
 	helpDocH *handlers.HelpDocumentHandler,
 	announcementH *handlers.AnnouncementHandler,
 	pushH *handlers.PushHandler,
+	handoverH *handlers.HandoverHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -309,7 +310,16 @@ func SetupRouter(
 			}
 		}
 
-		// Announcements
+		// --- Handovers ---
+		handovers := protected.Group("/handovers")
+		{
+			handovers.POST("", handoverH.CreateHandover)
+			handovers.GET("", handoverH.GetHandovers)
+			handovers.PUT("/:id/claim", handoverH.ClaimHandover)
+			handovers.PUT("/:id/complete", handoverH.CompleteHandover)
+		}
+
+		// --- Announcements ---
 		announcements := protected.Group("/announcements")
 		{
 			announcements.GET("/active", announcementH.GetActive)
