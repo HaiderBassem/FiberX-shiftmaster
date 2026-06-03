@@ -15,6 +15,7 @@ type EmployeeLeaveBalance struct {
 	Month           int       `json:"month"` // 0 for annual, 1-12 for monthly
 	AllocatedAmount float64   `json:"allocated_amount"`
 	UsedAmount      float64   `json:"used_amount"`
+	PendingAmount   float64   `json:"pending_amount,omitempty" db:"-"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 

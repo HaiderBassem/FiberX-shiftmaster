@@ -715,13 +715,35 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 		}
 	}
 
-	// 3. Get total approved leaves count
+	// 3. Get total approved leaves count and calculate pending amounts
 	totalLeavesTaken := 0
 	leaves, err := h.leaveRepo.GetByEmployee(ctx, empID)
 	if err == nil {
 		for _, l := range leaves {
 			if l.Status == "approved" || l.Status == "approved_by_manager" {
 				totalLeavesTaken++
+			} else if l.Status == "pending" || l.Status == "approved_by_team_leader" {
+				// Calculate pending amount and add to the corresponding balance
+				for i, b := range balances {
+					if b.LeaveTypeID == l.LeaveTypeID {
+						y := l.StartDate.Year()
+						m := 0
+						if b.ResetCycle == "monthly" {
+							m = int(l.StartDate.Month())
+						}
+						if y == b.Year && m == b.Month {
+							if b.Unit == "hours" && l.StartTime != nil && l.EndTime != nil {
+								st, _ := time.Parse("15:04", *l.StartTime)
+								en, _ := time.Parse("15:04", *l.EndTime)
+								balances[i].PendingAmount += en.Sub(st).Hours()
+							} else if b.Unit != "hours" {
+								for d := l.StartDate.UTC().Truncate(24 * time.Hour); !d.After(l.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
+									balances[i].PendingAmount += 1.0
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}

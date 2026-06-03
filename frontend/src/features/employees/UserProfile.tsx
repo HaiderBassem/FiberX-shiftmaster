@@ -132,8 +132,8 @@ export const UserProfile = () => {
               stats.leave_balances
                 .filter((b: any) => b.reset_cycle === 'annual' || b.month === new Date().getMonth() + 1)
                 .map((balance: any) => {
-                  const percentage = Math.min((balance.used_amount / balance.allocated_amount) * 100, 100) || 0;
-                  const remaining = balance.allocated_amount - balance.used_amount;
+                  const percentage = Math.min(((balance.used_amount + (balance.pending_amount || 0)) / balance.allocated_amount) * 100, 100) || 0;
+                  const remaining = balance.allocated_amount - balance.used_amount - (balance.pending_amount || 0);
                   
                   return (
                     <div key={balance.id} className="space-y-2">
@@ -145,7 +145,7 @@ export const UserProfile = () => {
                           </span>
                         </div>
                         <span className="text-muted-foreground">
-                          {balance.used_amount} / {balance.allocated_amount} {balance.unit} used
+                          {balance.used_amount} {balance.pending_amount ? `(+${balance.pending_amount} pending)` : ''} / {balance.allocated_amount} {balance.unit} used
                         </span>
                       </div>
                       <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">

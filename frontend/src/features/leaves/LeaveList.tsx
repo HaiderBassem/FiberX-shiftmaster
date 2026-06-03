@@ -77,8 +77,30 @@ export const LeaveList = () => {
   if (selectedType && balances) {
     const month = selectedType.reset_cycle === 'monthly' ? new Date(startDate).getMonth() + 1 : 0;
     const balance = balances.find((b: any) => b.leave_type_id === selectedType.id && b.month === month);
+    
+    let pendingAmount = 0;
+    if (leaves) {
+      leaves.forEach((l: any) => {
+        if ((l.status === 'pending' || l.status === 'approved_by_team_leader') && l.leave_type_id === selectedType.id) {
+          const lMonth = selectedType.reset_cycle === 'monthly' ? new Date(l.start_date).getMonth() + 1 : 0;
+          if (lMonth === month) {
+            if (isHourly && l.start_time && l.end_time) {
+              const [h1, m1] = l.start_time.split(':').map(Number);
+              const [h2, m2] = l.end_time.split(':').map(Number);
+              pendingAmount += (h2 - h1) + (m2 - m1) / 60;
+            } else if (!isHourly) {
+              const d1 = new Date(l.start_date);
+              const d2 = new Date(l.end_date);
+              const diffTime = Math.abs(d2.getTime() - d1.getTime());
+              pendingAmount += Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            }
+          }
+        }
+      });
+    }
+
     if (balance) {
-      const remainingAmount = balance.allocated_amount - balance.used_amount;
+      const remainingAmount = balance.allocated_amount - balance.used_amount - pendingAmount;
       remainingText = `${remainingAmount} ${selectedType.unit} remaining`;
       if (selectedType.reset_cycle === 'monthly') {
         remainingText += ` this month`;

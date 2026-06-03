@@ -145,12 +145,43 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 			allocated = balance.AllocatedAmount
 			used = balance.UsedAmount
 		}
-		if used+requestedAmount > allocated {
+
+		// Calculate pending amount to prevent overdrafting through multiple pending requests
+		pendingAmount := 0.0
+		existingLeaves, err := s.leaveRepo.GetByEmployee(ctx, leave.EmployeeID)
+		if err == nil {
+			for _, l := range existingLeaves {
+				if l.Status == "pending" || l.Status == "approved_by_team_leader" {
+					if l.LeaveTypeID == leave.LeaveTypeID {
+						y := l.StartDate.Year()
+						m := 0
+						if leaveType.ResetCycle == "monthly" {
+							m = int(l.StartDate.Month())
+						}
+						if y == year && m == month {
+							if isHourly && l.StartTime != nil && l.EndTime != nil {
+								st, err1 := time.Parse("15:04", *l.StartTime)
+								en, err2 := time.Parse("15:04", *l.EndTime)
+								if err1 == nil && err2 == nil {
+									pendingAmount += en.Sub(st).Hours()
+								}
+							} else if !isHourly {
+								for d := l.StartDate.UTC().Truncate(24 * time.Hour); !d.After(l.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
+									pendingAmount += 1.0
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if used+pendingAmount+requestedAmount > allocated {
 			unitStr := "days"
 			if isHourly {
 				unitStr = "hours"
 			}
-			return fmt.Errorf("insufficient leave balance. You have %.1f %s remaining", allocated-used, unitStr)
+			return fmt.Errorf("insufficient leave balance. You have %.1f %s remaining (%.1f %s pending)", allocated-used-pendingAmount, unitStr, pendingAmount, unitStr)
 		}
 	}
 
