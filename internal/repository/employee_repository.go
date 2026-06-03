@@ -26,6 +26,7 @@ type EmployeeRepository interface {
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+	UpdateProfileImage(ctx context.Context, id uuid.UUID, imagePath string) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	ForceDelete(ctx context.Context, id uuid.UUID) error
 	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
@@ -250,6 +251,11 @@ func (r *employeeRepo) UpdatePassword(ctx context.Context, id uuid.UUID, passwor
 func (r *employeeRepo) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE employees SET last_login=CURRENT_TIMESTAMP WHERE id=$1`, id)
+	return err
+}
+
+func (r *employeeRepo) UpdateProfileImage(ctx context.Context, id uuid.UUID, imagePath string) error {
+	_, err := r.db.Exec(ctx, `UPDATE employees SET profile_image = $1, updated_at = NOW() WHERE id = $2`, imagePath, id)
 	return err
 }
 

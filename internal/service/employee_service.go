@@ -161,6 +161,11 @@ func (s *EmployeeService) DeleteEmployee(ctx context.Context, id uuid.UUID) erro
 	return s.employeeRepo.ForceDelete(ctx, id)
 }
 
+func (s *EmployeeService) UpdateProfileImage(ctx context.Context, id uuid.UUID, imagePath string) error {
+	// Optional: validate image path or size here
+	return s.employeeRepo.UpdateProfileImage(ctx, id, imagePath)
+}
+
 
 func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
 	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManage)

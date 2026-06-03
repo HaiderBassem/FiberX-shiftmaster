@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -732,6 +734,50 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 			"active_tasks":       activeTasks,
 			"total_leaves_taken": totalLeavesTaken,
 			"worked_hours":       0, // Could calculate from schedule/check-in times if implemented
+		},
+	})
+}
+
+// UploadProfilePicture handles uploading and updating an employee's profile picture.
+func (h *EmployeeHandler) UploadProfilePicture(c *gin.Context) {
+	ctx := c.Request.Context()
+	requesterStr, _ := c.Get("employee_id")
+	requesterID, _ := uuid.Parse(requesterStr.(string))
+
+	file, err := c.FormFile("profile_picture")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "file missing"})
+		return
+	}
+
+	// Make uploads directory if it doesn't exist
+	uploadDir := "./uploads/profiles"
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "could not create upload directory"})
+		return
+	}
+
+	// Generate a unique file name
+	fileName := fmt.Sprintf("%s_%d_%s", requesterID.String(), time.Now().Unix(), file.Filename)
+	filePath := fmt.Sprintf("%s/%s", uploadDir, fileName)
+
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to save file"})
+		return
+	}
+
+	// Update the profile image path in the database. 
+	// We'll store it as relative URL to be served by the static route.
+	publicURL := fmt.Sprintf("/uploads/profiles/%s", fileName)
+	if err := h.employeeService.UpdateProfileImage(ctx, requesterID, publicURL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"profile_image": publicURL,
 		},
 	})
 }

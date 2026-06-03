@@ -1,3 +1,4 @@
+import React, { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -5,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { CalendarDays, CheckSquare, Clock, User } from 'lucide-react';
 
 export const UserProfile = () => {
-  const { user } = useAuthStore();
+  const { user, updateProfileImage } = useAuthStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['profile-stats'],
@@ -15,6 +18,30 @@ export const UserProfile = () => {
     },
   });
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('profile_picture', file);
+
+    try {
+      setUploading(true);
+      const res = await api.post('/employees/me/profile-picture', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data?.success && res.data?.data?.profile_image) {
+        updateProfileImage(res.data.data.profile_image);
+      }
+    } catch (error) {
+      console.error('Failed to upload image', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading profile...</div>;
   }
@@ -22,9 +49,27 @@ export const UserProfile = () => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20">
-          <User className="w-8 h-8 text-primary" />
+        <div 
+          className="relative w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20 overflow-hidden group cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {user?.profile_image ? (
+            <img src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8080'}${user.profile_image}`} alt="Profile" className="w-full h-full object-cover" />
+          ) : (
+            <User className="w-8 h-8 text-primary" />
+          )}
+          
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-[10px] text-white font-medium">{uploading ? '...' : 'Upload'}</span>
+          </div>
         </div>
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleImageUpload} 
+          accept="image/*" 
+          className="hidden" 
+        />
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">{user?.first_name} {user?.last_name}</h2>
           <p className="text-muted-foreground">{user?.role === 'manager' ? 'Manager' : user?.role === 'team_leader' ? 'Team Leader' : 'Employee'}</p>
