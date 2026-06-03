@@ -296,7 +296,7 @@ type updateEmployeeRequest struct {
 	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
 	WeeklyOffDays      int        `json:"weekly_off_days"`
 	CanCoverNightShift bool       `json:"can_cover_night_shift"`
-	CanManageHelpDocs  bool       `json:"can_manage_help_docs"`
+	CanManageHelpDocs  *bool      `json:"can_manage_help_docs"`
 	Status             string     `json:"status"`
 	ProfileImage       *string    `json:"profile_image"`
 	SecondaryPhone     *string    `json:"secondary_phone"`
@@ -356,13 +356,14 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		req.DepartmentID = me.DepartmentID
 	}
 
+	current, fetchErr := h.employeeService.GetByID(c.Request.Context(), id)
+	if fetchErr != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": fetchErr.Error()})
+		return
+	}
+
 	// If status or other enum fields are empty, fall back to current values.
 	if req.Status == "" || req.Role == "" || req.Gender == "" {
-		current, fetchErr := h.employeeService.GetByID(c.Request.Context(), id)
-		if fetchErr != nil {
-			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": fetchErr.Error()})
-			return
-		}
 		if req.Status == "" {
 			req.Status = current.Status
 		}
@@ -387,7 +388,11 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		DefaultShiftID:     req.DefaultShiftID,
 		WeeklyOffDays:      req.WeeklyOffDays,
 		CanCoverNightShift: req.CanCoverNightShift,
-		CanManageHelpDocs:  req.CanManageHelpDocs,
+		// Preserve permissions and preferences since they are managed by separate endpoints
+		// or omitted from the update payload
+		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
+		CanCreateTables:    current.CanCreateTables,
+		UIPreferences:      current.UIPreferences,
 		Status:             req.Status,
 		ProfileImage:       req.ProfileImage,
 		SecondaryPhone:     req.SecondaryPhone,
