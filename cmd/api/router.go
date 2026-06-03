@@ -28,6 +28,9 @@ func SetupRouter(
 	pushH *handlers.PushHandler,
 ) {
 	api := r.Group("/api")
+	
+	// Serve static uploads under /api/uploads
+	api.Static("/uploads", "./uploads")
 
 	// --- Public routes ---
 	auth := api.Group("/auth")

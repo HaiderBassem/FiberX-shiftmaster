@@ -111,9 +111,6 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
-	// Static route for uploads (profile pictures, etc.)
-	r.Static("/uploads", "./uploads")
-
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret,
 		authHandler, empHandler, deptHandler, shiftHandler,

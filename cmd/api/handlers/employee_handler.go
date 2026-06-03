@@ -767,8 +767,8 @@ func (h *EmployeeHandler) UploadProfilePicture(c *gin.Context) {
 	}
 
 	// Update the profile image path in the database. 
-	// We'll store it as relative URL to be served by the static route.
-	publicURL := fmt.Sprintf("/uploads/profiles/%s", fileName)
+	// We'll store it as relative URL including /api prefix to be served by the static route.
+	publicURL := fmt.Sprintf("/api/uploads/profiles/%s", fileName)
 	if err := h.employeeService.UpdateProfileImage(ctx, requesterID, publicURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
