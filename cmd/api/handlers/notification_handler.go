@@ -95,15 +95,16 @@ func (h *NotificationHandler) StreamSSE(c *gin.Context) {
 	}
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Cache-Control", "no-cache, no-transform")
 	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
 
 	clientChan := make(chan string, 10)
 	
 	notification.DefaultSSEHub.AddClient(empID, clientChan)
 	defer notification.DefaultSSEHub.RemoveClient(empID, clientChan)
 
-	// Send an initial connected message
+	// Send an initial connected message immediately and flush
 	c.Writer.Write([]byte("data: connected\n\n"))
 	c.Writer.Flush()
 
