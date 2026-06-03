@@ -305,7 +305,7 @@ func (r *employeeRepo) UpdateTablePermission(ctx context.Context, id uuid.UUID, 
 }
 
 func (r *employeeRepo) UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error {
-	query := `UPDATE employees SET ui_preferences = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	query := `UPDATE employees SET ui_preferences = COALESCE(ui_preferences, '{}'::jsonb) || $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, prefs)
 	return err
 }

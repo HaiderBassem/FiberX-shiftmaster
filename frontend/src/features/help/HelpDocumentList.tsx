@@ -30,7 +30,7 @@ export function HelpDocumentList() {
     updateUserPreferences(newPrefs);
     if (user?.id) {
       try {
-        await api.put(`/employees/${user.id}/preferences`, { ui_preferences: { ...user?.ui_preferences, ...newPrefs } });
+        await api.put(`/employees/${user.id}/preferences`, { ui_preferences: newPrefs });
       } catch (e) {
         console.error("Failed to save layout", e);
       }
