@@ -46,8 +46,8 @@ func (s *LeaveService) GetEmployeeLeaveBalances(ctx context.Context, empID uuid.
 	return s.leaveBalanceRepo.GetByEmployeeAndYear(ctx, empID, year)
 }
 
-func (s *LeaveService) UpdateEmployeeLeaveBalance(ctx context.Context, empID, leaveTypeID uuid.UUID, year int, allocatedDays float64) error {
-	return s.leaveBalanceRepo.UpdateAllocatedDays(ctx, empID, leaveTypeID, year, allocatedDays)
+func (s *LeaveService) UpdateEmployeeLeaveBalance(ctx context.Context, empID, leaveTypeID uuid.UUID, year int, month int, allocatedAmount float64) error {
+	return s.leaveBalanceRepo.UpdateAllocatedDays(ctx, empID, leaveTypeID, year, month, allocatedAmount)
 }
 
 // SyncLeaveBalances assigns the days_per_year from all active leave types to all active employees for the specified year.
@@ -69,10 +69,18 @@ func (s *LeaveService) SyncLeaveBalances(ctx context.Context, year int) error {
 		for _, lt := range leaveTypes {
 			// Only sync if days_per_year > 0 to avoid creating unnecessary zero-balance records
 			if lt.DaysPerYear > 0 {
-				err := s.leaveBalanceRepo.SyncAllocatedDays(ctx, emp.ID, lt.ID, year, float64(lt.DaysPerYear))
-				if err != nil {
-					// Log the error but continue with others
-					fmt.Printf("Error syncing balance for emp %s and type %s: %v\n", emp.ID, lt.ID, err)
+				if lt.ResetCycle == "monthly" {
+					for m := 1; m <= 12; m++ {
+						err := s.leaveBalanceRepo.SyncAllocatedDays(ctx, emp.ID, lt.ID, year, m, float64(lt.DaysPerYear))
+						if err != nil {
+							fmt.Printf("Error syncing monthly balance for emp %s and type %s (month %d): %v\n", emp.ID, lt.ID, m, err)
+						}
+					}
+				} else {
+					err := s.leaveBalanceRepo.SyncAllocatedDays(ctx, emp.ID, lt.ID, year, 0, float64(lt.DaysPerYear))
+					if err != nil {
+						fmt.Printf("Error syncing annual balance for emp %s and type %s: %v\n", emp.ID, lt.ID, err)
+					}
 				}
 			}
 		}
@@ -93,32 +101,56 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		return fmt.Errorf("cannot request leave for past dates")
 	}
 
-	// Calculate requested days
-	requestedDays := 0.0
-	if leave.StartTime != nil && leave.EndTime != nil {
-		// Just a simple abstraction for hourly leaves, assume 1 day for quota
-		requestedDays = 1.0
-	} else {
-		// Count days inclusive (as per user approval of plan assumptions)
-		for d := leave.StartDate.UTC().Truncate(24 * time.Hour); !d.After(leave.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
-			requestedDays += 1.0
+	// Get leave type if specified
+	var leaveType *models.LeaveType
+	var err error
+	if leave.LeaveTypeID != uuid.Nil {
+		leaveType, err = s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+		if err != nil {
+			return fmt.Errorf("leave type not found")
 		}
 	}
 
-	if leave.LeaveTypeID != uuid.Nil {
-		leaveType, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
-		if err == nil && leaveType.DaysPerYear > 0 {
-			year := leave.StartDate.Year()
-			balance, err := s.leaveBalanceRepo.GetByEmployeeLeaveTypeAndYear(ctx, leave.EmployeeID, leave.LeaveTypeID, year)
-			var allocated float64 = float64(leaveType.DaysPerYear)
-			var used float64 = 0
-			if err == nil && balance != nil {
-				allocated = balance.AllocatedDays
-				used = balance.UsedDays
+	// Calculate requested amount (days or hours)
+	requestedAmount := 0.0
+	isHourly := leaveType != nil && leaveType.Unit == "hours"
+	
+	if leave.StartTime != nil && leave.EndTime != nil && isHourly {
+		startTime, err1 := time.Parse("15:04", *leave.StartTime)
+		endTime, err2 := time.Parse("15:04", *leave.EndTime)
+		if err1 == nil && err2 == nil {
+			requestedAmount = endTime.Sub(startTime).Hours()
+			if requestedAmount <= 0 {
+				return fmt.Errorf("end time must be after start time")
 			}
-			if used+requestedDays > allocated {
-				return fmt.Errorf("insufficient leave balance. You have %.1f days remaining", allocated-used)
+		}
+	} else {
+		// Count days inclusive
+		for d := leave.StartDate.UTC().Truncate(24 * time.Hour); !d.After(leave.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
+			requestedAmount += 1.0
+		}
+	}
+
+	if leaveType != nil && leaveType.DaysPerYear > 0 {
+		year := leave.StartDate.Year()
+		month := 0
+		if leaveType.ResetCycle == "monthly" {
+			month = int(leave.StartDate.Month())
+		}
+
+		balance, err := s.leaveBalanceRepo.GetByEmployeeLeaveTypeAndYear(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month)
+		var allocated float64 = float64(leaveType.DaysPerYear)
+		var used float64 = 0
+		if err == nil && balance != nil {
+			allocated = balance.AllocatedAmount
+			used = balance.UsedAmount
+		}
+		if used+requestedAmount > allocated {
+			unitStr := "days"
+			if isHourly {
+				unitStr = "hours"
 			}
+			return fmt.Errorf("insufficient leave balance. You have %.1f %s remaining", allocated-used, unitStr)
 		}
 	}
 
@@ -401,6 +433,34 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 		}
 	}
 
+	// Decrement used amount in leave balances
+	if leave.LeaveTypeID != uuid.Nil {
+		leaveType, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+		if err == nil && leaveType != nil {
+			amountToRevert := 0.0
+			isHourly := leaveType.Unit == "hours"
+			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
+				st, err1 := time.Parse("15:04", *leave.StartTime)
+				en, err2 := time.Parse("15:04", *leave.EndTime)
+				if err1 == nil && err2 == nil {
+					amountToRevert = en.Sub(st).Hours()
+				}
+			} else {
+				for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+					amountToRevert += 1.0
+				}
+			}
+			
+			year := start.Year()
+			month := 0
+			if leaveType.ResetCycle == "monthly" {
+				month = int(start.Month())
+			}
+			// decrement by amountToRevert
+			_ = s.leaveBalanceRepo.IncrementUsedDays(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month, -amountToRevert)
+		}
+	}
+
 	// Notify employee
 	_ = s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       leave.EmployeeID,
@@ -482,30 +542,40 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 		}
 	}
 
-	// Increment used days in leave balances
+	// Increment used amount in leave balances
 	if leave.LeaveTypeID != uuid.Nil {
-		// Calculate days taken
-		daysTaken := 0.0
-		if leave.StartTime != nil && leave.EndTime != nil {
-			daysTaken = 1.0
-		} else {
-			for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-				daysTaken += 1.0
+		leaveType, ltErr := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+		if ltErr == nil && leaveType != nil {
+			amountTaken := 0.0
+			isHourly := leaveType.Unit == "hours"
+			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
+				st, err1 := time.Parse("15:04", *leave.StartTime)
+				en, err2 := time.Parse("15:04", *leave.EndTime)
+				if err1 == nil && err2 == nil {
+					amountTaken = en.Sub(st).Hours()
+				}
+			} else {
+				for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+					amountTaken += 1.0
+				}
 			}
-		}
-		
-		year := start.Year()
-		err := s.leaveBalanceRepo.IncrementUsedDays(ctx, leave.EmployeeID, leave.LeaveTypeID, year, daysTaken)
-		if err != nil {
-			// If not found, create it with the allocated amount based on leaveType
-			leaveType, ltErr := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
-			if ltErr == nil && leaveType != nil {
+			
+			year := start.Year()
+			month := 0
+			if leaveType.ResetCycle == "monthly" {
+				month = int(start.Month())
+			}
+			
+			err := s.leaveBalanceRepo.IncrementUsedDays(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month, amountTaken)
+			if err != nil {
+				// If not found, create it with the allocated amount based on leaveType
 				_ = s.leaveBalanceRepo.UpsertBalance(ctx, &models.EmployeeLeaveBalance{
-					EmployeeID:    leave.EmployeeID,
-					LeaveTypeID:   leave.LeaveTypeID,
-					Year:          year,
-					AllocatedDays: float64(leaveType.DaysPerYear),
-					UsedDays:      daysTaken,
+					EmployeeID:      leave.EmployeeID,
+					LeaveTypeID:     leave.LeaveTypeID,
+					Year:            year,
+					Month:           month,
+					AllocatedAmount: float64(leaveType.DaysPerYear),
+					UsedAmount:      amountTaken,
 				})
 			}
 		}

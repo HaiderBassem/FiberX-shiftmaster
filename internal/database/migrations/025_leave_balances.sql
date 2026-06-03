@@ -24,6 +24,6 @@ CREATE TABLE employee_leave_balances (
 CREATE TRIGGER set_timestamp_employee_leave_balances
 BEFORE UPDATE ON employee_leave_balances
 FOR EACH ROW
-EXECUTE FUNCTION trigger_set_timestamp();
+EXECUTE FUNCTION update_updated_at_column();
 
 COMMENT ON TABLE employee_leave_balances IS 'Tracks allocated and used leave days per employee per year';

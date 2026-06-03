@@ -10,7 +10,7 @@ import { Trash2, Plus, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 export const LeaveTypeManager = () => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false });
+  const [formData, setFormData] = useState({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false, unit: 'days', reset_cycle: 'annual' });
 
   const { data: leaveTypes, isLoading } = useQuery({
     queryKey: ['leave-types'],
@@ -31,7 +31,7 @@ export const LeaveTypeManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-types'] });
       setEditingId(null);
-      setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false });
+      setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false, unit: 'days', reset_cycle: 'annual' });
     },
   });
 
@@ -54,12 +54,14 @@ export const LeaveTypeManager = () => {
       color_code: type.color_code || '#3b82f6',
       days_per_year: type.days_per_year || 0,
       carries_forward: type.carries_forward || false,
+      unit: type.unit || 'days',
+      reset_cycle: type.reset_cycle || 'annual',
     });
   };
 
   const handleAddNew = () => {
     setEditingId('new');
-    setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false });
+    setFormData({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false, unit: 'days', reset_cycle: 'annual' });
   };
 
   const syncMutation = useMutation({
@@ -131,6 +133,30 @@ export const LeaveTypeManager = () => {
                 <input type="checkbox" id="carriesForwardNew" checked={formData.carries_forward} onChange={e => setFormData({ ...formData, carries_forward: e.target.checked })} />
                 <Label htmlFor="carriesForwardNew">Accumulates (Carries Forward)</Label>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <Label>Unit</Label>
+                  <select 
+                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={formData.unit} 
+                    onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                  >
+                    <option value="days">Days</option>
+                    <option value="hours">Hours</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Reset Cycle</Label>
+                  <select 
+                    className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={formData.reset_cycle} 
+                    onChange={e => setFormData({ ...formData, reset_cycle: e.target.value })}
+                  >
+                    <option value="annual">Annual</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label>Color Code</Label>
                 <div className="flex gap-2 items-center">
@@ -179,6 +205,30 @@ export const LeaveTypeManager = () => {
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id={`carriesForward${type.id}`} checked={formData.carries_forward} onChange={e => setFormData({ ...formData, carries_forward: e.target.checked })} />
                     <Label htmlFor={`carriesForward${type.id}`}>Accumulates (Carries Forward)</Label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Unit</Label>
+                      <select 
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={formData.unit} 
+                        onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                      >
+                        <option value="days">Days</option>
+                        <option value="hours">Hours</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reset Cycle</Label>
+                      <select 
+                        className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                        value={formData.reset_cycle} 
+                        onChange={e => setFormData({ ...formData, reset_cycle: e.target.value })}
+                      >
+                        <option value="annual">Annual</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Color Code</Label>

@@ -26,13 +26,14 @@ interface LeaveRequestModalProps {
   canSubmit: boolean;
   isHourly: boolean;
   error: string | null;
+  remainingText?: string;
 }
 
 export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
   isOpen, onClose, leaveTypes, isLoadingTypes, leaveTypeId, setLeaveTypeId,
   startDate, setStartDate, endDate, setEndDate, startTime, setStartTime,
   endTime, setEndTime, reason, setReason, onSubmit, isPending, canSubmit,
-  isHourly, error
+  isHourly, error, remainingText
 }) => {
   const selectClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
   const inputClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
@@ -82,6 +83,11 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                       <option key={type.id} value={type.id}>{type.name_en}</option>
                     ))}
                   </select>
+                  {remainingText && (
+                    <p className="text-sm font-medium text-emerald-600 mt-2 px-1">
+                      {remainingText}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

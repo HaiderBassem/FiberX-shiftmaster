@@ -40,6 +40,16 @@ export const LeaveList = () => {
     queryFn: async () => { const response = await api.get('/leave-types?active=true'); return response.data?.data || []; },
   });
 
+  const { data: balances } = useQuery({
+    queryKey: ['leave-balances', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const res = await api.get(`/leave-balances/employee/${user.id}?year=${new Date(startDate).getFullYear()}`);
+      return res.data?.data || [];
+    },
+    enabled: !!user?.id && !!startDate,
+  });
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       setError(null);
@@ -59,8 +69,23 @@ export const LeaveList = () => {
   });
 
   const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
-  const isHourly = selectedType?.name_en?.toLowerCase() === 'hourly';
+  const isHourly = selectedType?.unit === 'hours';
   const canSubmit = reason && (isHourly ? (startTime && endTime) : true);
+
+  // Find applicable balance
+  let remainingText = '';
+  if (selectedType && balances) {
+    const month = selectedType.reset_cycle === 'monthly' ? new Date(startDate).getMonth() + 1 : 0;
+    const balance = balances.find((b: any) => b.leave_type_id === selectedType.id && b.month === month);
+    if (balance) {
+      remainingText = `${balance.allocated_amount - balance.used_amount} ${selectedType.unit} remaining`;
+      if (selectedType.reset_cycle === 'monthly') {
+        remainingText += ` this month`;
+      } else {
+        remainingText += ` this year`;
+      }
+    }
+  }
 
   const getStatusIcon = (status: string) => {
     switch(status) {
@@ -202,8 +227,8 @@ export const LeaveList = () => {
 
           <LeaveRequestModal 
             isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            leaveTypes={leaveTypes}
+            onClose={() => { setIsModalOpen(false); setError(null); }}
+            leaveTypes={leaveTypes || []}
             isLoadingTypes={isLoadingTypes}
             leaveTypeId={leaveTypeId}
             setLeaveTypeId={setLeaveTypeId}
@@ -219,9 +244,10 @@ export const LeaveList = () => {
             setReason={setReason}
             onSubmit={() => submitMutation.mutate()}
             isPending={submitMutation.isPending}
-            canSubmit={!!canSubmit}
+            canSubmit={canSubmit}
             isHourly={isHourly}
             error={error}
+            remainingText={remainingText}
           />
         </>
       )}

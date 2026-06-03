@@ -22,15 +22,21 @@ func main() {
 	}
 	defer db.Close()
 
-	sqlBytes, err := ioutil.ReadFile("internal/database/migrations/023_add_announcements.sql")
-	if err != nil {
-		log.Fatalf("Failed to read migration: %v", err)
+	migrations := []string{
+		"internal/database/migrations/025_leave_balances.sql",
+		"internal/database/migrations/026_monthly_hourly_leaves.sql",
 	}
 
-	_, err = db.Pool().Exec(context.Background(), string(sqlBytes))
-	if err != nil {
-		log.Fatalf("Migration failed: %v", err)
-	}
+	for _, m := range migrations {
+		sqlBytes, err := ioutil.ReadFile(m)
+		if err != nil {
+			log.Fatalf("Failed to read migration %s: %v", m, err)
+		}
 
-	fmt.Println("Migration 023 applied successfully.")
+		_, err = db.Pool().Exec(context.Background(), string(sqlBytes))
+		if err != nil {
+			log.Fatalf("Migration %s failed: %v", m, err)
+		}
+		fmt.Printf("Migration %s applied successfully.\n", m)
+	}
 }

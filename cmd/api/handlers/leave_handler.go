@@ -311,8 +311,10 @@ func (h *LeaveHandler) UpdateEmployeeBalance(c *gin.Context) {
 	}
 	
 	var req struct {
-		Year          int     `json:"year"`
-		AllocatedDays float64 `json:"allocated_days"`
+		Year            int     `json:"year"`
+		Month           int     `json:"month"`
+		AllocatedAmount float64 `json:"allocated_amount"`
+		AllocatedDays   float64 `json:"allocated_days"` // fallback
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request"})
@@ -321,8 +323,12 @@ func (h *LeaveHandler) UpdateEmployeeBalance(c *gin.Context) {
 	if req.Year == 0 {
 		req.Year = 2026
 	}
+	amount := req.AllocatedAmount
+	if amount == 0 && req.AllocatedDays != 0 {
+		amount = req.AllocatedDays
+	}
 
-	if err := h.leaveSvc.UpdateEmployeeLeaveBalance(c.Request.Context(), empID, leaveTypeID, req.Year, req.AllocatedDays); err != nil {
+	if err := h.leaveSvc.UpdateEmployeeLeaveBalance(c.Request.Context(), empID, leaveTypeID, req.Year, req.Month, amount); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
