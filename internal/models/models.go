@@ -414,3 +414,13 @@ type HelpDocumentAccess struct {
 	GrantedBy   *uuid.UUID `json:"granted_by"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
+
+type PushSubscription struct {
+	ID         uuid.UUID `json:"id"`
+	EmployeeID uuid.UUID `json:"employee_id"`
+	Endpoint   string    `json:"endpoint"`
+	P256dh     string    `json:"p256dh"`
+	Auth       string    `json:"auth"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
