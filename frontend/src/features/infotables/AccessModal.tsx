@@ -236,7 +236,11 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
         {/* Footer */}
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end">
           <button
-            onClick={onClose}
+            onClick={async () => {
+              if (selectedDepId) await handleShareWithDepartment();
+              if (selectedEmpId) await handleAddEmployeeAccess();
+              onClose();
+            }}
             className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-sm font-medium"
           >
             Done
