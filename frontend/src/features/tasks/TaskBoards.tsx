@@ -209,15 +209,7 @@ const BoardListView = ({
     <div className="space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 sm:mb-2 flex items-center gap-2 sm:gap-3">
-            <LayoutGrid className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-            Task Boards
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">
-            Create and manage task boards. Each board shows an employee×day grid.
-          </p>
-        </div>
+        <div />
         {canEdit && (
           <Button onClick={() => setShowForm(!showForm)} className="gap-2">
             {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}

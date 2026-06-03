@@ -114,14 +114,7 @@ export const TaskHistory = () => {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
-          <History className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Task History
-        </h2>
-        <p className="text-muted-foreground">View all employee task completions by date</p>
-      </div>
+
 
       {/* ── Stats ── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

@@ -91,13 +91,6 @@ export const TaskManagement = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-2 sm:gap-3">
-          <ClipboardList className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Task Management
-        </h2>
-        <p className="text-muted-foreground">Create, assign, and schedule recurring tasks for your team.</p>
-      </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* ── Left: Create Task Schedule ── */}
