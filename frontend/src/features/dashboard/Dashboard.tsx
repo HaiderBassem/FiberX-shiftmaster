@@ -309,6 +309,14 @@ const LeaderDashboard = () => {
     },
   });
 
+  const { data: todaySchedules } = useQuery({
+    queryKey: ['dashboard-schedules-daily'],
+    queryFn: async () => {
+      const res = await api.get('/schedules/daily');
+      return res.data?.data || [];
+    },
+  });
+
   const { data: notifications } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: async () => {
@@ -523,6 +531,17 @@ const LeaderDashboard = () => {
                 });
                 
                 if (isOnLeave) return false;
+
+                // Check for OFF schedules today
+                const todaySched = todaySchedules?.find((s: any) => s.employee_id === e.id && s.shift_date?.startsWith(todayStr));
+                if (todaySched) {
+                    if (todaySched.shift_status === 'off' || todaySched.shift_status === 'leave' || todaySched.shift_status === 'vacation') {
+                        return false;
+                    }
+                    if (todaySched.shift_id) {
+                        effectiveShiftId = todaySched.shift_id;
+                    }
+                }
 
                 return selectedShiftFilter === 'all' || effectiveShiftId?.toString() === selectedShiftFilter;
               });
