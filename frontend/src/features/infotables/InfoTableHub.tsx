@@ -70,8 +70,8 @@ const InfoTableHub: React.FC = () => {
   );
 
   // can create table?
-  // Only admin, manager, team_leader or employee with can_create_tables
-  const canCreate = ['admin', 'manager', 'team_leader'].includes(user?.role || '') || user?.can_create_tables;
+  // Only admin, manager, or employee with can_create_tables
+  const canCreate = ['admin', 'manager'].includes(user?.role || '') || user?.can_create_tables;
   const canManagePermissions = user?.role === 'manager' || user?.role === 'admin';
 
   return (

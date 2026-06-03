@@ -22,7 +22,7 @@ export function HelpDocumentView() {
   if (!document) return <div className="p-8 text-center text-red-500">Document not found or you don't have permission to view it.</div>;
 
   const canEdit = document.access_level === 'write';
-  const canManageAccess = user?.role === 'manager' || user?.role === 'team_leader' || user?.role === 'admin';
+  const canManageAccess = user?.role === 'manager' || user?.role === 'admin';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

@@ -23,7 +23,7 @@ func NewInfoTableService(repo *repository.InfoTableRepository, empRepo repositor
 
 func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTable, creatorRole string, creatorCanCreate bool) (*models.InfoTable, error) {
 	// Only admins, managers, team_leaders, or employees with explicit can_create_tables permission can create.
-	if creatorRole != "admin" && creatorRole != "manager" && creatorRole != "team_leader" && !creatorCanCreate {
+	if creatorRole != "admin" && creatorRole != "manager" && !creatorCanCreate {
 		return nil, errors.New("unauthorized to create tables")
 	}
 
@@ -129,7 +129,7 @@ func (s *InfoTableService) computeAccessLevel(ctx context.Context, table *models
 	}
 
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
-		if reqRole == "manager" || reqRole == "team_leader" {
+		if reqRole == "manager" {
 			return "manage"
 		}
 	}
@@ -137,7 +137,7 @@ func (s *InfoTableService) computeAccessLevel(ctx context.Context, table *models
 	depAccesses, _ := s.repo.GetDepartmentAccesses(ctx, table.ID)
 	for _, da := range depAccesses {
 		if reqDepID != nil && da.DepartmentID == *reqDepID {
-			if reqRole == "manager" || reqRole == "team_leader" {
+			if reqRole == "manager" {
 				return "manage"
 			}
 		}
@@ -182,7 +182,7 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 
 	// If it's a manager/TL in the table's original department, they have full access to manage it.
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
-		if reqRole == "manager" || reqRole == "team_leader" {
+		if reqRole == "manager" {
 			return true
 		}
 	}
@@ -192,7 +192,7 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 	if err == nil {
 		for _, da := range depAccesses {
 			if reqDepID != nil && da.DepartmentID == *reqDepID {
-				if reqRole == "manager" || reqRole == "team_leader" {
+				if reqRole == "manager" {
 					return true
 				}
 			}
@@ -229,7 +229,7 @@ func (s *InfoTableService) HasManageAccessRight(ctx context.Context, tableID uui
 	}
 
 	if reqDepID != nil && table.DepartmentID != nil && *reqDepID == *table.DepartmentID {
-		if reqRole == "manager" || reqRole == "team_leader" {
+		if reqRole == "manager" {
 			return true
 		}
 	}
@@ -237,7 +237,7 @@ func (s *InfoTableService) HasManageAccessRight(ctx context.Context, tableID uui
 	if err == nil {
 		for _, da := range depAccesses {
 			if reqDepID != nil && da.DepartmentID == *reqDepID {
-				if reqRole == "manager" || reqRole == "team_leader" {
+				if reqRole == "manager" {
 					return true
 				}
 			}

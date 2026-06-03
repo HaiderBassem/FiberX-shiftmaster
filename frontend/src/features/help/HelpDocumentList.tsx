@@ -42,7 +42,7 @@ export function HelpDocumentList() {
     queryFn: helpDocumentService.getVisibleDocuments,
   });
 
-  const canCreate = user?.role === 'manager' || user?.role === 'team_leader' || user?.role === 'admin' || user?.can_manage_help_docs;
+  const canCreate = user?.role === 'manager' || user?.role === 'admin' || user?.can_manage_help_docs;
   const canManagePermissions = user?.role === 'manager' || user?.role === 'admin';
 
   if (isLoading) {

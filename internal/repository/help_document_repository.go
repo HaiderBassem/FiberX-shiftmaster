@@ -31,8 +31,8 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 		WHERE d.department_id = $1
 	`
 	
-	// If not manager/team_leader/admin and not global manager, only show docs with explicit read/write or default read (not hide)
-	if role != "manager" && role != "team_leader" && role != "admin" && !canManageHelpDocs {
+	// If not manager/admin and not global manager, only show docs with explicit read/write or default read (not hide)
+	if role != "manager" && role != "admin" && !canManageHelpDocs {
 		query += ` AND COALESCE(a.access_level, 'read') != 'hide' `
 	}
 	
@@ -55,8 +55,8 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 			return nil, err
 		}
 		
-		// If manager/tl or has can_manage_help_docs, grant 'write' access globally unless it's explicitly 'hide' (though even if hidden, maybe they should see it as write, but let's just make it write)
-		if (role == "manager" || role == "team_leader" || role == "admin" || canManageHelpDocs) {
+		// If manager or has can_manage_help_docs, grant 'write' access globally unless it's explicitly 'hide' (though even if hidden, maybe they should see it as write, but let's just make it write)
+		if (role == "manager" || role == "admin" || canManageHelpDocs) {
 			accLevel = "write"
 		}
 		
@@ -91,7 +91,7 @@ func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UU
 		return nil, err
 	}
 
-	if (role == "manager" || role == "team_leader" || role == "admin" || canManageHelpDocs) {
+	if (role == "manager" || role == "admin" || canManageHelpDocs) {
 		accLevel = "write"
 	}
 
