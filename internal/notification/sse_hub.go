@@ -1,7 +1,6 @@
 package notification
 
 import (
-	"context"
 	"encoding/json"
 	"sync"
 
