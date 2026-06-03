@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ClipboardList, Plus, Calendar, CheckSquare, Trash2, ToggleLeft, ToggleRight, Users } from 'lucide-react';
-import { format } from 'date-fns';
+import { ClipboardList, Plus, CheckSquare, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -22,7 +21,6 @@ export const TaskManagement = () => {
   const [maxAssignees, setMaxAssignees] = useState(1);
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [selectedBoardId, setSelectedBoardId] = useState('');
-  const assignDate = format(new Date(), 'yyyy-MM-dd');
 
   // ── Queries ──
   const { data: taskSchedules, isLoading: schedulesLoading } = useQuery({
@@ -40,20 +38,7 @@ export const TaskManagement = () => {
     queryFn: async () => { const res = await api.get('/tasks/boards'); return res.data?.data || []; },
   });
 
-  const { data: eligibleAssignees, isLoading: assigneesLoading } = useQuery({
-    queryKey: ['tasks', 'eligibleAssignees', assignShiftId, assignDate],
-    queryFn: async () => {
-      if (!assignShiftId) return [];
-      const res = await api.get(`/tasks/eligible-assignees?shift_id=${assignShiftId}&date=${assignDate}`);
-      return res.data?.data || [];
-    },
-    enabled: !!assignShiftId && !!assignDate,
-  });
 
-  const { data: dailyAssignments } = useQuery({
-    queryKey: ['tasks', 'assignments', assignDate],
-    queryFn: async () => { const res = await api.get(`/tasks/assignments?date=${assignDate}`); return res.data?.data || []; },
-  });
 
   // ── Mutations ──
   const createSchedule = useMutation({
@@ -219,34 +204,7 @@ export const TaskManagement = () => {
             </div>
           )}
 
-          {/* ── Daily Assignment View ── */}
-          <div className="space-y-4 pt-4 border-t border-border">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-amber-500" />
-                Assignments for {format(new Date(assignDate), 'MMM d, yyyy')}
-              </h3>
-            </div>
-            {dailyAssignments?.length > 0 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                {dailyAssignments.map((a: any) => (
-                  <Card key={a.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Employee #{a.employee_id?.slice(0, 8)}</p>
-                        <p className="text-xs text-muted-foreground">Schedule #{a.schedule_id?.slice(0, 8)}</p>
-                      </div>
-                      <span className="text-xs px-2 py-1 rounded bg-primary/10 text-primary border border-primary/20">
-                        Assigned
-                      </span>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm">No assignments for this date yet.</p>
-            )}
-          </div>
+
         </div>
       </div>
     </div>

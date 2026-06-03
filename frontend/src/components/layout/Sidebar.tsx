@@ -2,8 +2,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
-  ArrowLeftRight, ShieldCheck, ClipboardList, Building2, Columns3,
-  Clock, History, X, MapPin, ExternalLink, Ticket, Table, BookOpen
+  ArrowLeftRight, ShieldCheck, ClipboardList, Building2,
+  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen
 } from 'lucide-react';
 
 const navItems = [
