@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -265,7 +266,8 @@ const EmployeeDashboard = () => {
 // ═══════════════════════════════════════════════════════════
 
 const LeaderDashboard = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore(s => s.user);
+  const [selectedShiftFilter, setSelectedShiftFilter] = useState<number | 'all'>('all');
 
   const { data: employees } = useQuery({
     queryKey: ['all-employees-active'],
@@ -447,38 +449,60 @@ const LeaderDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Activity History */}
+      {/* Active Staff Today */}
       <motion.div variants={itemVariants}>
         <Card className="border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Play className="w-5 h-5 text-primary" />
-              Activity History
-            </CardTitle>
-            <CardDescription>Recent system events</CardDescription>
+          <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Users className="w-5 h-5 text-primary" />
+                Active Staff Today
+              </CardTitle>
+              <CardDescription>Employees scheduled for today</CardDescription>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <select
+                className="bg-muted/50 border border-border/50 text-sm rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-primary outline-none"
+                value={selectedShiftFilter}
+                onChange={(e) => setSelectedShiftFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+              >
+                <option value="all">All Shifts</option>
+                {shifts?.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
           </CardHeader>
           <CardContent>
-            {activity?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {activity.slice(0, 9).map((log: any) => (
-                  <div
-                    key={log.id}
-                    className="flex items-start justify-between gap-4 p-4 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">
-                        {log.action} <span className="text-muted-foreground font-normal">({log.table_name})</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" />
-                        {log.created_at ? fmtDateTime(log.created_at, 'MMM d, HH:mm') : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground text-sm py-6 text-center">No activity yet.</p>
+            {employees ? (() => {
+              const staff = employees.filter((e: any) => 
+                e.role === 'employee' && 
+                (selectedShiftFilter === 'all' || e.default_shift_id === selectedShiftFilter)
+              );
+              if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">No staff found for this shift.</p>;
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {staff.map((emp: any) => {
+                    const shift = shifts?.find((s: any) => s.id === emp.default_shift_id);
+                    return (
+                      <div key={emp.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                          {emp.first_name?.[0]}{emp.last_name?.[0]}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</p>
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
+                            {shift?.name || 'No Shift'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })() : (
+              <p className="text-muted-foreground text-sm py-6 text-center">Loading staff...</p>
             )}
           </CardContent>
         </Card>
