@@ -24,27 +24,19 @@ self.addEventListener('push', function(event) {
     vibrate: [200, 100, 200]
   };
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-      let isFocused = false;
-      for (let i = 0; i < windowClients.length; i++) {
-        if (windowClients[i].focused) {
-          isFocused = true;
-          // Send message to the open window to show in-app toast
-          windowClients[i].postMessage({
-            type: 'PUSH_NOTIFICATION',
-            payload: data
-          });
-          break;
-        }
-      }
+  const notificationPromise = self.registration.showNotification(data.title || 'ShiftMaster', options);
 
-      // If no window is focused, show native notification
-      if (!isFocused) {
-        return self.registration.showNotification(data.title || 'ShiftMaster', options);
-      }
-    })
-  );
+  // Still send message to client so they hear the ding and see the toast
+  const messagePromise = clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+    for (let i = 0; i < windowClients.length; i++) {
+      windowClients[i].postMessage({
+        type: 'PUSH_NOTIFICATION',
+        payload: data
+      });
+    }
+  });
+
+  event.waitUntil(Promise.all([notificationPromise, messagePromise]));
 });
 
 self.addEventListener('notificationclick', function(event) {
