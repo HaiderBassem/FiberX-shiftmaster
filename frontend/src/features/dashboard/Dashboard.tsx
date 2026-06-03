@@ -267,7 +267,7 @@ const EmployeeDashboard = () => {
 
 const LeaderDashboard = () => {
   const user = useAuthStore(s => s.user);
-  const [selectedShiftFilter, setSelectedShiftFilter] = useState<number | 'all'>('all');
+  const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('all');
 
   const { data: employees } = useQuery({
     queryKey: ['all-employees-active'],
@@ -464,11 +464,11 @@ const LeaderDashboard = () => {
               <select
                 className="bg-muted/50 border border-border/50 text-sm rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-primary outline-none"
                 value={selectedShiftFilter}
-                onChange={(e) => setSelectedShiftFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                onChange={(e) => setSelectedShiftFilter(e.target.value)}
               >
                 <option value="all">All Shifts</option>
                 {shifts?.map((s: any) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <option key={s.id} value={s.id.toString()}>{s.name}</option>
                 ))}
               </select>
             </div>
@@ -477,7 +477,7 @@ const LeaderDashboard = () => {
             {employees ? (() => {
               const staff = employees.filter((e: any) => 
                 e.role === 'employee' && 
-                (selectedShiftFilter === 'all' || e.default_shift_id === selectedShiftFilter)
+                (selectedShiftFilter === 'all' || e.default_shift_id?.toString() === selectedShiftFilter)
               );
               if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">No staff found for this shift.</p>;
               return (
