@@ -50,7 +50,7 @@ export const UserProfile = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex items-center gap-4">
         <div 
-          className="relative w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20 overflow-hidden group cursor-pointer"
+          className="relative w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20 overflow-hidden group cursor-pointer shrink-0"
           onClick={() => fileInputRef.current?.click()}
         >
           {user?.profile_image ? (
@@ -60,11 +60,11 @@ export const UserProfile = () => {
               className="w-full h-full object-cover" 
             />
           ) : (
-            <User className="w-8 h-8 text-primary" />
+            <User className="w-12 h-12 text-primary/50" />
           )}
           
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-[10px] text-white font-medium">{uploading ? '...' : 'Upload'}</span>
+          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="text-xs text-white font-medium">{uploading ? 'Uploading...' : 'Change Photo'}</span>
           </div>
         </div>
         <input 
@@ -129,33 +129,37 @@ export const UserProfile = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             {stats?.leave_balances && stats.leave_balances.length > 0 ? (
-              stats.leave_balances.map((balance: any) => {
-                const percentage = Math.min((balance.used_days / balance.allocated_days) * 100, 100);
-                const remaining = balance.allocated_days - balance.used_days;
-                
-                return (
-                  <div key={balance.id} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: balance.color_code || '#ccc' }} />
-                        <span className="font-medium">{balance.leave_type_name_en}</span>
+              stats.leave_balances
+                .filter((b: any) => b.reset_cycle === 'annual' || b.month === new Date().getMonth() + 1)
+                .map((balance: any) => {
+                  const percentage = Math.min((balance.used_amount / balance.allocated_amount) * 100, 100) || 0;
+                  const remaining = balance.allocated_amount - balance.used_amount;
+                  
+                  return (
+                    <div key={balance.id} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: balance.color_code || '#ccc' }} />
+                          <span className="font-medium">
+                            {balance.leave_type_name_en} {balance.reset_cycle === 'monthly' && '(This Month)'}
+                          </span>
+                        </div>
+                        <span className="text-muted-foreground">
+                          {balance.used_amount} / {balance.allocated_amount} {balance.unit} used
+                        </span>
                       </div>
-                      <span className="text-muted-foreground">
-                        {balance.used_days} / {balance.allocated_days} days used
-                      </span>
+                      <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500" 
+                          style={{ width: `${percentage}%`, backgroundColor: balance.color_code || '#3b82f6' }} 
+                        />
+                      </div>
+                      <p className="text-xs text-right text-muted-foreground font-medium">
+                        {remaining} {balance.unit} remaining
+                      </p>
                     </div>
-                    <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full rounded-full transition-all duration-500" 
-                        style={{ width: `${percentage}%`, backgroundColor: balance.color_code || '#3b82f6' }} 
-                      />
-                    </div>
-                    <p className="text-xs text-right text-muted-foreground font-medium">
-                      {remaining} days remaining
-                    </p>
-                  </div>
-                );
-              })
+                  );
+                })
             ) : (
               <div className="text-center py-6 text-muted-foreground">
                 No leave balances configured for this year.
