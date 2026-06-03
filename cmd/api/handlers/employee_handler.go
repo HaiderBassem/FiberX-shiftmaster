@@ -717,11 +717,16 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 
 	// 3. Get total approved leaves count and calculate pending amounts
 	totalLeavesTaken := 0
+	totalHourlyLeavesTaken := 0
 	leaves, err := h.leaveRepo.GetByEmployee(ctx, empID)
 	if err == nil {
 		for _, l := range leaves {
 			if l.Status == "approved" || l.Status == "approved_by_manager" {
-				totalLeavesTaken++
+				if l.StartTime != nil && l.EndTime != nil {
+					totalHourlyLeavesTaken++
+				} else {
+					totalLeavesTaken++
+				}
 			} else if l.Status == "pending" || l.Status == "approved_by_team_leader" {
 				// Calculate pending amount and add to the corresponding balance
 				for i, b := range balances {
@@ -751,11 +756,12 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": gin.H{
-			"leave_balances":     balances,
-			"completed_tasks":    completedTasks,
-			"active_tasks":       activeTasks,
-			"total_leaves_taken": totalLeavesTaken,
-			"worked_hours":       0, // Could calculate from schedule/check-in times if implemented
+			"leave_balances":            balances,
+			"completed_tasks":           completedTasks,
+			"active_tasks":              activeTasks,
+			"total_leaves_taken":        totalLeavesTaken,
+			"total_hourly_leaves_taken": totalHourlyLeavesTaken,
+			"worked_hours":              0, // Could calculate from schedule/check-in times if implemented
 		},
 	})
 }
