@@ -74,12 +74,12 @@ const EmployeeDashboard = () => {
   });
 
   const totalTasks = weeklyTasks?.length || 0;
-  const completedTasks = weeklyTasks?.filter((t: any) => t.status === 'completed').length || 0;
-  const inProgressTasks = weeklyTasks?.filter((t: any) => t.status === 'in_progress').length || 0;
+  const completedTasks = (weeklyTasks || []).filter((t: any) => t.status === 'completed').length;
+  const inProgressTasks = (weeklyTasks || []).filter((t: any) => t.status === 'in_progress').length;
   const pendingTasks = totalTasks - completedTasks - inProgressTasks;
   const completionPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const todayTasks = weeklyTasks?.filter((t: any) => t.assigned_date?.startsWith(today)) || [];
+  const todayTasks = (weeklyTasks || []).filter((t: any) => t.assigned_date?.startsWith(today));
 
   // Chart Data
   const pieData = [
@@ -307,11 +307,11 @@ const LeaderDashboard = () => {
     },
   });
 
-  const totalEmployees = employees?.filter((e: any) => e.role === 'employee').length || 0;
+  const totalEmployees = (employees || []).filter((e: any) => e.role === 'employee').length;
 
   // Group employees by shift for Recharts Pie
   const shiftPieData = (shifts || []).map((s: any) => {
-    const count = employees?.filter((e: any) => e.default_shift_id === s.id && e.role === 'employee').length || 0;
+    const count = (employees || []).filter((e: any) => e.default_shift_id === s.id && e.role === 'employee').length;
     return { name: s.name, value: count, color: s.color_code || '#0CCCCC' };
   }).filter(s => s.value > 0);
 
