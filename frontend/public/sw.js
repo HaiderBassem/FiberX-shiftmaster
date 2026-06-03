@@ -20,11 +20,11 @@ self.addEventListener('push', function(event) {
     body: data.body || 'You have a new update.',
     data: {
       url: data.url || '/'
-    },
-    vibrate: [200, 100, 200]
+    }
   };
 
-  const notificationPromise = self.registration.showNotification(data.title || 'ShiftMaster', options);
+  const notificationPromise = self.registration.showNotification(data.title || 'ShiftMaster', options)
+    .catch(err => console.error('Notification error:', err));
 
   // Still send message to client so they hear the ding and see the toast
   const messagePromise = clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {

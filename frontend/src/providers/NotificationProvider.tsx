@@ -74,10 +74,29 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const { data: keyData } = await api.get('/push/public-key');
       const applicationServerKey = urlBase64ToUint8Array(keyData.data.publicKey);
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey
-      });
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (subscription) {
+        // Compare keys or just unsubscribe to be safe if we want to ensure keys match
+        // But let's try subscribing directly, if it fails, we unsubscribe
+      }
+
+      try {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey
+        });
+      } catch (subErr) {
+        console.log('Subscribe failed, trying to unsubscribe existing...', subErr);
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+        // Try again
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey
+        });
+      }
 
       await api.post('/push/subscribe', subscription);
       console.log('Successfully subscribed to push notifications');
