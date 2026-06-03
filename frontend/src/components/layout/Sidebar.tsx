@@ -1,16 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import {
-  LayoutDashboard, Users, Calendar, CheckSquare, CalendarOff,
-  ArrowLeftRight, ShieldCheck, ClipboardList, Building2,
-  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen
+  LayoutDashboard, Users, Calendar, CheckSquare,
+  ShieldCheck, ClipboardList, Building2,
+  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox
 } from 'lucide-react';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/leaves', label: 'Leaves', icon: CalendarOff, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/swaps', label: 'Swaps', icon: ArrowLeftRight, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/requests', label: 'My Requests', icon: Inbox, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'] },
   { to: '/task-management', label: 'Task Center', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'] },

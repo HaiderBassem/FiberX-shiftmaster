@@ -95,13 +95,7 @@ export const SwapList = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
-          <ArrowLeftRight className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Shift Swaps
-        </h2>
-        <p className="text-sm sm:text-base text-muted-foreground">Request shift swaps with teammates in your department.</p>
-      </div>
+
 
       {error && (
         <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>

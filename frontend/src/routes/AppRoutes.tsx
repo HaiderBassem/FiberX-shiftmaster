@@ -8,8 +8,7 @@ import { ShiftList } from '../features/shifts/ShiftList';
 import { ScheduleView } from '../features/schedules/ScheduleView';
 import { MyTasksWeekly } from '../features/tasks/TaskList';
 import { TaskHub } from '../features/tasks/TaskHub';
-import { LeaveList } from '../features/leaves/LeaveList';
-import { SwapList } from '../features/swaps/SwapList';
+import { RequestHub } from '../features/requests/RequestHub';
 import { ApprovalDashboard } from '../features/approvals/ApprovalDashboard';
 import { NotificationList } from '../features/notifications/NotificationList';
 import { Dashboard } from '../features/dashboard/Dashboard';
@@ -55,18 +54,10 @@ export const AppRoutes = () => {
             } 
           />
           <Route 
-            path="leaves" 
+            path="requests" 
             element={
               <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
-                <LeaveList />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="swaps" 
-            element={
-              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
-                <SwapList />
+                <RequestHub />
               </ProtectedRoute>
             } 
           />

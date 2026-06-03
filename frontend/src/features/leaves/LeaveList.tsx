@@ -76,13 +76,7 @@ export const LeaveList = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-2 flex items-center gap-2 sm:gap-3">
-          <CalendarOff className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Leave Management
-        </h2>
-        <p className="text-muted-foreground">Request time off and track your leave balances.</p>
-      </div>
+
 
       {isAdmin && (
         <div className="flex gap-4 border-b border-border/50 pb-2">
