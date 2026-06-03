@@ -70,22 +70,38 @@ export const LeaveList = () => {
 
   const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
   const isHourly = selectedType?.unit === 'hours';
-  const canSubmit = reason && (isHourly ? (startTime && endTime) : true);
 
   // Find applicable balance
   let remainingText = '';
+  let hasEnoughBalance = true;
   if (selectedType && balances) {
     const month = selectedType.reset_cycle === 'monthly' ? new Date(startDate).getMonth() + 1 : 0;
     const balance = balances.find((b: any) => b.leave_type_id === selectedType.id && b.month === month);
     if (balance) {
-      remainingText = `${balance.allocated_amount - balance.used_amount} ${selectedType.unit} remaining`;
+      const remainingAmount = balance.allocated_amount - balance.used_amount;
+      remainingText = `${remainingAmount} ${selectedType.unit} remaining`;
       if (selectedType.reset_cycle === 'monthly') {
         remainingText += ` this month`;
       } else {
         remainingText += ` this year`;
       }
+      if (remainingAmount <= 0) {
+        hasEnoughBalance = false;
+        remainingText += " (Insufficient Balance)";
+      }
+    } else {
+      // If no balance record exists for this month/year, they effectively have 0
+      hasEnoughBalance = false;
+      remainingText = `0 ${selectedType.unit} remaining`;
+      if (selectedType.reset_cycle === 'monthly') {
+        remainingText += ` this month (Insufficient Balance)`;
+      } else {
+        remainingText += ` this year (Insufficient Balance)`;
+      }
     }
   }
+
+  const canSubmit = reason && (isHourly ? (startTime && endTime) : true) && hasEnoughBalance;
 
   const getStatusIcon = (status: string) => {
     switch(status) {

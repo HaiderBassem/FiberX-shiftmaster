@@ -126,7 +126,7 @@ export const LeaveTypeManager = () => {
                 <Label htmlFor="isActiveNew">Is Active</Label>
               </div>
               <div className="space-y-2">
-                <Label>Days Per Year (Quota)</Label>
+                <Label>Quota ({formData.unit === 'hours' ? 'Hours' : 'Days'} per {formData.reset_cycle === 'monthly' ? 'Month' : 'Year'})</Label>
                 <Input type="number" min="0" value={formData.days_per_year} onChange={e => setFormData({ ...formData, days_per_year: parseInt(e.target.value) || 0 })} placeholder="e.g. 21" />
               </div>
               <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ export const LeaveTypeManager = () => {
                     <Label htmlFor={`isActive${type.id}`}>Is Active</Label>
                   </div>
                   <div className="space-y-2">
-                    <Label>Days Per Year (Quota)</Label>
+                    <Label>Quota ({formData.unit === 'hours' ? 'Hours' : 'Days'} per {formData.reset_cycle === 'monthly' ? 'Month' : 'Year'})</Label>
                     <Input type="number" min="0" value={formData.days_per_year} onChange={e => setFormData({ ...formData, days_per_year: parseInt(e.target.value) || 0 })} />
                   </div>
                   <div className="flex items-center gap-2">
