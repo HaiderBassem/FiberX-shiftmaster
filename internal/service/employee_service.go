@@ -166,6 +166,10 @@ func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID
 	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManage)
 }
 
+func (s *EmployeeService) UpdateAnnouncementPermission(ctx context.Context, id uuid.UUID, canPost bool) error {
+	return s.employeeRepo.UpdateAnnouncementPermission(ctx, id, canPost)
+}
+
 
 func (s *EmployeeService) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
 	return s.employeeRepo.UpdateTablePermission(ctx, id, canCreate)

@@ -29,6 +29,7 @@ type EmployeeRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	ForceDelete(ctx context.Context, id uuid.UUID) error
 	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
+	UpdateAnnouncementPermission(ctx context.Context, id uuid.UUID, canPost bool) error
 	UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
 	GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error)
@@ -295,6 +296,12 @@ func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 func (r *employeeRepo) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
 	query := `UPDATE employees SET can_manage_help_docs = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, canManage)
+	return err
+}
+
+func (r *employeeRepo) UpdateAnnouncementPermission(ctx context.Context, id uuid.UUID, canPost bool) error {
+	query := `UPDATE employees SET can_post_announcements = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id, canPost)
 	return err
 }
 

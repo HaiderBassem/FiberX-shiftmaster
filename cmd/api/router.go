@@ -53,6 +53,7 @@ func SetupRouter(
 			employees.GET("/:id", empH.GetByID)
 			employees.PUT("/:id/password", empH.UpdatePassword)
 			employees.PUT("/:id/help-permission", empH.UpdateHelpPermission)
+			employees.PUT("/:id/announcement-permission", empH.UpdateAnnouncementPermission)
 			employees.PUT("/:id/table-permission", empH.UpdateTablePermission)
 			employees.PUT("/:id/preferences", empH.UpdatePreferences)
 		}

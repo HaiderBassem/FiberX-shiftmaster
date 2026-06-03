@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Power, AlertCircle, Loader } from 'lucide-react';
+import { Plus, Trash2, Power, AlertCircle, Loader, Shield } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
+import { AnnouncementPermissionsModal } from './AnnouncementPermissionsModal';
+import { useAuthStore } from '@/store/authStore';
 
 export const AnnouncementManager: React.FC = () => {
+  const { user } = useAuthStore();
+  const isAdminOrManager = user?.role === 'admin' || user?.role === 'manager';
+  
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
   
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -94,13 +100,24 @@ export const AnnouncementManager: React.FC = () => {
           <h2 className="text-2xl font-bold tracking-tight">Announcements</h2>
           <p className="text-muted-foreground">Manage department announcements</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Announcement</span>
-        </button>
+        <div className="flex gap-2">
+          {isAdminOrManager && (
+            <button
+              onClick={() => setIsPermissionsOpen(true)}
+              className="flex items-center space-x-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
+            >
+              <Shield className="h-4 w-4" />
+              <span>Permissions</span>
+            </button>
+          )}
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center space-x-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Announcement</span>
+          </button>
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
@@ -246,6 +263,11 @@ export const AnnouncementManager: React.FC = () => {
           </div>
         </div>
       )}
+
+      <AnnouncementPermissionsModal
+        isOpen={isPermissionsOpen}
+        onClose={() => setIsPermissionsOpen(false)}
+      />
     </div>
   );
 };
