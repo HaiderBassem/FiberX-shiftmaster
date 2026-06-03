@@ -23,11 +23,17 @@ func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"error":   "authorization header is required",
-			})
-			return
+			// Fallback to query string for SSE / EventSource
+			tokenQuery := c.Query("token")
+			if tokenQuery != "" {
+				authHeader = "Bearer " + tokenQuery
+			} else {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"success": false,
+					"error":   "authorization header is required",
+				})
+				return
+			}
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)

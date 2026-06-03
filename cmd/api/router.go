@@ -140,6 +140,7 @@ func SetupRouter(
 			notifs.GET("/unread/count", notifH.UnreadCount)
 			notifs.POST("/:id/read", notifH.MarkAsRead)
 			notifs.POST("/read-all", notifH.MarkAllAsRead)
+			notifs.GET("/stream", notifH.StreamSSE)
 		}
 
 		// Activity history (audit logs)

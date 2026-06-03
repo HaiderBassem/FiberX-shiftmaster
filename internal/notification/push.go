@@ -90,6 +90,14 @@ func (s *pushService) SendToEmployee(ctx context.Context, employeeID uuid.UUID, 
 		return fmt.Errorf("fetch subscriptions: %w", err)
 	}
 
+	// Trigger SSE for real-time in-app delivery
+	DefaultSSEHub.SendToEmployee(employeeID, PushPayload{
+		Title: title,
+		Body:  message,
+		Icon:  "/icon-192x192.png",
+		Url:   url,
+	})
+
 	return s.send(ctx, subs, PushPayload{
 		Title: title,
 		Body:  message,
@@ -104,12 +112,29 @@ func (s *pushService) SendToDepartment(ctx context.Context, departmentID uuid.UU
 		return fmt.Errorf("fetch subscriptions: %w", err)
 	}
 
-	return s.send(ctx, subs, PushPayload{
+	payload := PushPayload{
 		Title: title,
 		Body:  message,
 		Icon:  "/icon-192x192.png",
 		Url:   url,
-	})
+	}
+
+	// Trigger SSE for department users
+	// We need to fetch all active employees in the department to send via SSE
+	// For now, let's let the frontend fetch notifications or we broadcast.
+	// Actually, an efficient way is to broadcast to all and let frontend filter, OR just send to department.
+	// Since SSEHub requires employeeID, we need employeeIDs.
+	// We can add a simple Department broadcast or just iterate over subs.
+	// For simplicity, we'll iterate over subs to get employee IDs.
+	employeeIDs := make(map[uuid.UUID]bool)
+	for _, sub := range subs {
+		if !employeeIDs[sub.EmployeeID] {
+			DefaultSSEHub.SendToEmployee(sub.EmployeeID, payload)
+			employeeIDs[sub.EmployeeID] = true
+		}
+	}
+
+	return s.send(ctx, subs, payload)
 }
 
 func (s *pushService) Broadcast(ctx context.Context, title, message, url string) error {
@@ -118,10 +143,14 @@ func (s *pushService) Broadcast(ctx context.Context, title, message, url string)
 		return fmt.Errorf("fetch subscriptions: %w", err)
 	}
 
-	return s.send(ctx, subs, PushPayload{
+	payload := PushPayload{
 		Title: title,
 		Body:  message,
 		Icon:  "/icon-192x192.png",
 		Url:   url,
-	})
+	}
+
+	DefaultSSEHub.Broadcast(payload)
+
+	return s.send(ctx, subs, payload)
 }
