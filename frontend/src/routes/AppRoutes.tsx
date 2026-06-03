@@ -20,6 +20,8 @@ import { HelpDocumentList } from '../features/help/HelpDocumentList';
 import { HelpDocumentView } from '../features/help/HelpDocumentView';
 import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
 import { AnnouncementManager } from '../features/announcements/AnnouncementManager';
+import InteractiveCalendar from '../features/calendar/InteractiveCalendar';
+
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -48,6 +50,14 @@ export const AppRoutes = () => {
           <Route index element={<Dashboard />} />
 
           {/* ── Employee self-service routes (all roles) ── */}
+          <Route 
+            path="calendar" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <InteractiveCalendar />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="tasks" 
             element={
