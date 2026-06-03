@@ -22,12 +22,7 @@ export const TaskManagement = () => {
   const [maxAssignees, setMaxAssignees] = useState(1);
   const [selectedShiftId, setSelectedShiftId] = useState('');
   const [selectedBoardId, setSelectedBoardId] = useState('');
-
-  // Assignment form
-  const [assignDate, setAssignDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [assignScheduleId, setAssignScheduleId] = useState('');
-  const [assignEmployeeId, setAssignEmployeeId] = useState('');
-  const [assignShiftId, setAssignShiftId] = useState('');
+  const assignDate = format(new Date(), 'yyyy-MM-dd');
 
   // ── Queries ──
   const { data: taskSchedules, isLoading: schedulesLoading } = useQuery({
@@ -75,12 +70,6 @@ export const TaskManagement = () => {
     },
   });
 
-  const assignTask = useMutation({
-    mutationFn: async () => {
-      await api.post('/tasks/assign', { schedule_id: assignScheduleId, employee_id: assignEmployeeId, assigned_date: assignDate });
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tasks'] }); setAssignEmployeeId(''); },
-  });
 
   const toggleActive = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
@@ -182,64 +171,6 @@ export const TaskManagement = () => {
             </CardFooter>
           </Card>
 
-          {/* ── Quick Assign ── */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" />
-                Assign Task
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Task Schedule</Label>
-                <select className={selectClass} value={assignScheduleId}
-                  onChange={(e) => {
-                    setAssignScheduleId(e.target.value);
-                    const sched = taskSchedules?.find((s: any) => s.id === e.target.value);
-                    if (sched?.shift_id) setAssignShiftId(sched.shift_id);
-                    setAssignEmployeeId('');
-                  }}>
-                  <option value="" disabled>Select a task schedule</option>
-                  {taskSchedules?.filter((s: any) => s.is_active).map((s: any) => (
-                    <option key={s.id} value={s.id}>{s.title} ({s.recurrence})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Shift</Label>
-                <select className={selectClass} value={assignShiftId}
-                  onChange={(e) => { setAssignShiftId(e.target.value); setAssignEmployeeId(''); }}>
-                  <option value="" disabled>Select a shift</option>
-                  {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>Assignment Date</Label>
-                <Input type="date" value={assignDate}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setAssignDate(e.target.value); setAssignEmployeeId(''); }} />
-              </div>
-              <div className="space-y-2">
-                <Label>Employee</Label>
-                <select className={selectClass} value={assignEmployeeId}
-                  onChange={(e) => setAssignEmployeeId(e.target.value)} disabled={assigneesLoading || !assignShiftId}>
-                  <option value="" disabled>{!assignShiftId ? 'Select a shift first' : 'Select an employee'}</option>
-                  {eligibleAssignees?.map((emp: any) => (
-                    <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} — {emp.employee_code}</option>
-                  ))}
-                </select>
-                {assignShiftId && eligibleAssignees?.length === 0 && !assigneesLoading && (
-                  <p className="text-xs text-amber-500 mt-1">No eligible employees for this shift/date.</p>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full gap-2" onClick={() => assignTask.mutate()}
-                disabled={assignTask.isPending || !assignScheduleId || !assignEmployeeId}>
-                <CheckSquare className="w-4 h-4" /> Assign
-              </Button>
-            </CardFooter>
-          </Card>
         </div>
 
         {/* ── Right: Task Schedules + Assignments ── */}
