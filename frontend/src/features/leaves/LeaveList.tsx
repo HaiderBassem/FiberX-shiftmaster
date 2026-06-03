@@ -123,7 +123,7 @@ export const LeaveList = () => {
     }
   }
 
-  const canSubmit = reason && (isHourly ? (startTime && endTime) : true) && hasEnoughBalance;
+  const canSubmit = !!reason && (isHourly ? !!(startTime && endTime) : true) && hasEnoughBalance;
 
   const getStatusIcon = (status: string) => {
     switch(status) {

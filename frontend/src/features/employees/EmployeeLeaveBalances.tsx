@@ -9,7 +9,7 @@ import { Edit2, Save, X, CalendarDays } from 'lucide-react';
 type LeaveBalance = {
   id: string;
   leave_type_id: string;
-  year: parseInt;
+  year: number;
   allocated_amount: number;
   used_amount: number;
   leave_type_name_en: string;

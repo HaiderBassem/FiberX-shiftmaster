@@ -325,13 +325,6 @@ const LeaderDashboard = () => {
     },
   });
 
-  const { data: activity } = useQuery({
-    queryKey: ['activity'],
-    queryFn: async () => {
-      const res = await api.get('/activity');
-      return (res.data?.data || []) as any[];
-    },
-  });
 
   const totalEmployees = (employees || []).filter((e: any) => e.role === 'employee').length;
 
