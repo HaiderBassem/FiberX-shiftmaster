@@ -293,6 +293,22 @@ const LeaderDashboard = () => {
     },
   });
 
+  const { data: todayLeaves } = useQuery({
+    queryKey: ['dashboard-leaves-history'],
+    queryFn: async () => {
+      const res = await api.get('/leaves/history');
+      return res.data?.data || [];
+    },
+  });
+
+  const { data: todaySwaps } = useQuery({
+    queryKey: ['dashboard-swaps-history'],
+    queryFn: async () => {
+      const res = await api.get('/swaps/history');
+      return res.data?.data || [];
+    },
+  });
+
   const { data: notifications } = useQuery({
     queryKey: ['notifications-unread'],
     queryFn: async () => {
@@ -475,15 +491,55 @@ const LeaderDashboard = () => {
           </CardHeader>
           <CardContent>
             {employees ? (() => {
-              const staff = employees.filter((e: any) => 
-                e.role === 'employee' && 
-                (selectedShiftFilter === 'all' || e.default_shift_id?.toString() === selectedShiftFilter)
-              );
+              const todayStr = new Date().toISOString().split('T')[0];
+              const staff = employees.filter((e: any) => {
+                if (e.role !== 'employee') return false;
+                
+                let effectiveShiftId = e.default_shift_id;
+                
+                // Check for approved Swaps today
+                const todaysSwap = todaySwaps?.find((s: any) => 
+                  s.shift_date?.startsWith(todayStr) && 
+                  s.status === 'approved' &&
+                  (s.requester_id === e.id || s.target_employee_id === e.id)
+                );
+                
+                if (todaysSwap) {
+                   if (todaysSwap.requester_id === e.id) {
+                      return false; // Swapped out, not working
+                   } else if (todaysSwap.target_employee_id === e.id) {
+                      const requester = employees.find((req: any) => req.id === todaysSwap.requester_id);
+                      if (requester) effectiveShiftId = requester.default_shift_id;
+                   }
+                }
+
+                // Check for approved Leaves today
+                const isOnLeave = todayLeaves?.some((l: any) => {
+                  if (l.employee_id !== e.id) return false;
+                  if (l.status !== 'approved' && l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
+                  const start = new Date(l.start_date).toISOString().split('T')[0];
+                  const end = new Date(l.end_date).toISOString().split('T')[0];
+                  return todayStr >= start && todayStr <= end;
+                });
+                
+                if (isOnLeave) return false;
+
+                return selectedShiftFilter === 'all' || effectiveShiftId?.toString() === selectedShiftFilter;
+              });
+
               if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">No staff found for this shift.</p>;
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {staff.map((emp: any) => {
-                    const shift = shifts?.find((s: any) => s.id === emp.default_shift_id);
+                    // Re-calculate effective shift for display
+                    let effectiveShiftId = emp.default_shift_id;
+                    const todaysSwap = todaySwaps?.find((s: any) => s.shift_date?.startsWith(todayStr) && s.status === 'approved' && s.target_employee_id === emp.id);
+                    if (todaysSwap) {
+                        const requester = employees.find((req: any) => req.id === todaysSwap.requester_id);
+                        if (requester) effectiveShiftId = requester.default_shift_id;
+                    }
+                    const shift = shifts?.find((s: any) => s.id === effectiveShiftId);
+                    
                     return (
                       <div key={emp.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
@@ -494,6 +550,7 @@ const LeaderDashboard = () => {
                           <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
                             {shift?.name || 'No Shift'}
+                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">Swapped In</span>}
                           </p>
                         </div>
                       </div>
