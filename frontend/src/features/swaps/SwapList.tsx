@@ -2,19 +2,24 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  ArrowLeftRight, Send, Clock, CheckCircle2, XCircle, UserCircle, Inbox,
+  ArrowLeftRight, Clock, CheckCircle2, XCircle, UserCircle, Inbox, Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
+import { motion, AnimatePresence } from 'framer-motion';
+import { SwapRequestModal } from './SwapRequestModal';
 
 export const SwapList = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Form State
   const [targetEmployeeId, setTargetEmployeeId] = useState('');
   const [shiftDate, setShiftDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reason, setReason] = useState('');
@@ -56,6 +61,7 @@ export const SwapList = () => {
       queryClient.invalidateQueries({ queryKey: ['swaps'] });
       setReason('');
       setTargetEmployeeId('');
+      setIsModalOpen(false);
     },
     onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to create swap'),
   });
@@ -71,194 +77,205 @@ export const SwapList = () => {
 
   const getStatusBadge = (status: string) => {
     if (status === 'approved' || status === 'completed') {
-      return <span className="px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{status}</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">{status}</span>;
     }
     if (status === 'rejected') {
-      return <span className="px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider bg-destructive/10 text-destructive border border-destructive/20">{status}</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-destructive/15 text-destructive border border-destructive/30">{status}</span>;
     }
     if (status === 'employee_accepted') {
-      return <span className="px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">Awaiting TL</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-blue-500/15 text-blue-600 border border-blue-500/30">Awaiting TL</span>;
     }
-    return <span className="px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider bg-amber-500/10 text-amber-500 border border-amber-500/20">{status}</span>;
+    return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-amber-500/15 text-amber-600 border border-amber-500/30">{status}</span>;
   };
 
   const getStatusIcon = (status: string) => {
-    if (status === 'approved' || status === 'completed') return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
-    if (status === 'rejected') return <XCircle className="w-5 h-5 text-destructive" />;
-    if (status === 'employee_accepted') return <Clock className="w-5 h-5 text-blue-500" />;
-    return <Clock className="w-5 h-5 text-amber-500" />;
+    if (status === 'approved' || status === 'completed') return <CheckCircle2 className="w-6 h-6 text-emerald-500" />;
+    if (status === 'rejected') return <XCircle className="w-6 h-6 text-destructive" />;
+    if (status === 'employee_accepted') return <Clock className="w-6 h-6 text-blue-500" />;
+    return <Clock className="w-6 h-6 text-amber-500" />;
   };
 
-  const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
-
   const incomingCount = pendingForMe?.length || 0;
+  const canSubmit = targetEmployeeId && shiftDate && reason;
+
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
+      <div className="flex items-center justify-between">
+        <h3 className="text-2xl font-bold text-foreground tracking-tight">Shift Swaps</h3>
+        <Button 
+          onClick={() => setIsModalOpen(true)} 
+          className="gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+        >
+          <Plus className="w-5 h-5" /> Request Swap
+        </Button>
+      </div>
 
-
-      {error && (
-        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
-      )}
-
-      {/* ── Incoming Requests Banner (always visible) ── */}
-      <div className={`rounded-xl border p-4 ${incomingCount > 0
-        ? 'bg-amber-500/5 border-amber-500/30'
-        : 'bg-muted/30 border-border'
-      }`}>
-        <div className="flex items-center gap-3 mb-3">
-          <Inbox className={`w-5 h-5 ${incomingCount > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
-          <h3 className={`text-base font-semibold ${incomingCount > 0 ? 'text-foreground' : 'text-muted-foreground'} flex items-center gap-2`}>
-            Incoming Swap Requests
-            {incomingCount > 0 && (
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] font-bold bg-amber-500 text-white">
-                {incomingCount}
-              </span>
-            )}
-          </h3>
-        </div>
-
-        {respondError && (
-          <div className="mb-3 p-2 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">{respondError}</div>
-        )}
-
-        {pendingLoading ? (
-          <div className="space-y-2">
-            {[1, 2].map(i => <div key={i} className="animate-pulse h-16 bg-muted/50 rounded-lg" />)}
-          </div>
-        ) : incomingCount > 0 ? (
-          <div className="space-y-3">
-            {pendingForMe!.map((swap: any) => (
-              <div key={swap.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 rounded-lg bg-background border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                    <UserCircle className="w-5 h-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <p className="text-foreground font-medium">
-                      {swap.requester_name || `Employee #${swap.requester_id?.slice(0, 8)}`}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {fmtDate(swap.shift_date)}
-                      {swap.reason && <span className="italic"> · "{swap.reason}"</span>}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
-                    onClick={() => respondSwap.mutate({ swapId: swap.id, accept: false })}
-                    disabled={respondSwap.isPending}
-                  >
-                    <XCircle className="w-4 h-4" /> Decline
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => respondSwap.mutate({ swapId: swap.id, accept: true })}
-                    disabled={respondSwap.isPending}
-                  >
-                    <CheckCircle2 className="w-4 h-4" /> Accept
-                  </Button>
-                </div>
+      <AnimatePresence>
+        {incomingCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="rounded-2xl border-2 bg-amber-500/5 border-amber-500/30 p-5 shadow-inner">
+              <div className="flex items-center gap-3 mb-4">
+                <Inbox className="w-6 h-6 text-amber-500" />
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  Incoming Requests
+                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-amber-500 text-white shadow-sm">
+                    {incomingCount}
+                  </span>
+                </h3>
               </div>
-            ))}
+
+              {respondError && (
+                <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">{respondError}</div>
+              )}
+
+              {pendingLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => <div key={i} className="animate-pulse h-20 bg-muted/50 rounded-xl" />)}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingForMe!.map((swap: any) => (
+                  <motion.div 
+                    key={swap.id} 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-background border border-border shadow-sm"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                        <UserCircle className="w-6 h-6 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-foreground font-semibold text-lg tracking-tight">
+                          {swap.requester_name || `Employee #${swap.requester_id?.slice(0, 8)}`}
+                        </p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <Clock className="w-4 h-4 opacity-70" />
+                          {fmtDate(swap.shift_date)}
+                        </p>
+                        {swap.reason && <p className="text-sm italic text-muted-foreground mt-1">"{swap.reason}"</p>}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 sm:flex-none border-destructive/30 text-destructive hover:bg-destructive hover:text-white transition-colors rounded-xl"
+                        onClick={() => respondSwap.mutate({ swapId: swap.id, accept: false })}
+                        disabled={respondSwap.isPending}
+                      >
+                        Decline
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 sm:flex-none bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 rounded-xl"
+                        onClick={() => respondSwap.mutate({ swapId: swap.id, accept: true })}
+                        disabled={respondSwap.isPending}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="space-y-4">
+        <h3 className="text-xl font-semibold text-foreground tracking-tight">Your Swap History</h3>
+        
+        {mySwapsLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-28 rounded-2xl bg-muted/50 border-transparent" />)}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            No incoming swap requests at the moment.
-          </p>
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-4"
+          >
+            {mySwaps?.map((swap: any) => (
+              <motion.div key={swap.id} variants={itemVariants}>
+                <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                  <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex gap-4 items-center">
+                      <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                        swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
+                        swap.status === 'rejected' ? 'bg-destructive/10' :
+                        swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
+                        'bg-amber-500/10'
+                      }`}>
+                        {getStatusIcon(swap.status)}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
+                          <ArrowLeftRight className="w-4 h-4 text-primary" />
+                          Swap with {swap.target_employee_name || 'Colleague'}
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                          <Clock className="w-4 h-4 opacity-70" />
+                          {fmtDate(swap.shift_date)}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center self-end sm:self-auto">
+                      {getStatusBadge(swap.status)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+            
+            {(!mySwaps || mySwaps.length === 0) && (
+              <motion.div variants={itemVariants}>
+                <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                  <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <ArrowLeftRight className="w-16 h-16 mb-6 opacity-20" />
+                    <p className="text-lg font-medium text-foreground/70">No swap requests found</p>
+                    <p className="text-sm opacity-60">You haven't requested any shift swaps yet.</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </motion.div>
         )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* ── Create Swap ── */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ArrowLeftRight className="w-5 h-5 text-primary" />
-                New Swap Request
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Swap With</Label>
-                <select className={selectClass} value={targetEmployeeId} onChange={(e) => setTargetEmployeeId(e.target.value)}>
-                  <option value="" disabled>Select a teammate</option>
-                  {swapEligible.map((emp: any) => (
-                    <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} — {emp.employee_code}</option>
-                  ))}
-                </select>
-                {swapEligible.length === 0 && (
-                  <p className="text-xs text-muted-foreground">No eligible teammates found in your department.</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Shift Date</Label>
-                <Input type="date" value={shiftDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setShiftDate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Reason</Label>
-                <textarea
-                  className="w-full h-20 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none text-sm transition-colors"
-                  placeholder="Why do you need this swap?"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full gap-2"
-                onClick={() => createSwap.mutate()}
-                disabled={createSwap.isPending || !targetEmployeeId || !reason}
-              >
-                <Send className="w-4 h-4" /> {createSwap.isPending ? 'Sending…' : 'Send Swap Request'}
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        {/* ── My Swap History ── */}
-        <div className="lg:col-span-2 space-y-3">
-          <h3 className="text-lg font-semibold text-foreground">Your Swap History</h3>
-          {mySwapsLoading ? (
-            <div className="space-y-3">{[1, 2].map(i => <Card key={i} className="animate-pulse h-20" />)}</div>
-          ) : mySwaps?.length > 0 ? (
-            mySwaps.map((swap: any) => (
-              <Card key={swap.id}>
-                <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      {getStatusIcon(swap.status)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground">
-                        Swap with {swap.target_employee_name || `#${swap.target_employee_id?.slice(0, 8)}`}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {fmtDate(swap.shift_date)}
-                        {swap.reason && <span className="italic"> · "{swap.reason}"</span>}
-                      </p>
-                    </div>
-                  </div>
-                  {getStatusBadge(swap.status)}
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-                <ArrowLeftRight className="w-12 h-12 mb-4 opacity-20" />
-                <p>No swap requests sent yet.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+      <SwapRequestModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        employees={swapEligible}
+        targetEmployeeId={targetEmployeeId}
+        setTargetEmployeeId={setTargetEmployeeId}
+        shiftDate={shiftDate}
+        setShiftDate={setShiftDate}
+        reason={reason}
+        setReason={setReason}
+        onSubmit={() => createSwap.mutate()}
+        isPending={createSwap.isPending}
+        canSubmit={!!canSubmit}
+        error={error}
+      />
     </div>
   );
 };

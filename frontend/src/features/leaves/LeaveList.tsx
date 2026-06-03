@@ -1,20 +1,25 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { CalendarOff, Send, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { CalendarOff, Clock, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
 import { useAuthStore } from '@/store/authStore';
 import { LeaveTypeManager } from './LeaveTypeManager';
+import { LeaveRequestModal } from './LeaveRequestModal';
+import { motion } from 'framer-motion';
 
 export const LeaveList = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<'requests' | 'types'>('requests');
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Form State
   const [leaveTypeId, setLeaveTypeId] = useState('');
   const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -45,7 +50,11 @@ export const LeaveList = () => {
       }
       await api.post('/leaves', payload);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); setReason(''); setStartTime(''); setEndTime(''); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['leaves'] }); 
+      setReason(''); setStartTime(''); setEndTime(''); 
+      setIsModalOpen(false);
+    },
     onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to submit leave'),
   });
 
@@ -55,10 +64,10 @@ export const LeaveList = () => {
 
   const getStatusIcon = (status: string) => {
     switch(status) {
-      case 'approved_by_manager': return <CheckCircle2 className="w-5 h-5 text-emerald-500" />;
-      case 'approved_by_team_leader': return <CheckCircle2 className="w-5 h-5 text-blue-500" />;
-      case 'rejected': return <XCircle className="w-5 h-5 text-destructive" />;
-      default: return <Clock className="w-5 h-5 text-amber-500" />;
+      case 'approved_by_manager': return <CheckCircle2 className="w-6 h-6 text-emerald-500" />;
+      case 'approved_by_team_leader': return <CheckCircle2 className="w-6 h-6 text-blue-500" />;
+      case 'rejected': return <XCircle className="w-6 h-6 text-destructive" />;
+      default: return <Clock className="w-6 h-6 text-amber-500" />;
     }
   };
 
@@ -72,12 +81,21 @@ export const LeaveList = () => {
     }
   };
 
-  const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
 
   return (
-    <div className="space-y-8">
-
-
+    <div className="space-y-6 pb-24">
       {isAdmin && (
         <div className="flex gap-4 border-b border-border/50 pb-2">
           <button 
@@ -99,133 +117,112 @@ export const LeaveList = () => {
         <LeaveTypeManager />
       ) : (
         <>
-          {error && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">{error}</div>
-          )}
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold text-foreground tracking-tight">Your Requests</h3>
+            <Button 
+              onClick={() => setIsModalOpen(true)} 
+              className="gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+            >
+              <Plus className="w-5 h-5" /> Request Leave
+            </Button>
+          </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CalendarOff className="w-5 h-5 text-primary" />
-                New Request
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Leave Type</Label>
-                <select className={selectClass} value={leaveTypeId || (leaveTypes?.[0]?.id || '')} onChange={(e) => setLeaveTypeId(e.target.value)} disabled={isLoadingTypes}>
-                  {leaveTypes?.map((type: any) => (
-                    <option key={type.id} value={type.id}>{type.name_en}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>{isHourly ? 'Date' : 'Start Date'}</Label>
-                  <Input type="date" value={startDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    setStartDate(e.target.value);
-                    if (isHourly) setEndDate(e.target.value);
-                  }} />
-                </div>
-                {!isHourly && (
-                  <div className="space-y-2">
-                    <Label>End Date</Label>
-                    <Input type="date" value={endDate} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndDate(e.target.value)} />
-                  </div>
-                )}
-              </div>
-              {isHourly && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>From Time</Label>
-                    <Input type="time" value={startTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>To Time</Label>
-                    <Input type="time" value={endTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)} />
-                  </div>
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label>Reason</Label>
-                <textarea 
-                  className="w-full h-24 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none text-sm transition-colors"
-                  placeholder="Please provide a reason..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full gap-2" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending || !canSubmit}>
-                <Send className="w-4 h-4" /> Submit Request
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-xl font-semibold text-foreground mb-4">Your Request History</h3>
-          
           {isLoading ? (
             <div className="space-y-4">
-              {[1, 2].map((i) => <Card key={i} className="animate-pulse h-24" />)}
+              {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-28 rounded-2xl bg-muted/50 border-transparent" />)}
             </div>
           ) : (
-            <div className="space-y-4">
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="space-y-4"
+            >
               {leaves?.map((leave: any) => (
-                <Card key={leave.id}>
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div className="flex gap-4 items-center">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
-                        {getStatusIcon(leave.status)}
-                      </div>
-                      <div>
-                        <div className="font-medium text-foreground capitalize">{leave.leave_type_name_en || 'Leave'}</div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
-                            <>
-                              {fmtDate(leave.start_date)}
-                              {leave.start_time && leave.end_time && (
-                                <span className="ml-1">· {leave.start_time} → {leave.end_time}</span>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              {fmtDate(leave.start_date)} - {fmtDate(leave.end_date)}
-                            </>
-                          )}
+                <motion.div key={leave.id} variants={itemVariants}>
+                  <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex gap-4 items-center">
+                        <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                          leave.status === 'approved_by_manager' ? 'bg-emerald-500/10' :
+                          leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10' :
+                          leave.status === 'rejected' ? 'bg-destructive/10' :
+                          'bg-amber-500/10'
+                        }`}>
+                          {getStatusIcon(leave.status)}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || 'Leave'}</div>
+                          <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                            <Clock className="w-4 h-4 opacity-70" />
+                            {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
+                              <>
+                                {fmtDate(leave.start_date)}
+                                {leave.start_time && leave.end_time && (
+                                  <span className="font-medium">({leave.start_time} - {leave.end_time})</span>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {fmtDate(leave.start_date)} <span className="opacity-50">to</span> {fmtDate(leave.end_date)}
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end">
-                      <span className={`inline-flex px-2 py-1 rounded-md text-xs font-medium uppercase tracking-wider ${
-                        leave.status === 'approved_by_manager' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
-                        leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
-                        leave.status === 'rejected' ? 'bg-destructive/10 text-destructive border border-destructive/20' :
-                        'bg-amber-500/10 text-amber-500 border border-amber-500/20'
-                      }`}>
-                        {getStatusLabel(leave.status)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+                      
+                      <div className="flex items-center self-end sm:self-auto">
+                        <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
+                          leave.status === 'approved_by_manager' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30' :
+                          leave.status === 'approved_by_team_leader' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' :
+                          leave.status === 'rejected' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
+                          'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                        }`}>
+                          {getStatusLabel(leave.status)}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               ))}
               
               {(!leaves || leaves.length === 0) && (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center p-12 text-muted-foreground">
-                    <CalendarOff className="w-12 h-12 mb-4 opacity-20" />
-                    <p>No leave requests found.</p>
-                  </CardContent>
-                </Card>
+                <motion.div variants={itemVariants}>
+                  <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                    <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                      <CalendarOff className="w-16 h-16 mb-6 opacity-20" />
+                      <p className="text-lg font-medium text-foreground/70">No leave requests found</p>
+                      <p className="text-sm opacity-60">You haven't requested any leaves yet.</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               )}
-            </div>
+            </motion.div>
           )}
-        </div>
-      </div>
+
+          <LeaveRequestModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            leaveTypes={leaveTypes}
+            isLoadingTypes={isLoadingTypes}
+            leaveTypeId={leaveTypeId}
+            setLeaveTypeId={setLeaveTypeId}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            startTime={startTime}
+            setStartTime={setStartTime}
+            endTime={endTime}
+            setEndTime={setEndTime}
+            reason={reason}
+            setReason={setReason}
+            onSubmit={() => submitMutation.mutate()}
+            isPending={submitMutation.isPending}
+            canSubmit={!!canSubmit}
+            isHourly={isHourly}
+            error={error}
+          />
         </>
       )}
     </div>
