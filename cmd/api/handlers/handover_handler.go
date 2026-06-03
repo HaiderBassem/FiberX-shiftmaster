@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,13 +17,17 @@ import (
 type HandoverHandler struct {
 	handoverRepo repository.HandoverRepository
 	employeeRepo repository.EmployeeRepository
+	shiftRepo    repository.ShiftRepository
+	scheduleRepo repository.ScheduleRepository
 	notifService *service.NotificationService
 }
 
-func NewHandoverHandler(hr repository.HandoverRepository, er repository.EmployeeRepository, ns *service.NotificationService) *HandoverHandler {
+func NewHandoverHandler(hr repository.HandoverRepository, er repository.EmployeeRepository, sr repository.ShiftRepository, sch repository.ScheduleRepository, ns *service.NotificationService) *HandoverHandler {
 	return &HandoverHandler{
 		handoverRepo: hr,
 		employeeRepo: er,
+		shiftRepo:    sr,
+		scheduleRepo: sch,
 		notifService: ns,
 	}
 }
@@ -59,11 +65,41 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 		return
 	}
 
-	// Notify all employees in the department
+	// Determine Current Shift based on Time
+	now := time.Now()
+	hour := now.Hour()
+	var nextShiftCode string
+
+	// MORNING: 08:00 - 16:00 -> Next is EVENING
+	// EVENING: 16:00 - 00:00 -> Next is NIGHT
+	// NIGHT:   00:00 - 08:00 -> Next is MORNING
+	if hour >= 8 && hour < 16 {
+		nextShiftCode = "EVENING"
+	} else if hour >= 16 && hour < 24 {
+		nextShiftCode = "NIGHT"
+	} else {
+		nextShiftCode = "MORNING"
+	}
+
+	// Fetch all shifts for the department to find the target Shift ID
+	shifts, _ := h.shiftRepo.GetAll(c.Request.Context(), emp.DepartmentID)
+	var targetShiftID *uuid.UUID
+	for _, s := range shifts {
+		if strings.EqualFold(s.ShiftCode, nextShiftCode) {
+			targetShiftID = &s.ID
+			break
+		}
+	}
+
 	deptEmps, _ := h.employeeRepo.GetByDepartment(c.Request.Context(), *emp.DepartmentID)
 	for _, e := range deptEmps {
 		if e.ID != empID {
-			msg := fmt.Sprintf("%s %s created a new shift handover.", emp.FirstName, emp.LastName)
+			// If targetShiftID is found, only notify employees whose DefaultShiftID matches.
+			if targetShiftID != nil && e.DefaultShiftID != nil && *e.DefaultShiftID != *targetShiftID {
+				continue
+			}
+
+			msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftCode)
 			_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
 				RecipientID: e.ID,
 				SenderID:    &empID,

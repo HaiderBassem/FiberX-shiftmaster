@@ -84,7 +84,7 @@ func main() {
 	helpDocHandler := handlers.NewHelpDocumentHandler(helpDocService)
 	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService)
 	pushHandler := handlers.NewPushHandler(notifRepo, cfg.VAPID)
-	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, notifService)
+	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, shiftRepo, scheduleRepo, notifService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
