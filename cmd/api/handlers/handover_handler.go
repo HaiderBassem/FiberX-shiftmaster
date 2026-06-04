@@ -69,16 +69,20 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 	now := time.Now()
 	hour := now.Hour()
 	var nextShiftCode string
+	var nextShiftName string
 
 	// MORNING: 08:00 - 16:00 -> Next is EVENING
 	// EVENING: 16:00 - 00:00 -> Next is NIGHT
 	// NIGHT:   00:00 - 08:00 -> Next is MORNING
 	if hour >= 8 && hour < 16 {
-		nextShiftCode = "EVENING"
+		nextShiftCode = "E"
+		nextShiftName = "Evening"
 	} else if hour >= 16 && hour < 24 {
-		nextShiftCode = "NIGHT"
+		nextShiftCode = "N"
+		nextShiftName = "Night"
 	} else {
-		nextShiftCode = "MORNING"
+		nextShiftCode = "M"
+		nextShiftName = "Morning"
 	}
 
 	// Fetch all shifts for the department to find the target Shift ID
@@ -92,6 +96,10 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 	}
 
 	deptEmps, _ := h.employeeRepo.GetByDepartment(c.Request.Context(), *emp.DepartmentID)
+	
+	// Track if we successfully found employees to notify
+	notifiedCount := 0
+
 	for _, e := range deptEmps {
 		if e.ID != empID {
 			// If targetShiftID is found, only notify employees whose DefaultShiftID matches.
@@ -99,8 +107,8 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 				continue
 			}
 
-			msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftCode)
-			_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
+			msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftName)
+			err := h.notifService.SendNotification(c.Request.Context(), &models.Notification{
 				RecipientID: e.ID,
 				SenderID:    &empID,
 				Type:        "handover",
@@ -108,6 +116,26 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 				Message:     &msg,
 				Priority:    "high",
 			})
+			if err == nil {
+				notifiedCount++
+			}
+		}
+	}
+
+	// If no one was notified (maybe all DefaultShiftID are null?), fallback to notifying everyone
+	if notifiedCount == 0 && targetShiftID != nil {
+		for _, e := range deptEmps {
+			if e.ID != empID {
+				msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftName)
+				_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
+					RecipientID: e.ID,
+					SenderID:    &empID,
+					Type:        "handover",
+					Title:       "New Shift Handover",
+					Message:     &msg,
+					Priority:    "high",
+				})
+			}
 		}
 	}
 
