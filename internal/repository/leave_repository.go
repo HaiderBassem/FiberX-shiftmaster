@@ -153,14 +153,16 @@ func (r *leaveRepo) GetPendingForApproval(ctx context.Context, approverRole stri
 
 // GetPendingLeavesRich returns pending leaves with employee details for the approval dashboard.
 func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.PendingLeaveRich, error) {
-	var statusFilter string
+	var whereClause string
 	switch approverRole {
 	case "team_leader":
-		statusFilter = "pending"
+		// Team leaders only see pending leaves from regular employees
+		whereClause = "l.status = 'pending' AND e.role = 'employee'"
 	case "manager":
-		statusFilter = "approved_by_team_leader"
+		// Managers see leaves approved by TLs, PLUS pending leaves from TLs themselves
+		whereClause = "(l.status = 'approved_by_team_leader' OR (l.status = 'pending' AND e.role = 'team_leader'))"
 	case "admin":
-		statusFilter = "pending"
+		whereClause = "l.status IN ('pending', 'approved_by_team_leader')"
 	default:
 		return nil, fmt.Errorf("invalid approver role: %s", approverRole)
 	}
@@ -182,14 +184,15 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 		 LEFT JOIN shifts s ON s.id = e.default_shift_id
 		 LEFT JOIN departments d ON d.id = e.department_id
-		 WHERE l.status = $1`
-	args := []interface{}{statusFilter}
+		 WHERE ` + whereClause
+
+	args := []interface{}{}
 
 	if approverRole != "admin" {
 		if approverDeptID == nil {
 			return []models.PendingLeaveRich{}, nil
 		}
-		query += ` AND e.department_id = $2`
+		query += ` AND e.department_id = $1`
 		args = append(args, *approverDeptID)
 	}
 	query += ` ORDER BY l.applied_date`
