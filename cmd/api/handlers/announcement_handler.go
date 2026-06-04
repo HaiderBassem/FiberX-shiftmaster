@@ -23,27 +23,9 @@ func NewAnnouncementHandler(ar repository.AnnouncementRepository, svc service.An
 	}
 }
 
-// Helper to extract department_id from header/token (similar to others)
-func (h *AnnouncementHandler) getDepartmentID(c *gin.Context) *uuid.UUID {
-	headerDeptID := c.GetHeader("X-Department-ID")
-	if headerDeptID != "" {
-		if id, err := uuid.Parse(headerDeptID); err == nil {
-			return &id
-		}
-	}
-	tokenDeptID, exists := c.Get("department_id")
-	if exists {
-		if deptIDStr, ok := tokenDeptID.(string); ok && deptIDStr != "" {
-			if id, err := uuid.Parse(deptIDStr); err == nil {
-				return &id
-			}
-		}
-	}
-	return nil
-}
 
 func (h *AnnouncementHandler) GetActive(c *gin.Context) {
-	depID := h.getDepartmentID(c)
+	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return
@@ -59,7 +41,7 @@ func (h *AnnouncementHandler) GetActive(c *gin.Context) {
 }
 
 func (h *AnnouncementHandler) GetAll(c *gin.Context) {
-	depID := h.getDepartmentID(c)
+	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return
@@ -92,7 +74,7 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 	requesterID, _ := uuid.Parse(requesterStr.(string))
 	req.CreatedBy = requesterID
 
-	depID := h.getDepartmentID(c)
+	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return
@@ -115,7 +97,7 @@ func (h *AnnouncementHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	depID := h.getDepartmentID(c)
+	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return
@@ -138,7 +120,7 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 		return
 	}
 
-	depID := h.getDepartmentID(c)
+	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return

@@ -46,28 +46,14 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 	roleAny, _ := c.Get("role")
 	role, _ := roleAny.(string)
 
-	requesterStr, _ := c.Get("employee_id")
-	requesterID, _ := uuid.Parse(requesterStr.(string))
+
 
 	// Scope: strictly isolate non-admins to their own department.
 	if role != "admin" {
-		me, meErr := h.employeeService.GetByID(ctx, requesterID)
-		if meErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
-			return
-		}
 
-		// For managers, honour the X-Department-ID header so they can switch
-		// between departments they manage. For other roles, always use their own
-		// department_id from the JWT.
-		var targetDeptID *uuid.UUID
-		if role == "manager" {
-			targetDeptID = getDepartmentID(c)
-		}
-		if targetDeptID == nil {
-			targetDeptID = me.DepartmentID
-		}
 
+		// The middleware guarantees that getDepartmentID(c) returns a valid, authorized department context.
+		targetDeptID := getDepartmentID(c)
 		if targetDeptID == nil {
 			employees = []models.Employee{}
 			c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": 0}})
@@ -151,21 +137,9 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 
 		// allow an employee to always view their own profile
 		if requesterID != id {
-			me, meErr := h.employeeService.GetByID(c.Request.Context(), requesterID)
-			if meErr != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": meErr.Error()})
-				return
-			}
 
-			// For managers use the selected department (X-Department-ID header if present,
-			// otherwise fall back to the manager's own department_id).
-			var scopeDeptID *uuid.UUID
-			if role == "manager" {
-				scopeDeptID = getDepartmentID(c)
-			}
-			if scopeDeptID == nil {
-				scopeDeptID = me.DepartmentID
-			}
+
+			scopeDeptID := getDepartmentID(c)
 
 			if scopeDeptID == nil || emp.DepartmentID == nil || *scopeDeptID != *emp.DepartmentID {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})

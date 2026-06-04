@@ -114,7 +114,7 @@ func main() {
 	})
 
 	// Setup API routes
-	SetupRouter(r, cfg.JWT.Secret,
+	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
 		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler,
 	)

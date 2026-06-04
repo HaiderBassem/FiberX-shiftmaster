@@ -45,14 +45,16 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	emp, err := h.employeeRepo.GetByID(c.Request.Context(), empID)
-	if err != nil || emp.DepartmentID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "employee department not found"})
+	emp, _ := h.employeeRepo.GetByID(c.Request.Context(), empID)
+
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "department context is required"})
 		return
 	}
 
 	handover := &models.Handover{
-		DepartmentID:  *emp.DepartmentID,
+		DepartmentID:  *deptID,
 		CreatorID:     empID,
 		ShiftSummary:  req.ShiftSummary,
 		PendingIssues: req.PendingIssues,
@@ -64,7 +66,7 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 	}
 
 	// Notify all employees in the department
-	deptEmps, _ := h.employeeRepo.GetByDepartment(c.Request.Context(), *emp.DepartmentID)
+	deptEmps, _ := h.employeeRepo.GetByDepartment(c.Request.Context(), *deptID)
 
 	for _, e := range deptEmps {
 		if e.ID != empID {
@@ -84,16 +86,13 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 }
 
 func (h *HandoverHandler) GetHandovers(c *gin.Context) {
-	empIDStr, _ := c.Get("employee_id")
-	empID, _ := uuid.Parse(empIDStr.(string))
-
-	emp, err := h.employeeRepo.GetByID(c.Request.Context(), empID)
-	if err != nil || emp.DepartmentID == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "employee department not found"})
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "department context is required"})
 		return
 	}
 
-	handovers, err := h.handoverRepo.GetByDepartment(c.Request.Context(), *emp.DepartmentID)
+	handovers, err := h.handoverRepo.GetByDepartment(c.Request.Context(), *deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get handovers"})
 		return

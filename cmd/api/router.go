@@ -5,12 +5,14 @@ import (
 
 	"shiftmaster-backend/cmd/api/handlers"
 	"shiftmaster-backend/internal/middleware"
+	"shiftmaster-backend/internal/repository"
 )
 
 // SetupRouter configures all API routes on the Gin engine.
 func SetupRouter(
 	r *gin.Engine,
 	jwtSecret string,
+	deptRepo repository.DepartmentRepository,
 	authH *handlers.AuthHandler,
 	empH *handlers.EmployeeHandler,
 	deptH *handlers.DepartmentHandler,
@@ -43,6 +45,7 @@ func SetupRouter(
 	// --- Protected routes (JWT required) ---
 	protected := api.Group("")
 	protected.Use(middleware.JWTAuth(jwtSecret))
+	protected.Use(middleware.DepartmentContext(deptRepo))
 	{
 		// Auth
 		protectedAuth := protected.Group("/auth")
