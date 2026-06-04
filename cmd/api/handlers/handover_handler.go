@@ -3,8 +3,6 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -65,50 +63,13 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 		return
 	}
 
-	// Determine Current Shift based on Time
-	now := time.Now()
-	hour := now.Hour()
-	var nextShiftCode string
-	var nextShiftName string
-
-	// MORNING: 08:00 - 16:00 -> Next is EVENING
-	// EVENING: 16:00 - 00:00 -> Next is NIGHT
-	// NIGHT:   00:00 - 08:00 -> Next is MORNING
-	if hour >= 8 && hour < 16 {
-		nextShiftCode = "E"
-		nextShiftName = "Evening"
-	} else if hour >= 16 && hour < 24 {
-		nextShiftCode = "N"
-		nextShiftName = "Night"
-	} else {
-		nextShiftCode = "M"
-		nextShiftName = "Morning"
-	}
-
-	// Fetch all shifts for the department to find the target Shift ID
-	shifts, _ := h.shiftRepo.GetAll(c.Request.Context(), emp.DepartmentID)
-	var targetShiftID *uuid.UUID
-	for _, s := range shifts {
-		if strings.EqualFold(s.ShiftCode, nextShiftCode) {
-			targetShiftID = &s.ID
-			break
-		}
-	}
-
+	// Notify all employees in the department
 	deptEmps, _ := h.employeeRepo.GetByDepartment(c.Request.Context(), *emp.DepartmentID)
-	
-	// Track if we successfully found employees to notify
-	notifiedCount := 0
 
 	for _, e := range deptEmps {
 		if e.ID != empID {
-			// If targetShiftID is found, only notify employees whose DefaultShiftID matches.
-			if targetShiftID != nil && e.DefaultShiftID != nil && *e.DefaultShiftID != *targetShiftID {
-				continue
-			}
-
-			msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftName)
-			err := h.notifService.SendNotification(c.Request.Context(), &models.Notification{
+			msg := fmt.Sprintf("%s %s created a new handover.", emp.FirstName, emp.LastName)
+			_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
 				RecipientID: e.ID,
 				SenderID:    &empID,
 				Type:        "system_alert",
@@ -116,26 +77,6 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 				Message:     &msg,
 				Priority:    "high",
 			})
-			if err == nil {
-				notifiedCount++
-			}
-		}
-	}
-
-	// If no one was notified (maybe all DefaultShiftID are null?), fallback to notifying everyone
-	if notifiedCount == 0 && targetShiftID != nil {
-		for _, e := range deptEmps {
-			if e.ID != empID {
-				msg := fmt.Sprintf("%s %s created a new handover for the %s shift.", emp.FirstName, emp.LastName, nextShiftName)
-				_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
-					RecipientID: e.ID,
-					SenderID:    &empID,
-					Type:        "system_alert",
-					Title:       "New Shift Handover",
-					Message:     &msg,
-					Priority:    "high",
-				})
-			}
 		}
 	}
 
