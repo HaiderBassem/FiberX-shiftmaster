@@ -297,6 +297,30 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		}
 	}
 
+	// Send email to department managers
+	var managers []models.Employee
+	if emp.DepartmentID != nil {
+		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
+		for _, e := range deptEmps {
+			if e.Role == "manager" {
+				managers = append(managers, e)
+			}
+		}
+	}
+	if len(managers) == 0 {
+		managers, _ = s.employeeRepo.GetByRole(ctx, "manager")
+	}
+
+	for _, mgr := range managers {
+		if mgr.Email != "" {
+			s.emailService.SendEmailAsync(
+				[]string{mgr.Email},
+				"New Leave Request Pending Team Leader Approval",
+				msg+"\n\nThis request is currently pending approval by the team leader.",
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -368,6 +392,40 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		go func(eID uuid.UUID) {
 			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Approved", "Your leave request has been fully approved by "+tlName, "/leaves")
 		}(emp.ID)
+	}
+
+	// Send email to department managers about the approval
+	if emp != nil {
+		var managers []models.Employee
+		if emp.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "manager" {
+					managers = append(managers, e)
+				}
+			}
+		}
+		if len(managers) == 0 {
+			managers, _ = s.employeeRepo.GetByRole(ctx, "manager")
+		}
+
+		var detailMsg string
+		if leave.StartTime != nil && leave.EndTime != nil {
+			timeInfo := fmt.Sprintf(" from %s to %s", *leave.StartTime, *leave.EndTime)
+			detailMsg = fmt.Sprintf("hourly leave on %s%s", leave.StartDate.Format("2006-01-02"), timeInfo)
+		} else {
+			detailMsg = fmt.Sprintf("leave from %s to %s", leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
+		}
+
+		for _, mgr := range managers {
+			if mgr.Email != "" {
+				s.emailService.SendEmailAsync(
+					[]string{mgr.Email},
+					"Leave Request Approved by Team Leader",
+					fmt.Sprintf("Hello %s,\n\n%s %s's %s has been approved by team leader %s.", mgr.FirstName, emp.FirstName, emp.LastName, detailMsg, tlName),
+				)
+			}
+		}
 	}
 
 	return nil
@@ -686,6 +744,46 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		go func(eID uuid.UUID) {
 			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Rejected", "Your leave request has been rejected.", "/leaves")
 		}(emp.ID)
+	}
+
+	// Send email to department managers about the rejection
+	if emp != nil {
+		var managers []models.Employee
+		if emp.DepartmentID != nil {
+			deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
+			for _, e := range deptEmps {
+				if e.Role == "manager" {
+					managers = append(managers, e)
+				}
+			}
+		}
+		if len(managers) == 0 {
+			managers, _ = s.employeeRepo.GetByRole(ctx, "manager")
+		}
+
+		rejectorEmployee, _ := s.employeeRepo.GetByID(ctx, rejectedBy)
+		rejectorName := "A team leader/manager"
+		if rejectorEmployee != nil {
+			rejectorName = rejectorEmployee.FirstName + " " + rejectorEmployee.LastName
+		}
+
+		var detailMsg string
+		if leave.StartTime != nil && leave.EndTime != nil {
+			timeInfo := fmt.Sprintf(" from %s to %s", *leave.StartTime, *leave.EndTime)
+			detailMsg = fmt.Sprintf("hourly leave on %s%s", leave.StartDate.Format("2006-01-02"), timeInfo)
+		} else {
+			detailMsg = fmt.Sprintf("leave from %s to %s", leave.StartDate.Format("2006-01-02"), leave.EndDate.Format("2006-01-02"))
+		}
+
+		for _, mgr := range managers {
+			if mgr.Email != "" {
+				s.emailService.SendEmailAsync(
+					[]string{mgr.Email},
+					"Leave Request Rejected",
+					fmt.Sprintf("Hello %s,\n\n%s %s's %s has been rejected by %s.\nReason: %s", mgr.FirstName, emp.FirstName, emp.LastName, detailMsg, rejectorName, reason),
+				)
+			}
+		}
 	}
 
 	return nil
