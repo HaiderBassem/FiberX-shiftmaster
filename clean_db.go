@@ -41,6 +41,7 @@ func main() {
 		MaxConnLifetime:   time.Hour,
 		MaxConnIdleTime:   time.Minute * 30,
 		ConnectTimeout:    time.Second * 5,
+		HealthCheckPeriod: time.Minute,
 	}
 
 	db, err := database.New(dbCfg)
