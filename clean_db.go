@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"time"
+
+	"github.com/joho/godotenv"
 
 	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/pkg/database"
@@ -12,12 +16,34 @@ import (
 func main() {
 	fmt.Println("Starting Database Cleanup...")
 
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+	_ = godotenv.Load() // Load local .env if present
+
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5432")
+	dbUser := getEnv("DB_USER", "postgres")
+	dbPass := getEnv("DB_PASSWORD", "postgres")
+	dbName := getEnv("DB_NAME", "shiftmaster")
+	sslMode := getEnv("DB_SSLMODE", "disable")
+
+
+
+	// Since pkg/database needs a config object, we'll construct a minimal valid one.
+	// Actually, database.New uses the config struct, so let's just make one directly.
+	dbCfg := config.DatabaseConfig{
+		Host:              dbHost,
+		Port:              dbPort,
+		User:              dbUser,
+		Password:          dbPass,
+		DBName:            dbName,
+		SSLMode:           sslMode,
+		MaxOpenConns:      10,
+		MinConns:          2,
+		MaxConnLifetime:   time.Hour,
+		MaxConnIdleTime:   time.Minute * 30,
+		ConnectTimeout:    time.Second * 5,
 	}
 
-	db, err := database.New(cfg.Database)
+	db, err := database.New(dbCfg)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -58,4 +84,11 @@ func main() {
 
 	fmt.Println("✅ Database cleanup completed successfully!")
 	fmt.Println("Note: Departments, Employees, Shifts, and Employee Schedules were NOT deleted.")
+}
+
+func getEnv(key, fallback string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return fallback
 }
