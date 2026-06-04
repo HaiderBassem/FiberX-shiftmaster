@@ -58,14 +58,16 @@ func main() {
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, notifService, db)
-	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService)
+	
+	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
+	
+	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
 	leaveTypeService := service.NewLeaveTypeService(leaveTypeRepo)
 	infoTableService := service.NewInfoTableService(infoTableRepo, employeeRepo)
 	helpDocService := service.NewHelpDocumentService(helpDocRepo, employeeRepo)
-	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
 	announcementService := service.NewAnnouncementService(announcementRepo, employeeRepo, emailService, pushService)
 
 	// --- Initialize Handlers ---

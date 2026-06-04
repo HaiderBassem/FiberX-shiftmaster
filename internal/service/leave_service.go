@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"shiftmaster-backend/internal/models"
+	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/repository"
 )
 
@@ -20,6 +21,7 @@ type LeaveService struct {
 	leaveTypeRepo    repository.LeaveTypeRepository
 	notifService     *NotificationService
 	emailService     *EmailService
+	pushService      notification.PushService
 }
 
 func NewLeaveService(
@@ -30,6 +32,7 @@ func NewLeaveService(
 	leaveTypeRepo repository.LeaveTypeRepository,
 	notifService *NotificationService,
 	emailService *EmailService,
+	pushService notification.PushService,
 ) *LeaveService {
 	return &LeaveService{
 		leaveRepo:        leaveRepo,
@@ -39,6 +42,7 @@ func NewLeaveService(
 		leaveTypeRepo:    leaveTypeRepo,
 		notifService:     notifService,
 		emailService:     emailService,
+		pushService:      pushService,
 	}
 }
 
@@ -244,6 +248,11 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 					msg+"\n\nPlease review it in the Approval Center.",
 				)
 			}
+			if s.pushService != nil {
+				go func(mID uuid.UUID) {
+					_ = s.pushService.SendToEmployee(context.Background(), mID, "New Leave Request (Team Leader)", msg, "/approvals")
+				}(mgr.ID)
+			}
 		}
 		return nil
 	}
@@ -280,6 +289,11 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 				"New Leave Request",
 				msg+"\n\nPlease review it in the Approval Center.",
 			)
+		}
+		if s.pushService != nil {
+			go func(tID uuid.UUID) {
+				_ = s.pushService.SendToEmployee(context.Background(), tID, "New Leave Request", msg, "/approvals")
+			}(tl.ID)
 		}
 	}
 
@@ -350,6 +364,12 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		)
 	}
 
+	if s.pushService != nil {
+		go func(eID uuid.UUID) {
+			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Approved", "Your leave request has been fully approved by "+tlName, "/leaves")
+		}(emp.ID)
+	}
+
 	return nil
 }
 
@@ -402,6 +422,12 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 			"Leave Request Approved",
 			fmt.Sprintf("Hello %s,\n\nYour leave request has been fully approved by a manager!", emp.FirstName),
 		)
+	}
+
+	if s.pushService != nil {
+		go func(eID uuid.UUID) {
+			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Approved", "Your leave request has been fully approved by a manager!", "/leaves")
+		}(emp.ID)
 	}
 
 	return nil
@@ -652,8 +678,14 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		s.emailService.SendEmailAsync(
 			[]string{emp.Email},
 			"Leave Request Rejected",
-			fmt.Sprintf("Hello %s,\n\nYour leave request has been rejected.\nReason: %s", emp.FirstName, reason),
+			fmt.Sprintf("Hello %s,\n\nYour leave request starting on %s has been rejected.\nReason: %s", emp.FirstName, leave.StartDate.Format("2006-01-02"), reason),
 		)
+	}
+
+	if s.pushService != nil {
+		go func(eID uuid.UUID) {
+			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Rejected", "Your leave request has been rejected.", "/leaves")
+		}(emp.ID)
 	}
 
 	return nil
