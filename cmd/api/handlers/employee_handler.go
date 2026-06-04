@@ -111,6 +111,20 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 		employees = []models.Employee{}
 	}
 
+	// Filter by contextual department if one is selected (e.g., by an Admin from the Topbar)
+	if role == "admin" {
+		targetDeptID := getDepartmentID(c)
+		if targetDeptID != nil {
+			filtered := make([]models.Employee, 0)
+			for _, e := range employees {
+				if e.DepartmentID != nil && *e.DepartmentID == *targetDeptID {
+					filtered = append(filtered, e)
+				}
+			}
+			employees = filtered
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": len(employees)}})
 }
 
