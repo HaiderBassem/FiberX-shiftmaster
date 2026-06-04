@@ -111,7 +111,7 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 			err := h.notifService.SendNotification(c.Request.Context(), &models.Notification{
 				RecipientID: e.ID,
 				SenderID:    &empID,
-				Type:        "handover",
+				Type:        "system_alert",
 				Title:       "New Shift Handover",
 				Message:     &msg,
 				Priority:    "high",
@@ -130,7 +130,7 @@ func (h *HandoverHandler) CreateHandover(c *gin.Context) {
 				_ = h.notifService.SendNotification(c.Request.Context(), &models.Notification{
 					RecipientID: e.ID,
 					SenderID:    &empID,
-					Type:        "handover",
+					Type:        "system_alert",
 					Title:       "New Shift Handover",
 					Message:     &msg,
 					Priority:    "high",
