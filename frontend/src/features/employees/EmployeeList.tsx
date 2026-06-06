@@ -30,6 +30,7 @@ interface Employee {
   status: string;
   secondary_phone: string | null;
   secondary_email: string | null;
+  profile_image?: string | null;
   created_at: string;
 }
 
@@ -498,9 +499,17 @@ export const EmployeeList = () => {
                 <Link to={`/employees/${emp.id}`} className="block">
                   <CardHeader className="pb-2 flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <UserCircle className="w-5 h-5 text-primary" />
-                      </div>
+                      {emp.profile_image ? (
+                        <img 
+                          src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${emp.profile_image.startsWith('/api') ? emp.profile_image : '/api' + emp.profile_image}`}
+                          alt="Profile"
+                          className="w-10 h-10 rounded-xl object-cover shrink-0 border border-border"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                          <UserCircle className="w-5 h-5 text-primary" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <CardTitle className="text-base truncate">{emp.first_name} {emp.last_name}</CardTitle>
                         <CardDescription className="text-xs font-mono">{emp.employee_code}</CardDescription>

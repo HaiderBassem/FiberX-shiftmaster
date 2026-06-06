@@ -31,6 +31,7 @@ type Employee = {
   last_login: string | null;
   secondary_phone: string | null;
   secondary_email: string | null;
+  profile_image?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -141,7 +142,15 @@ export const EmployeeDetail = () => {
           </Link>
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
-              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+              {employee.profile_image ? (
+                <img 
+                  src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${employee.profile_image.startsWith('/api') ? employee.profile_image : '/api' + employee.profile_image}`}
+                  alt="Profile"
+                  className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border border-border"
+                />
+              ) : (
+                <Users className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+              )}
               {employee.first_name} {employee.last_name}
             </h2>
             <p className="text-sm text-muted-foreground">{employee.employee_code} · {employee.role.replace('_', ' ')}</p>
