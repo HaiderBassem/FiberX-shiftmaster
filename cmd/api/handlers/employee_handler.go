@@ -21,6 +21,7 @@ type EmployeeHandler struct {
 	leaveBalanceRepo repository.LeaveBalanceRepository
 	taskRepo         repository.TaskRepository
 	leaveRepo        repository.LeaveRepository
+	deptRepo         repository.DepartmentRepository
 }
 
 func NewEmployeeHandler(
@@ -28,12 +29,14 @@ func NewEmployeeHandler(
 	leaveBalanceRepo repository.LeaveBalanceRepository,
 	taskRepo repository.TaskRepository,
 	leaveRepo repository.LeaveRepository,
+	deptRepo repository.DepartmentRepository,
 ) *EmployeeHandler {
 	return &EmployeeHandler{
 		employeeService:  empSvc,
 		leaveBalanceRepo: leaveBalanceRepo,
 		taskRepo:         taskRepo,
 		leaveRepo:        leaveRepo,
+		deptRepo:         deptRepo,
 	}
 }
 
@@ -241,15 +244,43 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": getErr.Error()})
 			return
 		}
-		if creator.DepartmentID == nil {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "you are not assigned to a department"})
-			return
+		if creatorRoleStr == "manager" {
+			if req.DepartmentID == nil {
+				if creator.DepartmentID != nil {
+					req.DepartmentID = creator.DepartmentID
+				} else {
+					c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers must specify a department to create an employee in"})
+					return
+				}
+			}
+			
+			managedDepts, err := h.deptRepo.GetByManagerID(c.Request.Context(), creatorID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+				return
+			}
+			isManaging := false
+			for _, d := range managedDepts {
+				if d.ID == *req.DepartmentID {
+					isManaging = true
+					break
+				}
+			}
+			if !isManaging && (creator.DepartmentID == nil || *creator.DepartmentID != *req.DepartmentID) {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot create employees in a department you don't manage"})
+				return
+			}
+		} else {
+			if creator.DepartmentID == nil {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "you are not assigned to a department"})
+				return
+			}
+			if req.DepartmentID != nil && *req.DepartmentID != *creator.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot create employees in another department"})
+				return
+			}
+			req.DepartmentID = creator.DepartmentID
 		}
-		if req.DepartmentID != nil && *req.DepartmentID != *creator.DepartmentID {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot create employees in another department"})
-			return
-		}
-		req.DepartmentID = creator.DepartmentID
 	}
 
 	hireDate, err := parseTime(req.HireDate)
@@ -345,24 +376,66 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 			return
 		}
 
-		if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
-			return
+		if role == "manager" {
+			managedDepts, _ := h.deptRepo.GetByManagerID(c.Request.Context(), requesterID)
+			isManagingTargetDept := false
+			if target.DepartmentID != nil {
+				for _, d := range managedDepts {
+					if d.ID == *target.DepartmentID {
+						isManagingTargetDept = true
+						break
+					}
+				}
+			}
+			
+			if !isManagingTargetDept && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
+				return
+			}
+			
+			if target.Role == "admin" || target.Role == "manager" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers cannot edit admin or manager accounts"})
+				return
+			}
+			
+			if req.Role != "" && req.Role != "employee" && req.Role != "team_leader" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only set role to employee or team_leader"})
+				return
+			}
+
+			if req.DepartmentID != nil && target.DepartmentID != nil && *req.DepartmentID != *target.DepartmentID {
+				isManagingNewDept := false
+				for _, d := range managedDepts {
+					if d.ID == *req.DepartmentID {
+						isManagingNewDept = true
+						break
+					}
+				}
+				if !isManagingNewDept && (me.DepartmentID == nil || *req.DepartmentID != *me.DepartmentID) {
+					c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot move employee to a department you don't manage"})
+					return
+				}
+			}
+		} else {
+			if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+				return
+			}
+			if target.Role != "employee" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only edit employees in your department"})
+				return
+			}
+			if req.Role != "" && req.Role != "employee" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only set role=employee"})
+				return
+			}
+			if req.DepartmentID != nil && me.DepartmentID != nil && *req.DepartmentID != *me.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot move employee to another department"})
+				return
+			}
+			req.Role = "employee"
+			req.DepartmentID = me.DepartmentID
 		}
-		if target.Role != "employee" {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only edit employees in your department"})
-			return
-		}
-		if req.Role != "" && req.Role != "employee" {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only set role=employee"})
-			return
-		}
-		if req.DepartmentID != nil && me.DepartmentID != nil && *req.DepartmentID != *me.DepartmentID {
-			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "cannot move employee to another department"})
-			return
-		}
-		req.Role = "employee"
-		req.DepartmentID = me.DepartmentID
 	}
 
 	current, fetchErr := h.employeeService.GetByID(c.Request.Context(), id)
@@ -435,6 +508,53 @@ func (h *EmployeeHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+	
+	if role == "team_leader" || role == "manager" {
+		requesterStr, _ := c.Get("employee_id")
+		requesterID, _ := uuid.Parse(requesterStr.(string))
+
+		target, targetErr := h.employeeService.GetByID(c.Request.Context(), id)
+		if targetErr != nil {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "employee not found"})
+			return
+		}
+
+		if role == "manager" {
+			managedDepts, _ := h.deptRepo.GetByManagerID(c.Request.Context(), requesterID)
+			isManagingTarget := false
+			if target.DepartmentID != nil {
+				for _, d := range managedDepts {
+					if d.ID == *target.DepartmentID {
+						isManagingTarget = true
+						break
+					}
+				}
+			}
+			
+			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
+				return
+			}
+			if target.Role == "admin" || target.Role == "manager" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers cannot update status for admin or manager accounts"})
+				return
+			}
+		} else {
+			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+			if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: employee is not in your department"})
+				return
+			}
+			if target.Role != "employee" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "team leaders can only update status for employees"})
+				return
+			}
+		}
+	}
+
 	if err := h.employeeService.UpdateStatus(c.Request.Context(), id, req.Status); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -449,6 +569,53 @@ func (h *EmployeeHandler) Delete(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
 		return
+	}
+
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+
+	if role == "team_leader" || role == "manager" {
+		requesterStr, _ := c.Get("employee_id")
+		requesterID, _ := uuid.Parse(requesterStr.(string))
+
+		target, targetErr := h.employeeService.GetByID(c.Request.Context(), id)
+		if targetErr != nil {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "employee not found"})
+			return
+		}
+
+		if role == "manager" {
+			managedDepts, _ := h.deptRepo.GetByManagerID(c.Request.Context(), requesterID)
+			isManagingTarget := false
+			if target.DepartmentID != nil {
+				for _, d := range managedDepts {
+					if d.ID == *target.DepartmentID {
+						isManagingTarget = true
+						break
+					}
+				}
+			}
+			
+			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
+				return
+			}
+			if target.Role == "admin" || target.Role == "manager" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers cannot delete admin or manager accounts"})
+				return
+			}
+		} else {
+			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+			if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: employee is not in your department"})
+				return
+			}
+			if target.Role != "employee" {
+				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "team leaders can only delete employees"})
+				return
+			}
+		}
 	}
 
 	if err := h.employeeService.DeleteEmployee(c.Request.Context(), id); err != nil {

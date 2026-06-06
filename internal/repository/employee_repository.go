@@ -213,7 +213,7 @@ func (r *employeeRepo) Create(ctx context.Context, emp *models.Employee) error {
 		`INSERT INTO employees (employee_code, first_name, last_name, gender, phone, email, password_hash,
 			hire_date, role, department_id, position, default_shift_id, weekly_off_days,
 			can_cover_night_shift, status, profile_image, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, ui_preferences, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 		 RETURNING id, created_at, updated_at`,
 		emp.EmployeeCode, emp.FirstName, emp.LastName, emp.Gender, emp.Phone, emp.Email, emp.PasswordHash,
 		emp.HireDate, emp.Role, emp.DepartmentID, emp.Position, emp.DefaultShiftID, emp.WeeklyOffDays,

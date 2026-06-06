@@ -225,11 +225,10 @@ func SetupRouter(
 			supervisor.GET("/leaves/pending/rich", leaveH.PendingRich)
 		}
 
-		// --- Team Leader + Admin WRITE routes ---
-		// Only team_leader and admin can modify schedules, tasks, and employees
-		// Manager is VIEW ONLY
+		// --- Team Leader + Manager + Admin WRITE routes ---
+		// Only team_leader, manager, and admin can modify schedules, tasks, and employees
 		tlWrite := protected.Group("")
-		tlWrite.Use(middleware.RequireRole("team_leader", "admin"))
+		tlWrite.Use(middleware.RequireRole("team_leader", "manager", "admin"))
 		{
 			// Task management (create, assign, update, delete)
 			tlWrite.POST("/tasks/schedules", taskH.CreateSchedule)
