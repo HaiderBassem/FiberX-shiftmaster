@@ -54,6 +54,7 @@ type TaskRepository interface {
 
 	// Task Executions
 	GetExecutionByAssignment(ctx context.Context, assignmentID uuid.UUID) (*models.TaskExecution, error)
+	GetAssignmentDateByExecution(ctx context.Context, executionID uuid.UUID) (time.Time, error)
 	CreateExecution(ctx context.Context, te *models.TaskExecution) error
 	StartExecution(ctx context.Context, id uuid.UUID) error
 	UpdateExecutionStatus(ctx context.Context, id uuid.UUID, status string, notes *string) error
@@ -578,6 +579,20 @@ func (r *taskRepo) GetExecutionByAssignment(ctx context.Context, assignmentID uu
 		return nil, fmt.Errorf("get execution: %w", err)
 	}
 	return &te, nil
+}
+
+func (r *taskRepo) GetAssignmentDateByExecution(ctx context.Context, executionID uuid.UUID) (time.Time, error) {
+	var assignedDate time.Time
+	err := r.db.QueryRow(ctx,
+		`SELECT ta.assigned_date
+		 FROM task_assignments ta
+		 JOIN task_executions te ON te.assignment_id = ta.id
+		 WHERE te.id = $1`, executionID,
+	).Scan(&assignedDate)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("get assignment date by execution: %w", err)
+	}
+	return assignedDate, nil
 }
 
 func (r *taskRepo) CreateExecution(ctx context.Context, te *models.TaskExecution) error {

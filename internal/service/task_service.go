@@ -281,13 +281,34 @@ func (s *TaskService) DeleteAssignment(ctx context.Context, id uuid.UUID) error 
 // Task Executions
 // ═══════════════════════════════════════════
 
+func (s *TaskService) checkTaskFutureDate(ctx context.Context, executionID uuid.UUID) error {
+	assignedDate, err := s.taskRepo.GetAssignmentDateByExecution(ctx, executionID)
+	if err != nil {
+		return err
+	}
+	
+	assignedStr := assignedDate.Format("2006-01-02")
+	todayStr := time.Now().Format("2006-01-02")
+	
+	if assignedStr > todayStr {
+		return fmt.Errorf("cannot execute a task scheduled in the future")
+	}
+	return nil
+}
+
 // StartTask marks a task execution as in_progress with a timestamp.
 func (s *TaskService) StartTask(ctx context.Context, executionID uuid.UUID) error {
+	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
+		return err
+	}
 	return s.taskRepo.StartExecution(ctx, executionID)
 }
 
 // CompleteTask marks a task execution as completed with a timestamp.
 func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, completionType string, notes *string) error {
+	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
+		return err
+	}
 	validTypes := map[string]bool{"without_issue": true, "with_issue": true}
 	if !validTypes[completionType] {
 		return fmt.Errorf("invalid completion_type: %s (must be 'without_issue' or 'with_issue')", completionType)
@@ -296,6 +317,9 @@ func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, c
 }
 
 func (s *TaskService) UpdateTaskStatus(ctx context.Context, executionID uuid.UUID, status string, notes *string) error {
+	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
+		return err
+	}
 	validStatuses := map[string]bool{"pending": true, "in_progress": true, "completed": true, "cancelled": true}
 	if !validStatuses[status] {
 		return fmt.Errorf("invalid task status: %s", status)
