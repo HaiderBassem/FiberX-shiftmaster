@@ -81,7 +81,10 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 	}
 	req.DepartmentID = *depID
 
-	if err := h.announcementSvc.CreateAnnouncement(c.Request.Context(), &req); err != nil {
+	roleStr, _ := c.Get("role")
+	role := roleStr.(string)
+
+	if err := h.announcementSvc.CreateAnnouncement(c.Request.Context(), &req, role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}

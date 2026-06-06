@@ -22,6 +22,13 @@ func NewInfoTableService(repo *repository.InfoTableRepository, empRepo repositor
 }
 
 func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTable, creatorRole string, creatorCanCreate bool) (*models.InfoTable, error) {
+	if table.CreatedBy != nil {
+		emp, err := s.employeeRepo.GetByID(ctx, *table.CreatedBy)
+		if err == nil && emp != nil {
+			creatorCanCreate = emp.CanCreateTables
+		}
+	}
+	
 	// Only admins, managers, team_leaders, or employees with explicit can_create_tables permission can create.
 	if creatorRole != "admin" && creatorRole != "manager" && !creatorCanCreate {
 		return nil, errors.New("unauthorized to create tables")

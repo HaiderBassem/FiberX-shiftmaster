@@ -2,14 +2,17 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/repository"
+
+	"github.com/google/uuid"
 )
 
 type AnnouncementService interface {
-	CreateAnnouncement(ctx context.Context, announcement *models.Announcement) error
+	CreateAnnouncement(ctx context.Context, announcement *models.Announcement, role string) error
 }
 
 type announcementService struct {
@@ -28,7 +31,21 @@ func NewAnnouncementService(ar repository.AnnouncementRepository, er repository.
 	}
 }
 
-func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.Announcement) error {
+func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.Announcement, role string) error {
+	canCreate := false
+	if role == "admin" || role == "manager" {
+		canCreate = true
+	} else if a.CreatedBy != uuid.Nil {
+		emp, err := s.employeeRepo.GetByID(ctx, a.CreatedBy)
+		if err == nil && emp != nil && emp.CanPostAnnouncements {
+			canCreate = true
+		}
+	}
+
+	if !canCreate {
+		return errors.New("unauthorized to post announcements")
+	}
+
 	// If the new announcement is active, deactivate others
 	if a.IsActive {
 		err := s.announcementRepo.SetInactiveByDepartment(ctx, a.DepartmentID)
