@@ -17,6 +17,11 @@ export const infoTableService = {
     return res.data.data;
   },
 
+  updateTable: async (tableId: string, data: Partial<InfoTable>): Promise<InfoTable> => {
+    const res = await api.put(`/info-tables/${tableId}`, data);
+    return res.data.data;
+  },
+
   deleteTable: async (tableId: string): Promise<void> => {
     await api.delete(`/info-tables/${tableId}`);
   },

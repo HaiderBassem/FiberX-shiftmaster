@@ -6,6 +6,7 @@ import type { InfoTable, InfoTableRow } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
 import RowModal from './RowModal';
 import AccessModal from './AccessModal';
+import CreateTableModal from './CreateTableModal';
 
 const InfoTableView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ const InfoTableView: React.FC = () => {
   const [isRowModalOpen, setIsRowModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<InfoTableRow | null>(null);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [isEditTableModalOpen, setIsEditTableModalOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -123,14 +125,21 @@ const InfoTableView: React.FC = () => {
                 className="px-4 py-2 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-800/50 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete Table
+                Delete
+              </button>
+              <button
+                onClick={() => setIsEditTableModalOpen(true)}
+                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit
               </button>
               <button
                 onClick={() => setIsAccessModalOpen(true)}
                 className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2"
               >
                 <Shield className="w-4 h-4" />
-                Manage Access
+                Access
               </button>
             </>
           )}
@@ -250,6 +259,16 @@ const InfoTableView: React.FC = () => {
         isOpen={isAccessModalOpen}
         onClose={() => setIsAccessModalOpen(false)}
         table={table}
+      />
+
+      <CreateTableModal
+        isOpen={isEditTableModalOpen}
+        onClose={() => setIsEditTableModalOpen(false)}
+        initialData={table}
+        onUpdated={(updatedTable) => {
+          setTable({ ...table, ...updatedTable });
+          setIsEditTableModalOpen(false);
+        }}
       />
     </div>
   );

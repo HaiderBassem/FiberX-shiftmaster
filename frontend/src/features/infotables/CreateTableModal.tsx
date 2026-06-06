@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import type { InfoTable, InfoTableColumn } from '../../types/infoTable';
@@ -6,10 +6,12 @@ import type { InfoTable, InfoTableColumn } from '../../types/infoTable';
 interface CreateTableModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (table: InfoTable) => void;
+  onCreated?: (table: InfoTable) => void;
+  onUpdated?: (table: InfoTable) => void;
+  initialData?: InfoTable | null;
 }
 
-const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, onCreated }) => {
+const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, onCreated, onUpdated, initialData }) => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [columns, setColumns] = useState<InfoTableColumn[]>([
@@ -17,6 +19,21 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        setName(initialData.name);
+        setDescription(initialData.description || '');
+        setColumns(initialData.columns && initialData.columns.length > 0 ? initialData.columns : [{ id: 'col_1', name: 'Field 1', type: 'text', order: 1 }]);
+      } else {
+        setName('');
+        setDescription('');
+        setColumns([{ id: 'col_1', name: 'Field 1', type: 'text', order: 1 }]);
+      }
+      setError(null);
+    }
+  }, [isOpen, initialData]);
 
   if (!isOpen) return null;
 
@@ -50,17 +67,23 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
     try {
       setLoading(true);
       setError(null);
-      const newTable = await infoTableService.createTable({
-        name,
-        description,
-        columns: columns.map((c, idx) => ({ ...c, order: idx + 1 }))
-      });
-      onCreated(newTable);
-      setName('');
-      setDescription('');
-      setColumns([{ id: 'col_1', name: 'Field 1', type: 'text', order: 1 }]);
+      if (initialData && onUpdated) {
+        const updatedTable = await infoTableService.updateTable(initialData.id, {
+          name,
+          description,
+          columns: columns.map((c, idx) => ({ ...c, order: idx + 1 }))
+        });
+        onUpdated(updatedTable);
+      } else if (onCreated) {
+        const newTable = await infoTableService.createTable({
+          name,
+          description,
+          columns: columns.map((c, idx) => ({ ...c, order: idx + 1 }))
+        });
+        onCreated(newTable);
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to create table');
+      setError(err.response?.data?.error || `Failed to ${initialData ? 'update' : 'create'} table`);
     } finally {
       setLoading(false);
     }
@@ -70,7 +93,9 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
     <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden">
         <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Create New Table</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {initialData ? 'Edit Table' : 'Create New Table'}
+          </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
             <X className="w-5 h-5" />
           </button>
@@ -182,7 +207,7 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
               ) : null}
-              Create Table
+              {initialData ? 'Update Table' : 'Create Table'}
             </button>
           </div>
         </form>

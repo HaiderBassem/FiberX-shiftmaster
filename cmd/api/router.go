@@ -168,6 +168,7 @@ func SetupRouter(
 		{
 			infoTables.GET("", infoTableH.GetVisibleTables)
 			infoTables.POST("", infoTableH.CreateTable)
+			infoTables.PUT("/:id", infoTableH.UpdateTable)
 			infoTables.DELETE("/:id", infoTableH.DeleteTable)
 			infoTables.GET("/:id/rows", infoTableH.GetTableRows)
 			infoTables.POST("/:id/rows", infoTableH.CreateTableRow)
