@@ -72,7 +72,7 @@ func main() {
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
-	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, deptRepo)
+	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo)
 	deptHandler := handlers.NewDepartmentHandler(departmentRepo, employeeRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftRepo)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
