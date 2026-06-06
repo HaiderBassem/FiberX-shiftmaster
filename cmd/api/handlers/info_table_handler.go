@@ -77,6 +77,35 @@ func (h *InfoTableHandler) CreateTable(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": created})
 }
 
+func (h *InfoTableHandler) DeleteTable(c *gin.Context) {
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+	roleStr, _ := c.Get("role")
+	role := roleStr.(string)
+	
+	var depID *uuid.UUID
+	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
+		id, err := uuid.Parse(depStr.(string))
+		if err == nil {
+			depID = &id
+		}
+	}
+
+	tableID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid table id"})
+		return
+	}
+
+	err = h.svc.DeleteTable(c.Request.Context(), tableID, empID, role, depID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (h *InfoTableHandler) GetTableRows(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))

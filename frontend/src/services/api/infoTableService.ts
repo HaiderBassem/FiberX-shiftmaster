@@ -17,6 +17,10 @@ export const infoTableService = {
     return res.data.data;
   },
 
+  deleteTable: async (tableId: string): Promise<void> => {
+    await api.delete(`/info-tables/${tableId}`);
+  },
+
   getTableRows: async (tableId: string): Promise<InfoTableRow[]> => {
     const res = await api.get(`/info-tables/${tableId}/rows`);
     return res.data.data || [];

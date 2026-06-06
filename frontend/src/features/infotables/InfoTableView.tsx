@@ -60,6 +60,17 @@ const InfoTableView: React.FC = () => {
     }
   };
 
+  const handleDeleteTable = async () => {
+    if (!window.confirm('Are you sure you want to delete this entire table? This action cannot be undone.')) return;
+    try {
+      await infoTableService.deleteTable(id!);
+      navigate('/info-tables');
+    } catch (error) {
+      console.error('Failed to delete table:', error);
+      alert('Failed to delete table. You might not have permission.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center py-20">
@@ -106,13 +117,22 @@ const InfoTableView: React.FC = () => {
 
         <div className="flex gap-3">
           {canManageAccess && (
-            <button
-              onClick={() => setIsAccessModalOpen(true)}
-              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              Manage Access
-            </button>
+            <>
+              <button
+                onClick={handleDeleteTable}
+                className="px-4 py-2 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-800/50 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete Table
+              </button>
+              <button
+                onClick={() => setIsAccessModalOpen(true)}
+                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                Manage Access
+              </button>
+            </>
           )}
           {canWrite && (
             <button
