@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark, .dark *));
 
@@ -142,6 +143,48 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Jodit Editor Dark Mode Overrides
+   ═══════════════════════════════════════════════════════════ */
+.dark .jodit-container {
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-workplace, .dark .jodit-wysiwyg {
+  background-color: transparent !important;
+  color: var(--color-foreground) !important;
+}
+.dark .jodit-toolbar__box {
+  background-color: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-toolbar-button__button {
+  color: var(--color-foreground) !important;
+}
+.dark .jodit-toolbar-button__button:hover {
+  background-color: var(--color-muted) !important;
+}
+.dark .jodit-ui-popup__content {
+  background-color: var(--color-popover) !important;
+  color: var(--color-popover-foreground) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-ui-input {
+  background-color: var(--color-input) !important;
+  color: var(--color-foreground) !important;
+}
+
+/* Force Jodit content text color in dark mode */
+.dark .jodit-content {
+  color: var(--color-foreground) !important;
+}
+/* This overrides inline color styles set by Jodit when copying from Word or setting text color to black */
+.dark .jodit-content [style*="color: rgb(0, 0, 0)"], 
+.dark .jodit-content [style*="color: #000000"],
+.dark .jodit-content [style*="color:#000000"] {
+  color: var(--color-foreground) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
