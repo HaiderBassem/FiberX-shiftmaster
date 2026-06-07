@@ -18,7 +18,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Folder as FolderIcon, X, Edit2, ChevronDown, ChevronUp, GripHorizontal } from 'lucide-react';
+import { Folder as FolderIcon, X, Edit2, ChevronDown, ChevronUp, GripHorizontal, Plus } from 'lucide-react';
 
 export interface LayoutFolder {
   id: string;
@@ -71,10 +71,28 @@ const EmptyFolderDropZone = ({ id }: { id: string }) => {
     <div
       ref={setNodeRef}
       className={`text-center py-8 text-sm border-2 border-dashed rounded-lg transition-colors ${
-        isOver ? 'bg-indigo-50 border-indigo-400 text-indigo-700' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-400 border-gray-200 dark:border-gray-700'
+        isOver ? 'bg-indigo-50 border-indigo-400 text-indigo-700 scale-[1.02]' : 'bg-gray-50 dark:bg-gray-800/50 text-gray-400 border-gray-200 dark:border-gray-700'
       }`}
     >
-      Drop items here to add them to this folder
+      <div className="pointer-events-none">Drop items here to add them to this folder</div>
+    </div>
+  );
+};
+
+const AddFolderDropZone = ({ id }: { id: string }) => {
+  const { isOver, setNodeRef } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center py-4 text-xs font-medium border-2 border-dashed rounded-xl transition-all h-full min-h-[100px] ${
+        isOver ? 'bg-indigo-50 border-indigo-400 text-indigo-700 scale-[1.02]' : 'bg-gray-50/50 dark:bg-gray-800/30 text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+      }`}
+    >
+      <div className="flex flex-col items-center gap-2 pointer-events-none">
+        <Plus className="w-5 h-5" />
+        <span>Drop item here</span>
+      </div>
     </div>
   );
 };
@@ -183,18 +201,33 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     };
 
     let targetFolderId: string | null = null;
-    let isDroppingIntoEmptyFolder = false;
+    let isDroppingIntoFolderArea = false;
 
     if (overIdStr.endsWith('-empty-dropzone')) {
       targetFolderId = overIdStr.replace('-empty-dropzone', '');
-      isDroppingIntoEmptyFolder = true;
+      isDroppingIntoFolderArea = true;
+    } else if (overIdStr.endsWith('-add-dropzone')) {
+      targetFolderId = overIdStr.replace('-add-dropzone', '');
+      isDroppingIntoFolderArea = true;
+    } else if (overIdStr.endsWith('-header-dropzone')) {
+      targetFolderId = overIdStr.replace('-header-dropzone', '');
+      isDroppingIntoFolderArea = true;
     }
 
     const activeParent = isItemInFolder(activeIdStr);
-    const overParent = isDroppingIntoEmptyFolder ? targetFolderId : isItemInFolder(overIdStr);
+    const overParent = isDroppingIntoFolderArea ? targetFolderId : isItemInFolder(overIdStr);
+
+    // If active is an item, and over is a folder (SortableItem), we should drop INTO the folder instead of reordering
+    // This happens if they drag an item and drop it directly onto the folder's background or header where there's no specific dropzone
+    if (!isDroppingIntoFolderArea && newLayout.folders[overIdStr] && !newLayout.folders[activeIdStr]) {
+      targetFolderId = overIdStr;
+      isDroppingIntoFolderArea = true;
+    }
+
+    const finalOverParent = isDroppingIntoFolderArea ? targetFolderId : overParent;
 
     // If moving within the SAME parent
-    if (activeParent === overParent && !isDroppingIntoEmptyFolder) {
+    if (activeParent === finalOverParent && !isDroppingIntoFolderArea) {
       if (activeParent) {
         // Reorder inside folder
         const folder = newLayout.folders[activeParent];
@@ -227,17 +260,17 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     }
 
     // Add active to new parent
-    if (overParent) {
+    if (finalOverParent) {
       // Adding to a folder
-      const folder = newLayout.folders[overParent];
+      const folder = newLayout.folders[finalOverParent];
       const newItems = [...folder.itemIds];
-      if (isDroppingIntoEmptyFolder) {
+      if (isDroppingIntoFolderArea) {
         newItems.push(activeIdStr);
       } else {
         const overIndex = folder.itemIds.indexOf(overIdStr);
         newItems.splice(overIndex >= 0 ? overIndex : newItems.length, 0, activeIdStr);
       }
-      newLayout.folders[overParent] = {
+      newLayout.folders[finalOverParent] = {
         ...folder,
         itemIds: newItems
       };
@@ -402,8 +435,8 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
                                     if (!item) return null;
                                     return (
                                       <SortableItem key={itemId} id={itemId}>
-                                        <div className="relative group">
-                                          <div onClick={() => onItemClick(item)}>
+                                        <div className="relative group h-full">
+                                          <div className="h-full" onClick={() => onItemClick(item)}>
                                             {renderItem(item)}
                                           </div>
                                           <button 
@@ -417,6 +450,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
                                       </SortableItem>
                                     );
                                   })}
+                                  <AddFolderDropZone id={`${id}-add-dropzone`} />
                                 </div>
                               </SortableContext>
                             )}
