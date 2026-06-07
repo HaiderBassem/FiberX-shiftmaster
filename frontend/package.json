@@ -23,6 +23,8 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "framer-motion": "^12.40.0",
+    "jodit": "^4.12.9",
+    "jodit-react": "^5.3.21",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",

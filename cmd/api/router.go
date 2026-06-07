@@ -29,6 +29,7 @@ func SetupRouter(
 	announcementH *handlers.AnnouncementHandler,
 	pushH *handlers.PushHandler,
 	handoverH *handlers.HandoverHandler,
+	uploadH *handlers.UploadHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -47,6 +48,12 @@ func SetupRouter(
 	protected.Use(middleware.JWTAuth(jwtSecret))
 	protected.Use(middleware.DepartmentContext(deptRepo))
 	{
+		// Uploads
+		uploads := protected.Group("/upload")
+		{
+			uploads.POST("/image", uploadH.UploadImage)
+		}
+
 		// Auth
 		protectedAuth := protected.Group("/auth")
 		{

@@ -171,6 +171,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		        l.reason, l.status, l.applied_date,
 		        e.first_name || ' ' || e.last_name as employee_name,
 		        e.employee_code,
+		        e.profile_image,
 		        COALESCE(e.default_shift_id::text, '') as default_shift_id,
 		        COALESCE(s.name, '') as shift_name,
 		        COALESCE(s.shift_code, '') as shift_code,
@@ -209,7 +210,7 @@ func (r *leaveRepo) GetPendingLeavesRich(ctx context.Context, approverRole strin
 		if err := rows.Scan(
 			&p.ID, &p.EmployeeID, &p.LeaveTypeID, &p.LeaveTypeNameAr, &p.LeaveTypeNameEn, &p.StartDate, &p.EndDate, &p.TotalDays,
 			&p.Reason, &p.Status, &p.AppliedDate,
-			&p.EmployeeName, &p.EmployeeCode, &p.DefaultShiftID, &p.ShiftName, &p.ShiftCode,
+			&p.EmployeeName, &p.EmployeeCode, &p.EmployeeProfileImage, &p.DefaultShiftID, &p.ShiftName, &p.ShiftCode,
 			&p.DepartmentName, &p.TLApprovals, &p.TotalTLs, &p.StartTime, &p.EndTime,
 		); err != nil {
 			return nil, fmt.Errorf("scan pending leave rich: %w", err)
@@ -282,7 +283,7 @@ func (r *leaveRepo) HasApproved(ctx context.Context, leaveID, approverID uuid.UU
 func (r *leaveRepo) GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID) ([]models.LeaveHistoryRow, error) {
 	// Get all leaves with employee info
 	rows, err := r.db.Query(ctx,
-		`SELECT l.id, e.first_name || ' ' || e.last_name, e.employee_code,
+		`SELECT l.id, e.first_name || ' ' || e.last_name, e.employee_code, e.profile_image,
 		        l.leave_type_id, lt.name_ar, lt.name_en, l.start_date, l.end_date, l.total_days, l.reason,
 		        l.status, l.applied_date, l.rejection_reason
 		 FROM leaves l
@@ -299,7 +300,7 @@ func (r *leaveRepo) GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID
 	var result []models.LeaveHistoryRow
 	for rows.Next() {
 		var h models.LeaveHistoryRow
-		if err := rows.Scan(&h.LeaveID, &h.EmployeeName, &h.EmployeeCode,
+		if err := rows.Scan(&h.LeaveID, &h.EmployeeName, &h.EmployeeCode, &h.EmployeeProfileImage,
 			&h.LeaveTypeID, &h.LeaveTypeNameAr, &h.LeaveTypeNameEn, &h.StartDate, &h.EndDate, &h.TotalDays, &h.Reason,
 			&h.Status, &h.AppliedDate, &h.RejectionReason); err != nil {
 			return nil, err

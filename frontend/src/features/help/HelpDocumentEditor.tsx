@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
 import { helpDocumentService } from '../../services/api/helpDocumentService';
+import { RichTextEditor } from '../../components/RichTextEditor';
 
 export function HelpDocumentEditor() {
   const { id } = useParams();
@@ -121,14 +122,12 @@ export function HelpDocumentEditor() {
           />
         </div>
         
-        <div className="flex-1 p-0">
-          <textarea
+        <div className="flex-1 p-0 overflow-y-auto">
+          <RichTextEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full h-full p-6 resize-none border-none focus:ring-0 text-gray-800 text-lg leading-relaxed outline-none"
-            style={{ fontFamily: "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
-            placeholder="Start typing your content here... (Supports Arabic and English seamlessly)"
-            dir="auto"
+            onChange={setContent}
+            placeholder="Start typing your content here... (Supports images, tables, Arabic and English seamlessly)"
+            height={window.innerHeight * 0.6}
           />
         </div>
       </div>

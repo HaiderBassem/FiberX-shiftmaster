@@ -21,6 +21,7 @@ interface TaskHistoryRow {
   employee_id: string;
   employee_name: string;
   employee_code: string;
+  employee_profile_image: string | null;
   status: string;
   completion_type: string | null;
   started_at: string | null;
@@ -108,6 +109,9 @@ export const TaskHistory = () => {
                   <div className="space-y-1">
                     <p className="text-sm font-medium leading-none">{task.task_title}</p>
                     <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 pt-1">
+                      {task.employee_profile_image && (
+                        <img src={task.employee_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                      )}
                       <span className="font-medium text-foreground/80">{task.employee_name}</span>
                       {task.board_name && (
                         <>
@@ -130,7 +134,8 @@ export const TaskHistory = () => {
                 </div>
                 {task.notes && (
                   <div className="mt-2 p-2 bg-muted/30 rounded text-xs text-muted-foreground border-l-2 border-primary/40">
-                    <span className="font-medium text-foreground">Notes:</span> {task.notes}
+                    <span className="font-medium text-foreground block mb-1">Notes & Attachments:</span>
+                    <div className="jodit-content overflow-hidden max-w-full" dangerouslySetInnerHTML={{ __html: task.notes }} />
                   </div>
                 )}
               </Card>

@@ -157,8 +157,12 @@ export const SwapList = () => {
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-background border border-border shadow-sm"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                        <UserCircle className="w-6 h-6 text-amber-500" />
+                      <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {swap.requester_profile_image ? (
+                          <img src={swap.requester_profile_image} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <UserCircle className="w-6 h-6 text-amber-500" />
+                        )}
                       </div>
                       <div>
                         <p className="text-foreground font-semibold text-lg tracking-tight">
@@ -229,7 +233,11 @@ export const SwapList = () => {
                       <div>
                         <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
                           <ArrowLeftRight className="w-4 h-4 text-primary" />
-                          Swap with {swap.target_employee_name || 'Colleague'}
+                          Swap with
+                          {swap.target_profile_image && (
+                            <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          )}
+                          {swap.target_employee_name || 'Colleague'}
                         </div>
                         <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                           <Clock className="w-4 h-4 opacity-70" />

@@ -87,6 +87,7 @@ func main() {
 	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService)
 	pushHandler := handlers.NewPushHandler(notifRepo, cfg.VAPID)
 	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, shiftRepo, scheduleRepo, notifService)
+	uploadHandler := handlers.NewUploadHandler()
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -118,7 +119,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler,
 	)
 
 	// --- Start HTTP Server ---

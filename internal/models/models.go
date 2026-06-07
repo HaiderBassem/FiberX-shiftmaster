@@ -177,6 +177,7 @@ type TaskHistoryRow struct {
 	EmployeeID     uuid.UUID  `json:"employee_id"`
 	EmployeeName   string     `json:"employee_name"`
 	EmployeeCode   string     `json:"employee_code"`
+	EmployeeProfileImage *string `json:"employee_profile_image"`
 	Status         string     `json:"status"`
 	CompletionType *string    `json:"completion_type"`
 	StartedAt      *time.Time `json:"started_at"`
@@ -222,6 +223,7 @@ type LeaveHistoryRow struct {
 	LeaveID       uuid.UUID  `json:"leave_id"`
 	EmployeeName  string     `json:"employee_name"`
 	EmployeeCode  string     `json:"employee_code"`
+	EmployeeProfileImage *string `json:"employee_profile_image"`
 	LeaveTypeID   uuid.UUID  `json:"leave_type_id"`
 	LeaveTypeNameAr *string  `json:"leave_type_name_ar"`
 	LeaveTypeNameEn *string  `json:"leave_type_name_en"`
@@ -259,6 +261,7 @@ type PendingLeaveRich struct {
 	AppliedDate    *time.Time `json:"applied_date"`
 	EmployeeName   string     `json:"employee_name"`
 	EmployeeCode   string     `json:"employee_code"`
+	EmployeeProfileImage *string `json:"employee_profile_image"`
 	DefaultShiftID string     `json:"default_shift_id"`
 	ShiftName      string     `json:"shift_name"`
 	ShiftCode      string     `json:"shift_code"`
@@ -273,8 +276,10 @@ type ShiftSwap struct {
 	ID                   uuid.UUID  `json:"id"`
 	RequesterID          uuid.UUID  `json:"requester_id"`
 	RequesterName        string     `json:"requester_name"`
+	RequesterProfileImage *string   `json:"requester_profile_image"`
 	TargetEmployeeID     uuid.UUID  `json:"target_employee_id"`
 	TargetEmployeeName   string     `json:"target_employee_name"`
+	TargetProfileImage   *string    `json:"target_profile_image"`
 	ShiftDate            time.Time  `json:"shift_date"`
 	ShiftID              uuid.UUID  `json:"shift_id"`
 	Reason               *string    `json:"reason"`

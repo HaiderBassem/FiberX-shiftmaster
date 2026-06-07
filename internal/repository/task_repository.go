@@ -637,6 +637,7 @@ func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *
 			e.id AS employee_id,
 			e.first_name || ' ' || e.last_name AS employee_name,
 			e.employee_code,
+			e.profile_image,
 			te.status,
 			te.completion_type,
 			te.started_at,
@@ -679,7 +680,7 @@ func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *
 		if err := rows.Scan(
 			&row.AssignmentID, &row.ExecutionID, &row.AssignedDate,
 			&row.TaskTitle, &row.TaskDesc, &row.BoardName,
-			&row.EmployeeID, &row.EmployeeName, &row.EmployeeCode,
+			&row.EmployeeID, &row.EmployeeName, &row.EmployeeCode, &row.EmployeeProfileImage,
 			&row.Status, &row.CompletionType, &row.StartedAt, &row.CompletedAt, &row.Notes,
 		); err != nil {
 			return nil, fmt.Errorf("scan task history row: %w", err)

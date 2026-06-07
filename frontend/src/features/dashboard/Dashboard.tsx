@@ -554,9 +554,13 @@ const LeaderDashboard = () => {
                     
                     return (
                       <div key={emp.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
-                          {emp.first_name?.[0]}{emp.last_name?.[0]}
-                        </div>
+                        {emp.profile_image ? (
+                          <img src={emp.profile_image} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                            {emp.first_name?.[0]}{emp.last_name?.[0]}
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</p>
                           <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">

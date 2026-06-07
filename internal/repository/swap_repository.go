@@ -38,14 +38,14 @@ const swapColumns = `id, requester_id, target_employee_id, shift_date, shift_id,
 	approved_by_team_leader, approved_by_manager, approval_date, created_at, updated_at`
 const swapColumnsWithNames = `ss.id, ss.requester_id, ss.target_employee_id, ss.shift_date, ss.shift_id, ss.reason, ss.status,
 	ss.approved_by_team_leader, ss.approved_by_manager, ss.approval_date, ss.created_at, ss.updated_at,
-	(CONCAT(r.first_name, ' ', r.last_name)) AS requester_name,
-	(CONCAT(t.first_name, ' ', t.last_name)) AS target_employee_name`
+	(CONCAT(r.first_name, ' ', r.last_name)) AS requester_name, r.profile_image as requester_profile_image,
+	(CONCAT(t.first_name, ' ', t.last_name)) AS target_employee_name, t.profile_image as target_profile_image`
 
 func (r *swapRepo) scanSwap(row pgx.Row) (*models.ShiftSwap, error) {
 	var s models.ShiftSwap
 	err := row.Scan(&s.ID, &s.RequesterID, &s.TargetEmployeeID, &s.ShiftDate, &s.ShiftID,
 		&s.Reason, &s.Status, &s.ApprovedByTeamLeader, &s.ApprovedByManager, &s.ApprovalDate,
-		&s.CreatedAt, &s.UpdatedAt, &s.RequesterName, &s.TargetEmployeeName)
+		&s.CreatedAt, &s.UpdatedAt, &s.RequesterName, &s.RequesterProfileImage, &s.TargetEmployeeName, &s.TargetProfileImage)
 	return &s, err
 }
 
@@ -55,7 +55,7 @@ func (r *swapRepo) scanSwaps(rows pgx.Rows) ([]models.ShiftSwap, error) {
 		var s models.ShiftSwap
 		if err := rows.Scan(&s.ID, &s.RequesterID, &s.TargetEmployeeID, &s.ShiftDate, &s.ShiftID,
 			&s.Reason, &s.Status, &s.ApprovedByTeamLeader, &s.ApprovedByManager, &s.ApprovalDate,
-			&s.CreatedAt, &s.UpdatedAt, &s.RequesterName, &s.TargetEmployeeName); err != nil {
+			&s.CreatedAt, &s.UpdatedAt, &s.RequesterName, &s.RequesterProfileImage, &s.TargetEmployeeName, &s.TargetProfileImage); err != nil {
 			return nil, fmt.Errorf("scan swap: %w", err)
 		}
 		swaps = append(swaps, s)

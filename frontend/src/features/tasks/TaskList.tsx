@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
+import { RichTextEditor } from '@/components/RichTextEditor';
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -66,14 +67,15 @@ const CompletionDialog = ({
         {/* Notes */}
         <div className="px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add any remarks or details..."
-              rows={3}
-              className="w-full px-3 py-2 rounded-xl bg-background border border-input text-foreground text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+            <label className="block text-sm font-medium text-foreground mb-2">Notes & Attachments (optional)</label>
+            <div className="overflow-y-auto max-h-[30vh]">
+              <RichTextEditor
+                value={notes}
+                onChange={setNotes}
+                placeholder="Add any remarks, details, or paste screenshots..."
+                height={200}
+              />
+            </div>
           </div>
 
           {/* Completion Buttons */}
@@ -436,7 +438,9 @@ const TaskRow = ({
           {task.completion_type === 'without_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ No Issues</span>}
           {task.completion_type === 'with_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">⚠ Has Issues</span>}
         </div>
-        {task.notes && task.status === 'completed' && <p className="text-xs text-muted-foreground mt-1 italic">📝 {task.notes}</p>}
+        {task.notes && task.status === 'completed' && (
+          <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground italic jodit-content max-w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: task.notes }} />
+        )}
       </div>
       {task.execution_id && task.status === 'pending' && (
         <Button size="sm" onClick={() => onStart(task.execution_id!)} disabled={startPending}

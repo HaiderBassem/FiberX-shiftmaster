@@ -79,12 +79,11 @@ export function HelpDocumentView() {
         )}
         
         <div 
-          className="p-8 max-w-none text-gray-800 text-lg leading-relaxed whitespace-pre-wrap break-words"
+          className="p-8 max-w-none text-gray-800 text-lg leading-relaxed break-words jodit-content"
           style={{ fontFamily: "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
           dir="auto"
-        >
-          {document.content}
-        </div>
+          dangerouslySetInnerHTML={{ __html: document.content }}
+        />
       </div>
     </div>
   );
