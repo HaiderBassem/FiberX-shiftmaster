@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { X } from 'lucide-react';
+import { RichTextEditor } from '@/components/RichTextEditor';
 
 export default function CreateHandoverModal({
   isOpen,
@@ -61,26 +62,24 @@ export default function CreateHandoverModal({
             {error && <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm">{error}</div>}
 
             <div className="space-y-2">
-              <label htmlFor="shift_summary" className="block text-sm font-semibold text-gray-900 dark:text-white">Shift Summary <span className="text-red-500">*</span></label>
+              <label className="block text-sm font-semibold text-gray-900 dark:text-white">Shift Summary <span className="text-red-500">*</span></label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">What happened during your shift? Any major events?</p>
-              <textarea
-                id="shift_summary"
+              <RichTextEditor
                 value={shiftSummary}
-                onChange={(e) => setShiftSummary(e.target.value)}
+                onChange={setShiftSummary}
                 placeholder="E.g., Smooth shift, all regular checks completed..."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 min-h-[100px]"
+                height={250}
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="pending_issues" className="block text-sm font-semibold text-orange-500">Pending Issues</label>
+              <label className="block text-sm font-semibold text-orange-500">Pending Issues</label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">What is left for the next shift to handle?</p>
-              <textarea
-                id="pending_issues"
+              <RichTextEditor
                 value={pendingIssues}
-                onChange={(e) => setPendingIssues(e.target.value)}
+                onChange={setPendingIssues}
                 placeholder="E.g., Ticket #1234 is still open, waiting for customer reply."
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 min-h-[100px]"
+                height={250}
               />
             </div>
           </div>

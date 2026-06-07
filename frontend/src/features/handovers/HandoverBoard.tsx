@@ -85,13 +85,19 @@ export default function HandoverBoard() {
                 </div>
                 <div className="p-4 space-y-4">
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400">Shift Summary:</h4>
-                    <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-200">{h.shift_summary}</p>
+                    <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 mb-2">Shift Summary:</h4>
+                    <div 
+                      className="text-sm text-gray-800 dark:text-gray-200 jodit-content max-w-none prose prose-sm dark:prose-invert" 
+                      dangerouslySetInnerHTML={{ __html: h.shift_summary }} 
+                    />
                   </div>
                   {h.pending_issues && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-orange-500">Pending Issues:</h4>
-                      <p className="text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-200">{h.pending_issues}</p>
+                    <div className="pt-2">
+                      <h4 className="text-sm font-semibold text-orange-500 mb-2">Pending Issues:</h4>
+                      <div 
+                        className="text-sm text-gray-800 dark:text-gray-200 jodit-content max-w-none prose prose-sm dark:prose-invert" 
+                        dangerouslySetInnerHTML={{ __html: h.pending_issues }} 
+                      />
                     </div>
                   )}
                   {h.status === 'claimed' && (
@@ -144,7 +150,10 @@ export default function HandoverBoard() {
                 <CheckCircle className="w-5 h-5 text-emerald-500" />
               </div>
               <div className="px-4 pb-4">
-                <p className="text-sm line-clamp-2 text-gray-500 dark:text-gray-400">{h.shift_summary}</p>
+                <div 
+                  className="text-sm text-gray-500 dark:text-gray-400 jodit-content max-w-none prose prose-sm dark:prose-invert line-clamp-3 overflow-hidden" 
+                  dangerouslySetInnerHTML={{ __html: h.shift_summary }} 
+                />
               </div>
             </div>
           ))}
