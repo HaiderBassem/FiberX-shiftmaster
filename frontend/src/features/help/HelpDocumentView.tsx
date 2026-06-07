@@ -25,28 +25,33 @@ export function HelpDocumentView() {
   const canManageAccess = user?.role === 'manager' || user?.role === 'admin';
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+      {/* Header Section */}
+      <div className="bg-card rounded-2xl shadow-sm border border-border p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="flex items-start sm:items-center gap-4">
           <button
             onClick={() => navigate('/help')}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500"
+            className="p-2.5 bg-muted/50 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground shrink-0 mt-1 sm:mt-0"
+            title="Back to Info Bank"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{document.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Created on {format(new Date(document.created_at), 'yyyy-MM-dd')}
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight leading-tight">
+              {document.title}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-primary/60"></span>
+              Created on {format(new Date(document.created_at), 'MMMM d, yyyy')}
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {canManageAccess && (
             <button
               onClick={() => setShowAccessManager(!showAccessManager)}
-              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 bg-secondary/50 text-secondary-foreground border border-border px-4 py-2.5 rounded-xl hover:bg-secondary transition-colors font-medium text-sm"
             >
               <Users className="w-4 h-4" />
               <span>Manage Access</span>
@@ -55,32 +60,32 @@ export function HelpDocumentView() {
           {canEdit && (
             <button
               onClick={() => navigate(`/help/${id}/edit`)}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl hover:bg-primary/90 transition-all font-medium shadow-sm hover:shadow-md text-sm"
             >
               <Edit className="w-4 h-4" />
-              <span>Edit</span>
+              <span>Edit Document</span>
             </button>
           )}
         </div>
       </div>
 
       {showAccessManager && canManageAccess && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 animate-in slide-in-from-top-4 fade-in duration-300">
           <HelpDocumentAccessManager documentId={id!} />
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* Document Content */}
+      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
         {document.access_level === 'write' && (
-          <div className="bg-amber-50 border-b border-amber-100 p-3 px-6 flex items-center gap-2 text-amber-800 text-sm">
-            <ShieldAlert className="w-4 h-4" />
-            <span>You have permission to edit this document.</span>
+          <div className="bg-amber-500/10 border-b border-amber-500/20 p-4 px-6 flex items-center gap-3 text-amber-600 text-sm font-medium">
+            <ShieldAlert className="w-5 h-5" />
+            <span>You have permission to edit this document. Your changes will be visible to all permitted users.</span>
           </div>
         )}
         
         <div 
-          className="p-8 max-w-none text-gray-800 text-lg leading-relaxed break-words jodit-content"
-          style={{ fontFamily: "'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}
+          className="p-8 sm:p-10 lg:p-12 prose prose-slate dark:prose-invert max-w-none prose-headings:font-bold prose-h1:text-3xl prose-a:text-primary prose-img:rounded-xl prose-img:shadow-sm jodit-content"
           dir="auto"
           dangerouslySetInnerHTML={{ __html: document.content }}
         />
