@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"time"
@@ -18,15 +19,23 @@ func NewUploadHandler() *UploadHandler {
 }
 
 func (h *UploadHandler) UploadImage(c *gin.Context) {
-	// The file might be sent as "file" or "upload" depending on the rich text editor
-	// Jodit usually sends "files[0]" or similar if configured, or just "file"
-	file, err := c.FormFile("file")
+	form, err := c.MultipartForm()
 	if err != nil {
-		file, err = c.FormFile("upload") // fallback for some editors
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "file missing"})
-			return
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid form"})
+		return
+	}
+
+	var file *multipart.FileHeader
+	for _, files := range form.File {
+		if len(files) > 0 {
+			file = files[0]
+			break
 		}
+	}
+
+	if file == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "no file uploaded"})
+		return
 	}
 
 	uploadDir := "./uploads/images"

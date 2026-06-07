@@ -1,5 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import JoditEditor from 'jodit-react';
+import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
 interface RichTextEditorProps {
@@ -25,7 +26,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     height: height,
     uploader: {
       insertImageAsBase64URI: false,
-      url: '/api/upload/image', // Our backend endpoint
+      url: `${api.defaults.baseURL || '/api'}/upload/image`, // Correctly resolve API base URL
       format: 'json',
       headers: {
         Authorization: `Bearer ${token}`, // Pass the JWT token for auth
