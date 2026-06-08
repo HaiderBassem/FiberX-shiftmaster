@@ -42,7 +42,7 @@ export const ModuleAccessSettings = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Access data
-  const { data: accessData, isLoading: isLoadingAccess } = useLinkAccess(selectedLink || null);
+  const { data: accessData, isLoading: isLoadingAccess, error: accessError } = useLinkAccess(selectedLink || null);
   const setDepartmentAccess = useSetDepartmentAccess();
   const setEmployeeExclusion = useSetEmployeeExclusion();
 
@@ -255,6 +255,14 @@ export const ModuleAccessSettings = () => {
               <div className="space-y-6">
                 {isLoadingAccess ? (
                   <div className="text-center py-10 text-gray-500">Loading access data...</div>
+                ) : accessError ? (
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+                    <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Failed to load access data</p>
+                      <p className="text-xs text-red-400/70 mt-1">The server returned an error. Please make sure the database tables are set up correctly and try redeploying.</p>
+                    </div>
+                  </div>
                 ) : (
                   manageableDepartments?.map((dept) => {
                     // Check if department is granted

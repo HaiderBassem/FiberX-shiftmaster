@@ -84,9 +84,10 @@ export const useLinkAccess = (linkId: string | null) => {
     queryKey: ['link-access', linkId],
     queryFn: async () => {
       const { data } = await api.get(`/external-links/${linkId}/access`);
-      return data.data;
+      return data.data || { link_id: linkId, title: '', departments: [], excluded_employees: [] };
     },
     enabled: !!linkId,
+    retry: false,
   });
 };
 
