@@ -110,7 +110,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
 
       {/* ── Dynamic External Tools ── */}
       {myModules && (() => {
-        const otherLinks = myModules.filter(link => !(['Live Map', 'Ticket System'].includes(link.title) || link.url.includes('maps.shift-master.org') || link.url.includes('ticket.shift-master.org')));
+        const otherLinks = myModules.filter(link => !(['Live Map'].includes(link.title) || link.url.includes('maps.shift-master.org')));
         if (otherLinks.length === 0) return null;
         
         return (
@@ -211,62 +211,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       </div>
       )}
 
-      {/* ── Ticket System Tab ── */}
-      {(user?.role === 'admin' || myModules?.some(link => link.title === 'Ticket System' || link.url.includes('ticket.shift-master.org'))) && (
-      <div className="px-3 pb-3">
-        <button
-          id="ticket-system-tab"
-          onClick={() => window.open('https://ticket.shift-master.org/', '_blank', 'noopener,noreferrer')}
-          className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.18) 0%, rgba(109,40,217,0.10) 100%)',
-            border: '1px solid rgba(139,92,246,0.30)',
-            boxShadow: '0 0 18px rgba(139,92,246,0.10), inset 0 1px 0 rgba(255,255,255,0.06)',
-          }}
-        >
-          <svg
-            className="absolute right-0 top-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20"
-            width="80" height="56" viewBox="0 0 80 56" fill="none"
-            aria-hidden="true"
-          >
-            <polygon points="56,4 76,16 76,40 56,52 36,40 36,16" stroke="#8B5CF6" strokeWidth="1.2" fill="rgba(139,92,246,0.08)" />
-            <polygon points="72,0 80,4 80,12 72,16 64,12 64,4" stroke="#8B5CF6" strokeWidth="0.8" fill="none" />
-            <polygon points="40,10 52,17 52,31 40,38 28,31 28,17" stroke="#6D28D9" strokeWidth="0.6" fill="none" />
-          </svg>
 
-          <div className="relative flex-shrink-0">
-            <span
-              className="absolute inset-0 rounded-lg animate-ping"
-              style={{ background: 'rgba(139,92,246,0.20)', animationDuration: '2.8s' }}
-            />
-            <div
-              className="relative w-9 h-9 rounded-lg flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
-                boxShadow: '0 0 14px rgba(139,92,246,0.45)',
-                clipPath: 'polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%)',
-              }}
-            >
-              <Ticket className="w-4 h-4 text-white" />
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-semibold leading-tight" style={{ color: '#A78BFA' }}>
-              Ticket System
-            </p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              ticket.shift-master.org
-            </p>
-          </div>
-
-          <ExternalLink
-            className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            style={{ color: 'rgba(139,92,246,0.70)' }}
-          />
-        </button>
-      </div>
-      )}
 
       {/* ── Footer ── */}
       <div className="px-5 py-4 border-t border-white/5">
