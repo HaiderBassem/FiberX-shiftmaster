@@ -67,6 +67,26 @@ for migration in "$PROJECT_DIR"/internal/database/migrations/*.sql; do
 done
 echo "  ✓  Migrations complete"
 
+# ── 5b. Fix table ownership (in case tables were created by a different user) ──
+echo "→ Fixing table ownership..."
+sudo -u postgres psql -d "$DB_NAME" -c "
+DO \$\$
+BEGIN
+    -- Fix ownership for external modules tables
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'external_links') THEN
+        EXECUTE 'ALTER TABLE external_links OWNER TO ' || quote_ident('$DB_USER');
+        EXECUTE 'ALTER TABLE link_departments OWNER TO ' || quote_ident('$DB_USER');
+        EXECUTE 'ALTER TABLE link_exclusions OWNER TO ' || quote_ident('$DB_USER');
+        RAISE NOTICE 'Fixed ownership for external_links tables';
+    END IF;
+    -- Grant all privileges on all tables to the app user (safety net)
+    EXECUTE 'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ' || quote_ident('$DB_USER');
+    EXECUTE 'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ' || quote_ident('$DB_USER');
+END
+\$\$;
+" 2>/dev/null || true
+echo "  ✓  Ownership fixed"
+
 # ── 6. Install systemd service ──
 echo "→ Setting up systemd service..."
 sudo cp "$PROJECT_DIR/deploy/shiftmaster.service" /etc/systemd/system/shiftmaster.service
