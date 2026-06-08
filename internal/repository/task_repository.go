@@ -29,7 +29,7 @@ type TaskRepository interface {
 	// Board View & Tracker
 	GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID *uuid.UUID, fromDate *time.Time, toDate *time.Time) ([]models.BoardViewRow, error)
 	GetBoardStats(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskBoardStats, error)
-	GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error)
+	GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time, departmentID *uuid.UUID) ([]models.Employee, error)
 
 	// Employee Weekly View
 	GetMyWeeklyTasks(ctx context.Context, employeeID uuid.UUID, weekStart, weekEnd time.Time) ([]models.MyTaskRow, error)
@@ -305,7 +305,7 @@ func (r *taskRepo) GetBoardStats(ctx context.Context, departmentID *uuid.UUID) (
 // Managers and admins are excluded (team leaders are included).
 // Optionally filters by default_shift_id.
 // When a date is provided, employees on approved leave or with an off-day are excluded.
-func (r *taskRepo) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error) {
+func (r *taskRepo) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time, departmentID *uuid.UUID) ([]models.Employee, error) {
 	query := `
 		SELECT id, employee_code, first_name, last_name, gender, phone, email,
 			hire_date, role, department_id, position, default_shift_id,
@@ -321,6 +321,12 @@ func (r *taskRepo) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.
 	if shiftID != nil {
 		query += fmt.Sprintf(` AND default_shift_id = $%d`, argIdx)
 		args = append(args, *shiftID)
+		argIdx++
+	}
+
+	if departmentID != nil {
+		query += fmt.Sprintf(` AND department_id = $%d`, argIdx)
+		args = append(args, *departmentID)
 		argIdx++
 	}
 

@@ -182,7 +182,8 @@ func (h *TaskHandler) GetBoardEligibleEmployees(c *gin.Context) {
 		}
 		shiftID = &parsed
 	}
-	employees, err := h.taskSvc.GetBoardEligibleEmployees(c.Request.Context(), shiftID, nil)
+	deptID := getDepartmentID(c)
+	employees, err := h.taskSvc.GetBoardEligibleEmployees(c.Request.Context(), shiftID, nil, deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

@@ -86,8 +86,8 @@ func (s *TaskService) GetBoardStats(ctx context.Context, departmentID *uuid.UUID
 	return s.taskRepo.GetBoardStats(ctx, departmentID)
 }
 
-func (s *TaskService) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time) ([]models.Employee, error) {
-	return s.taskRepo.GetBoardEligibleEmployees(ctx, shiftID, date)
+func (s *TaskService) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.UUID, date *time.Time, departmentID *uuid.UUID) ([]models.Employee, error) {
+	return s.taskRepo.GetBoardEligibleEmployees(ctx, shiftID, date, departmentID)
 }
 
 // ═══════════════════════════════════════════

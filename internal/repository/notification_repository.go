@@ -111,13 +111,19 @@ func (r *notificationRepo) Delete(ctx context.Context, id uuid.UUID) error {
 // ── Web Push Subscriptions ──
 
 func (r *notificationRepo) SavePushSubscription(ctx context.Context, sub *models.PushSubscription) error {
+	// Delete any existing subscription for this endpoint (if it belonged to a previous user on the same browser)
+	_, err := r.db.Exec(ctx, `DELETE FROM push_subscriptions WHERE endpoint = $1 AND employee_id != $2`, sub.Endpoint, sub.EmployeeID)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		INSERT INTO push_subscriptions (employee_id, endpoint, p256dh, auth)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (employee_id, endpoint) DO UPDATE 
 		SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := r.db.Exec(ctx, query, sub.EmployeeID, sub.Endpoint, sub.P256dh, sub.Auth)
+	_, err = r.db.Exec(ctx, query, sub.EmployeeID, sub.Endpoint, sub.P256dh, sub.Auth)
 	return err
 }
 
