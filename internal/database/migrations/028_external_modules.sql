@@ -30,9 +30,5 @@ CREATE TABLE IF NOT EXISTS link_exclusions (
     PRIMARY KEY (link_id, employee_id)
 );
 
--- Optional: Insert the defaults (Live Map, Ticket System) if you want them there immediately
-INSERT INTO external_links (id, title, url, icon_name) 
-VALUES 
-    (gen_random_uuid(), 'Live Map', 'https://maps.shift-master.org/', 'map-pin'),
-    (gen_random_uuid(), 'Ticket System', 'https://ticket.shift-master.org/', 'ticket')
-ON CONFLICT DO NOTHING;
+-- Note: Seed data (Live Map) is handled by the Go autoMigrate on app startup.
+-- Do NOT insert here — gen_random_uuid() creates duplicates on every deploy run.

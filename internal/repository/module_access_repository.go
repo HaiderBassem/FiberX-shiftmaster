@@ -94,14 +94,20 @@ func (r *moduleAccessRepo) autoMigrate() {
 	}
 	log.Println("[ExternalModules] ✓ link_exclusions table ready")
 
-	// Step 4: Seed Live Map if no links exist yet
-	var count int
-	err = r.db.QueryRow(ctx, `SELECT COUNT(*) FROM external_links`).Scan(&count)
+	// Step 4: Deduplicate — remove duplicate entries (keep the oldest one per title)
+	_, _ = r.db.Exec(ctx, `
+		DELETE FROM external_links a USING external_links b
+		WHERE a.id > b.id AND a.title = b.title AND a.url = b.url
+	`)
+
+	// Step 5: Seed Live Map if it doesn't exist by title
+	var exists bool
+	err = r.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM external_links WHERE title = 'Live Map')`).Scan(&exists)
 	if err != nil {
-		log.Printf("[ExternalModules] Warning: could not check existing links: %v", err)
+		log.Printf("[ExternalModules] Warning: could not check for Live Map: %v", err)
 		return
 	}
-	if count == 0 {
+	if !exists {
 		_, err = r.db.Exec(ctx, `
 			INSERT INTO external_links (title, url, icon_name)
 			VALUES ('Live Map', 'https://maps.shift-master.org/', 'map-pin')
