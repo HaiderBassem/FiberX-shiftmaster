@@ -306,7 +306,7 @@ const ModuleAccessSettingsInner = () => {
                         {/* Department Header */}
                         <div className="bg-white/[0.03] p-4 flex items-center justify-between border-b border-white/5">
                           <div>
-                            <h3 className="font-semibold text-white text-lg">{dept.name}</h3>
+                            <h3 className="font-semibold text-white text-lg">{dept.name || 'Unnamed Department'}</h3>
                             <p className="text-xs text-gray-400">
                               {isDeptGranted 
                                 ? 'Tool is ENABLED for this department' 
@@ -346,11 +346,11 @@ const ModuleAccessSettingsInner = () => {
                                   <div key={emp.id} className="flex items-center justify-between py-3">
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs border border-blue-500/30">
-                                        {emp.name.charAt(0)}
+                                        {(emp.name || '?').charAt(0)}
                                       </div>
                                       <div>
-                                        <p className="text-sm font-medium text-gray-200">{emp.name}</p>
-                                        <p className="text-xs text-gray-500">{emp.role}</p>
+                                        <p className="text-sm font-medium text-gray-200">{emp.name || 'Unknown'}</p>
+                                        <p className="text-xs text-gray-500">{emp.role || 'employee'}</p>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-3">
