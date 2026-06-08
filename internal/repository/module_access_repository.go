@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"log"
 
 	"github.com/google/uuid"
 
@@ -36,7 +37,40 @@ type moduleAccessRepo struct {
 }
 
 func NewModuleAccessRepository(db *database.DB) ModuleAccessRepository {
-	return &moduleAccessRepo{db: db}
+	repo := &moduleAccessRepo{db: db}
+	repo.autoMigrate()
+	return repo
+}
+
+func (r *moduleAccessRepo) autoMigrate() {
+	query := `
+	CREATE TABLE IF NOT EXISTS external_links (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		title VARCHAR(255) NOT NULL,
+		url VARCHAR(2048) NOT NULL,
+		icon_name VARCHAR(100) DEFAULT 'link',
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		created_by UUID REFERENCES employees(id) ON DELETE SET NULL
+	);
+	CREATE TABLE IF NOT EXISTS link_departments (
+		link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
+		department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+		granted_by UUID REFERENCES employees(id) ON DELETE SET NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (link_id, department_id)
+	);
+	CREATE TABLE IF NOT EXISTS link_exclusions (
+		link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
+		employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+		excluded_by UUID REFERENCES employees(id) ON DELETE SET NULL,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (link_id, employee_id)
+	);
+	`
+	_, err := r.db.Exec(context.Background(), query)
+	if err != nil {
+		log.Printf("Failed to auto-migrate external_links tables: %v", err)
+	}
 }
 
 func (r *moduleAccessRepo) CreateLink(ctx context.Context, link *models.ExternalLink) error {
