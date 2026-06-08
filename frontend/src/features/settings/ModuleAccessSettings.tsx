@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component } from 'react';
+import type { ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -11,7 +12,37 @@ import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLi
 
 const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users', 'book-open'];
 
-export const ModuleAccessSettings = () => {
+// ErrorBoundary to prevent black screen crashes
+class ModuleErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-white mb-2">Something went wrong</h2>
+          <p className="text-gray-400 mb-4">An error occurred while loading this page.</p>
+          <p className="text-xs text-red-400/70 mb-4 font-mono">{this.state.error}</p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: '' }); }}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ModuleAccessSettingsInner = () => {
   const user = useAuthStore(state => state.user);
   const { data: departmentsResponse } = useQuery({
     queryKey: ['departments'],
@@ -361,3 +392,10 @@ export const ModuleAccessSettings = () => {
     </div>
   );
 };
+
+// Exported component wrapped in ErrorBoundary
+export const ModuleAccessSettings = () => (
+  <ModuleErrorBoundary>
+    <ModuleAccessSettingsInner />
+  </ModuleErrorBoundary>
+);

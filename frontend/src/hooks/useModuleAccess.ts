@@ -21,9 +21,15 @@ export const useMyLinks = () => {
   return useQuery<ExternalLink[]>({
     queryKey: ['my-links'],
     queryFn: async () => {
-      const { data } = await api.get('/external-links/my-links');
-      return data.data || [];
+      try {
+        const { data } = await api.get('/external-links/my-links');
+        return data.data || [];
+      } catch (err) {
+        console.error('[useMyLinks] API error:', err);
+        return [];
+      }
     },
+    retry: false,
   });
 };
 
@@ -31,9 +37,15 @@ export const useAllLinks = () => {
   return useQuery<ExternalLink[]>({
     queryKey: ['all-links'],
     queryFn: async () => {
-      const { data } = await api.get('/external-links');
-      return data.data || [];
+      try {
+        const { data } = await api.get('/external-links');
+        return data.data || [];
+      } catch (err) {
+        console.error('[useAllLinks] API error:', err);
+        return [];
+      }
     },
+    retry: false,
   });
 };
 
@@ -83,8 +95,13 @@ export const useLinkAccess = (linkId: string | null) => {
   return useQuery<LinkAccessResponse>({
     queryKey: ['link-access', linkId],
     queryFn: async () => {
-      const { data } = await api.get(`/external-links/${linkId}/access`);
-      return data.data || { link_id: linkId, title: '', departments: [], excluded_employees: [] };
+      try {
+        const { data } = await api.get(`/external-links/${linkId}/access`);
+        return data.data || { link_id: linkId || '', title: '', departments: [], excluded_employees: [] };
+      } catch (err) {
+        console.error('[useLinkAccess] API error:', err);
+        return { link_id: linkId || '', title: '', departments: [], excluded_employees: [] };
+      }
     },
     enabled: !!linkId,
     retry: false,
