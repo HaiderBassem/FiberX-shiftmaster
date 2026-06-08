@@ -25,7 +25,9 @@ import InteractiveCalendar from '../features/calendar/InteractiveCalendar';
 import { LeaveTypeManager } from '../features/leaves/LeaveTypeManager';
 import HandoverBoard from '../features/handovers/HandoverBoard';
 import { ModuleAccessSettings } from '../features/settings/ModuleAccessSettings';
-
+import { FiberxDataHub } from '../features/fiberx-data/FiberxDataHub';
+import { FiberxDataView } from '../features/fiberx-data/FiberxDataView';
+import { FiberxDataEditor } from '../features/fiberx-data/FiberxDataEditor';
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -130,13 +132,29 @@ export const AppRoutes = () => {
           <Route 
             path="help/:id/edit" 
             element={
-              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']} allowHelpDocsAccess={true}>
+              <ProtectedRoute allowedRoles={['admin', 'manager']} allowHelpDocsAccess>
                 <HelpDocumentEditor />
               </ProtectedRoute>
-            } 
+            }
           />
-
-          {/* ── Supervisor routes (team_leader, manager, admin) ── */}
+          <Route 
+            path="fiberx-data/new" 
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                <FiberxDataEditor />
+              </ProtectedRoute>
+            }
+          />
+          <Route 
+            path="fiberx-data/:id/edit" 
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+                <FiberxDataEditor />
+              </ProtectedRoute>
+            }
+          />
+          
+          {/* ── Management & Supervisor routes ── */}
           <Route 
             path="approvals" 
             element={
@@ -174,8 +192,24 @@ export const AppRoutes = () => {
               </ProtectedRoute>
             }
           />
-
-          {/* ── Admin / Manager / Approver routes ── */}
+          <Route 
+            path="fiberx-data" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <FiberxDataHub />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="fiberx-data/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <FiberxDataView />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* ── Help / Info Bank Editor (role restricted) ── */}
           <Route 
             path="announcements/manage" 
             element={

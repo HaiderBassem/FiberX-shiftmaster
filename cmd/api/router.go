@@ -31,6 +31,7 @@ func SetupRouter(
 	handoverH *handlers.HandoverHandler,
 	uploadH *handlers.UploadHandler,
 	moduleAccessH *handlers.ModuleAccessHandler,
+	fiberxDataH *handlers.FiberxDataHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -111,6 +112,22 @@ func SetupRouter(
 			leaves.POST("", leaveH.Request)
 			leaves.GET("/me", leaveH.MyLeaves)
 			leaves.GET("/pending", leaveH.PendingForApproval)
+		}
+
+		// FiberxData
+		fiberxData := protected.Group("/fiberx-data")
+		{
+			fiberxData.GET("", fiberxDataH.GetVisibleDocuments)
+			fiberxData.GET("/:id", fiberxDataH.GetDocument)
+			fiberxData.POST("", fiberxDataH.CreateDocument)
+			fiberxData.PUT("/:id", fiberxDataH.UpdateDocument)
+			fiberxData.DELETE("/:id", fiberxDataH.DeleteDocument)
+			
+			// Access Management
+			fiberxData.GET("/:id/access", fiberxDataH.GetEmployeeAccessList)
+			fiberxData.POST("/:id/access", fiberxDataH.SetEmployeeAccess)
+			fiberxData.GET("/:id/shares", fiberxDataH.GetDepartmentShares)
+			fiberxData.POST("/:id/shares", fiberxDataH.SetDepartmentShare)
 		}
 
 		// Leave Balances (Admin only for sync/update)

@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useMyLinks } from '@/hooks/useModuleAccess';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
-  ShieldCheck, ClipboardList, Building2,
+  ShieldCheck, ClipboardList, Building2, Database,
   Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, User, Link as LinkIcon, Bell
 } from 'lucide-react';
 
@@ -23,8 +23,9 @@ const navItems = [
   { to: '/leave-config', label: 'Leave Config', icon: CalendarDays, roles: ['admin'] },
   { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements' },
-  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
+  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'] },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
