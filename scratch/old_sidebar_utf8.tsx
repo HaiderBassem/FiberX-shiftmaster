@@ -1,10 +1,10 @@
-import { Link, useLocation } from 'react-router-dom';
+﻿import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { useMyLinks } from '@/hooks/useModuleAccess';
+import { useMyModules } from '@/hooks/useModuleAccess';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2,
-  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, User, Link as LinkIcon
+  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, User
 } from 'lucide-react';
 
 const navItems = [
@@ -29,7 +29,7 @@ const navItems = [
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
-  const { data: myModules } = useMyLinks();
+  const { data: myModules } = useMyModules();
 
   const visibleItems = navItems.filter((item) => {
     if (!user) return false;
@@ -49,7 +49,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
 
   return (
     <aside className="w-64 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
-      {/* ── Brand ── */}
+      {/* ظ¤ظ¤ Brand ظ¤ظ¤ */}
       <div className="px-5 py-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center glow-teal-sm">
@@ -75,7 +75,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         )}
       </div>
 
-      {/* ── Nav ── */}
+      {/* ظ¤ظ¤ Nav ظ¤ظ¤ */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {visibleItems.map((item) => {
           const isActive =
@@ -108,51 +108,13 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
       </nav>
 
-      {/* ── Dynamic External Tools ── */}
-      {myModules && (() => {
-        const otherLinks = myModules.filter(link => !(['Live Map', 'Ticket System'].includes(link.title) || link.url.includes('maps.shift-master.org') || link.url.includes('ticket.shift-master.org')));
-        if (otherLinks.length === 0) return null;
-        
-        return (
-          <div className="px-3 pb-3">
-            <div className="p-2 bg-white/5 border border-white/5 rounded-xl space-y-1">
-              <h3 className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">External Tools</h3>
-              {otherLinks.map(link => {
-                const Icon = (() => {
-                  switch (link.icon_name) {
-                    case 'map-pin': return MapPin;
-                    case 'ticket': return Ticket;
-                    case 'external-link': return ExternalLink;
-                    case 'calendar': return Calendar;
-                    case 'users': return Users;
-                    case 'book-open': return BookOpen;
-                    default: return LinkIcon;
-                  }
-                })();
-                
-                return (
-                  <button
-                    key={link.id}
-                    onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
-                    className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-colors group text-left"
-                  >
-                    <Icon className="w-4 h-4 text-gray-400 group-hover:text-purple-400 transition-colors" />
-                    <span className="flex-1 truncate">{link.title}</span>
-                    <ExternalLink className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── Live Map Tab ── */}
-      {(user?.role === 'admin' || myModules?.some(link => link.title === 'Live Map' || link.url.includes('maps.shift-master.org'))) && (
+      {/* ظ¤ظ¤ Live Map Tab ظ¤ظ¤ */}
+      {myModules?.includes('live_map') && (
       <div className="px-3 pb-3">
         <button
           id="live-map-tab"
           onClick={() => {
+            // ╪ز╪ص╪»┘è╪» ╪د┘┘â╪▒┘è╪»┘╪┤┘╪▓ ╪ص╪│╪ذ ╪د┘╪»┘ê╪▒
             const sysRoles = ['admin', 'manager', 'team_leader'];
             const isSys = user && sysRoles.includes(user.role);
             const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
@@ -167,6 +129,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             boxShadow: '0 0 18px rgba(12,204,204,0.10), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}
         >
+          {/* Geometric hex background */}
           <svg
             className="absolute right-0 top-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20"
             width="80" height="56" viewBox="0 0 80 56" fill="none"
@@ -177,7 +140,9 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             <polygon points="40,10 52,17 52,31 40,38 28,31 28,17" stroke="#01A3A3" strokeWidth="0.6" fill="none" />
           </svg>
 
+          {/* Icon with animated ring */}
           <div className="relative flex-shrink-0">
+            {/* Pulse ring */}
             <span
               className="absolute inset-0 rounded-lg animate-ping"
               style={{ background: 'rgba(12,204,204,0.20)', animationDuration: '2.5s' }}
@@ -194,6 +159,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             </div>
           </div>
 
+          {/* Text */}
           <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-semibold leading-tight" style={{ color: '#0CCCCC' }}>
               Live Map
@@ -203,6 +169,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             </p>
           </div>
 
+          {/* External link icon */}
           <ExternalLink
             className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
             style={{ color: 'rgba(12,204,204,0.70)' }}
@@ -211,8 +178,8 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       </div>
       )}
 
-      {/* ── Ticket System Tab ── */}
-      {(user?.role === 'admin' || myModules?.some(link => link.title === 'Ticket System' || link.url.includes('ticket.shift-master.org'))) && (
+      {/* ظ¤ظ¤ Ticket System Tab ظ¤ظ¤ */}
+      {myModules?.includes('ticket_system') && (
       <div className="px-3 pb-3">
         <button
           id="ticket-system-tab"
@@ -224,6 +191,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             boxShadow: '0 0 18px rgba(139,92,246,0.10), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}
         >
+          {/* Geometric background */}
           <svg
             className="absolute right-0 top-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20"
             width="80" height="56" viewBox="0 0 80 56" fill="none"
@@ -234,6 +202,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             <polygon points="40,10 52,17 52,31 40,38 28,31 28,17" stroke="#6D28D9" strokeWidth="0.6" fill="none" />
           </svg>
 
+          {/* Icon */}
           <div className="relative flex-shrink-0">
             <span
               className="absolute inset-0 rounded-lg animate-ping"
@@ -251,6 +220,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             </div>
           </div>
 
+          {/* Text */}
           <div className="flex-1 min-w-0 text-left">
             <p className="text-sm font-semibold leading-tight" style={{ color: '#A78BFA' }}>
               Ticket System
@@ -260,6 +230,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
             </p>
           </div>
 
+          {/* External link icon */}
           <ExternalLink
             className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
             style={{ color: 'rgba(139,92,246,0.70)' }}
@@ -268,10 +239,10 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       </div>
       )}
 
-      {/* ── Footer ── */}
+      {/* ظ¤ظ¤ Footer ظ¤ظ¤ */}
       <div className="px-5 py-4 border-t border-white/5">
         <p className="text-[10px] text-muted-foreground/50 text-center">
-          © {new Date().getFullYear()} Shiftmaster
+          ┬ر {new Date().getFullYear()} Shiftmaster
         </p>
       </div>
     </aside>
