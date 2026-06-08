@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/pkg/database"
 )
 
