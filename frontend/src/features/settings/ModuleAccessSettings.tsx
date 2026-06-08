@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { useDepartments } from '@/hooks/useDepartments';
-import { useEmployees } from '@/hooks/useEmployees';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 import { 
   useAllLinks, useCreateLink, useDeleteLink, 
   useLinkAccess, useSetDepartmentAccess, useSetEmployeeExclusion 
@@ -14,8 +14,23 @@ const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users'
 export const ModuleAccessSettings = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const { data: departments } = useDepartments();
-  const { data: employees } = useEmployees();
+  const { data: departmentsResponse } = useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const res = await api.get('/departments');
+      return res.data?.data || [];
+    }
+  });
+  const departments: any[] = departmentsResponse || [];
+
+  const { data: employeesResponse } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const res = await api.get('/employees');
+      return res.data?.data || [];
+    }
+  });
+  const employees: any[] = employeesResponse || [];
 
   // Links
   const { data: allLinks, isLoading: isLoadingLinks } = useAllLinks();
