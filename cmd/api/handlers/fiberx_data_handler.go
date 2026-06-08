@@ -93,6 +93,7 @@ func (h *FiberxDataHandler) CreateDocument(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) UpdateDocument(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -111,7 +112,7 @@ func (h *FiberxDataHandler) UpdateDocument(c *gin.Context) {
 	}
 	req.ID = docID
 
-	updated, err := h.svc.UpdateDocument(c.Request.Context(), &req, empID, role)
+	updated, err := h.svc.UpdateDocument(c.Request.Context(), &req, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -121,6 +122,7 @@ func (h *FiberxDataHandler) UpdateDocument(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) DeleteDocument(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -132,7 +134,7 @@ func (h *FiberxDataHandler) DeleteDocument(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.DeleteDocument(c.Request.Context(), docID, empID, role)
+	err = h.svc.DeleteDocument(c.Request.Context(), docID, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -142,6 +144,7 @@ func (h *FiberxDataHandler) DeleteDocument(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) GetEmployeeAccessList(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -153,7 +156,7 @@ func (h *FiberxDataHandler) GetEmployeeAccessList(c *gin.Context) {
 		return
 	}
 
-	list, err := h.svc.GetEmployeeAccessList(c.Request.Context(), docID, empID, role)
+	list, err := h.svc.GetEmployeeAccessList(c.Request.Context(), docID, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -163,6 +166,7 @@ func (h *FiberxDataHandler) GetEmployeeAccessList(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) SetEmployeeAccess(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -183,7 +187,7 @@ func (h *FiberxDataHandler) SetEmployeeAccess(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.SetEmployeeAccess(c.Request.Context(), docID, req.EmployeeID, req.AccessLevel, empID, role)
+	err = h.svc.SetEmployeeAccess(c.Request.Context(), docID, req.EmployeeID, req.AccessLevel, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -193,6 +197,7 @@ func (h *FiberxDataHandler) SetEmployeeAccess(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) GetDepartmentShares(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -204,7 +209,7 @@ func (h *FiberxDataHandler) GetDepartmentShares(c *gin.Context) {
 		return
 	}
 
-	list, err := h.svc.GetDepartmentShares(c.Request.Context(), docID, empID, role)
+	list, err := h.svc.GetDepartmentShares(c.Request.Context(), docID, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -214,6 +219,7 @@ func (h *FiberxDataHandler) GetDepartmentShares(c *gin.Context) {
 }
 
 func (h *FiberxDataHandler) SetDepartmentShare(c *gin.Context) {
+	depID := getDepartmentID(c)
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
@@ -234,7 +240,7 @@ func (h *FiberxDataHandler) SetDepartmentShare(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.SetDepartmentShare(c.Request.Context(), docID, req.DepartmentID, req.AccessLevel, empID, role)
+	err = h.svc.SetDepartmentShare(c.Request.Context(), docID, req.DepartmentID, req.AccessLevel, depID, empID, role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return

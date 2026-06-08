@@ -48,7 +48,7 @@ func (s *FiberxDataService) CreateDocument(ctx context.Context, doc *models.Fibe
 	if err != nil {
 		return nil, err
 	}
-	if role != "manager" && role != "admin" && !emp.CanManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
 		return nil, errors.New("only managers and authorized employees can create FiberX Data documents")
 	}
 	if doc.DepartmentID == uuid.Nil {
@@ -57,15 +57,15 @@ func (s *FiberxDataService) CreateDocument(ctx context.Context, doc *models.Fibe
 	return s.repo.CreateDocument(ctx, doc)
 }
 
-func (s *FiberxDataService) UpdateDocument(ctx context.Context, doc *models.FiberxData, employeeID uuid.UUID, role string) (*models.FiberxData, error) {
+func (s *FiberxDataService) UpdateDocument(ctx context.Context, doc *models.FiberxData, departmentID *uuid.UUID, employeeID uuid.UUID, role string) (*models.FiberxData, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
 	}
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")
 	}
-	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return nil, err
 	}
@@ -81,15 +81,15 @@ func (s *FiberxDataService) UpdateDocument(ctx context.Context, doc *models.Fibe
 	return s.repo.UpdateDocument(ctx, &existing.FiberxData)
 }
 
-func (s *FiberxDataService) DeleteDocument(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) error {
+func (s *FiberxDataService) DeleteDocument(ctx context.Context, id uuid.UUID, departmentID *uuid.UUID, employeeID uuid.UUID, role string) error {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return err
 	}
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return errors.New("employee does not belong to a department")
 	}
-	existing, err := s.repo.GetDocumentByID(ctx, id, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	existing, err := s.repo.GetDocumentByID(ctx, id, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return err
 	}
@@ -103,21 +103,21 @@ func (s *FiberxDataService) DeleteDocument(ctx context.Context, id uuid.UUID, em
 	return s.repo.DeleteDocument(ctx, id)
 }
 
-func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, targetEmployeeID uuid.UUID, accessLevel string, employeeID uuid.UUID, role string) error {
+func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, targetEmployeeID uuid.UUID, accessLevel string, departmentID *uuid.UUID, employeeID uuid.UUID, role string) error {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return err
 	}
-	if role != "manager" && role != "admin" && !emp.CanManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
 		return errors.New("only managers and authorized employees can manage access")
 	}
 
 	// targetEmp, err := s.empRepo.GetByID(ctx, targetEmployeeID) // if we needed to verify target emp
 	
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return errors.New("employee does not belong to a department")
 	}
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return err
 	}
@@ -132,18 +132,18 @@ func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, t
 	return s.repo.SetEmployeeAccess(ctx, documentID, targetEmployeeID, accessLevel, employeeID)
 }
 
-func (s *FiberxDataService) GetEmployeeAccessList(ctx context.Context, documentID uuid.UUID, employeeID uuid.UUID, role string) ([]models.FiberxDataEmployeeAccess, error) {
+func (s *FiberxDataService) GetEmployeeAccessList(ctx context.Context, documentID uuid.UUID, departmentID *uuid.UUID, employeeID uuid.UUID, role string) ([]models.FiberxDataEmployeeAccess, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
 	}
-	if role != "manager" && role != "admin" && !emp.CanManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
 		return nil, errors.New("only managers and authorized employees can view access lists")
 	}
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")
 	}
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return nil, err
 	}
@@ -154,19 +154,19 @@ func (s *FiberxDataService) GetEmployeeAccessList(ctx context.Context, documentI
 	return s.repo.GetEmployeeAccessList(ctx, documentID)
 }
 
-func (s *FiberxDataService) SetDepartmentShare(ctx context.Context, documentID, targetDepartmentID uuid.UUID, accessLevel string, employeeID uuid.UUID, role string) error {
+func (s *FiberxDataService) SetDepartmentShare(ctx context.Context, documentID, targetDepartmentID uuid.UUID, accessLevel string, departmentID *uuid.UUID, employeeID uuid.UUID, role string) error {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return err
 	}
-	if role != "manager" && role != "admin" && !emp.CanManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
 		return errors.New("only managers and authorized employees can manage shares")
 	}
 
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return errors.New("employee does not belong to a department")
 	}
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return err
 	}
@@ -180,18 +180,18 @@ func (s *FiberxDataService) SetDepartmentShare(ctx context.Context, documentID, 
 	return s.repo.SetDepartmentShare(ctx, documentID, targetDepartmentID, accessLevel, employeeID)
 }
 
-func (s *FiberxDataService) GetDepartmentShares(ctx context.Context, documentID uuid.UUID, employeeID uuid.UUID, role string) ([]models.FiberxDataDepartmentShare, error) {
+func (s *FiberxDataService) GetDepartmentShares(ctx context.Context, documentID uuid.UUID, departmentID *uuid.UUID, employeeID uuid.UUID, role string) ([]models.FiberxDataDepartmentShare, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
 	}
-	if role != "manager" && role != "admin" && !emp.CanManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
 		return nil, errors.New("only managers and authorized employees can view shares")
 	}
-	if emp.DepartmentID == nil {
+	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")
 	}
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, *emp.DepartmentID, employeeID, role, emp.CanManageFiberxData)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, *departmentID, employeeID, role, emp.CanManageFiberxData)
 	if err != nil {
 		return nil, err
 	}

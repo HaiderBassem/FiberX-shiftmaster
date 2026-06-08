@@ -42,7 +42,7 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 	`
 	
 	// If not manager/admin and doesn't have explicit manage permission, hide documents marked as 'hide'
-	if role != "manager" && role != "admin" && !canManageFiberxData {
+	if role != "manager" && role != "admin" && role != "team_leader" && !canManageFiberxData {
 		query += ` AND COALESCE(ea.access_level, 'read') != 'hide' `
 	}
 	
@@ -67,7 +67,7 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 		}
 		
 		// If manager or has can_manage_fiberx_data and it belongs to their department, grant 'write' access globally
-		if (role == "manager" || role == "admin" || canManageFiberxData) && !d.IsShared {
+		if (role == "manager" || role == "admin" || role == "team_leader" || canManageFiberxData) && !d.IsShared {
 			accLevel = "write"
 		}
 		
@@ -112,7 +112,7 @@ func (r *FiberxDataRepository) GetDocumentByID(ctx context.Context, id uuid.UUID
 		return nil, err
 	}
 
-	if (role == "manager" || role == "admin" || canManageFiberxData) && !d.IsShared {
+	if (role == "manager" || role == "admin" || role == "team_leader" || canManageFiberxData) && !d.IsShared {
 		accLevel = "write"
 	}
 
