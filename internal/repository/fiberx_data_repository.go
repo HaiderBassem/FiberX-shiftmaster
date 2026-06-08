@@ -20,7 +20,7 @@ func NewFiberxDataRepository(db *database.DB) *FiberxDataRepository {
 
 // Get accessible documents for an employee
 func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageFiberxData bool) ([]models.FiberxDataResponse, error) {
-	var docs []models.FiberxDataResponse
+	docs := []models.FiberxDataResponse{}
 	
 	query := `
 		SELECT 
@@ -183,7 +183,7 @@ func (r *FiberxDataRepository) GetEmployeeAccessList(ctx context.Context, docume
 	}
 	defer rows.Close()
 
-	var list []models.FiberxDataEmployeeAccess
+	list := []models.FiberxDataEmployeeAccess{}
 	for rows.Next() {
 		var a models.FiberxDataEmployeeAccess
 		if err := rows.Scan(&a.ID, &a.DataID, &a.EmployeeID, &a.AccessLevel, &a.GrantedBy, &a.CreatedAt, &a.EmployeeName); err != nil {
@@ -223,7 +223,7 @@ func (r *FiberxDataRepository) GetDepartmentShares(ctx context.Context, document
 	}
 	defer rows.Close()
 
-	var list []models.FiberxDataDepartmentShare
+	list := []models.FiberxDataDepartmentShare{}
 	for rows.Next() {
 		var s models.FiberxDataDepartmentShare
 		if err := rows.Scan(&s.ID, &s.DataID, &s.DepartmentID, &s.AccessLevel, &s.GrantedBy, &s.CreatedAt, &s.DepartmentName); err != nil {

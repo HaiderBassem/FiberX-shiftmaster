@@ -16,10 +16,12 @@ export function FiberxDataHub() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'my-dept' | 'shared'>('my-dept');
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data = [], isLoading } = useQuery({
     queryKey: ['fiberx-data'],
     queryFn: fiberxDataService.getVisible,
   });
+
+  const documents = Array.isArray(data) ? data : [];
 
   const canCreate = user?.role === 'manager' || user?.role === 'admin' || (user as any)?.can_manage_fiberx_data;
   const canManagePermissions = user?.role === 'manager' || user?.role === 'admin' || (user as any)?.can_manage_fiberx_data;
