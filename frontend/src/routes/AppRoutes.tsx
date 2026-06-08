@@ -10,7 +10,7 @@ import { MyTasksWeekly } from '../features/tasks/TaskList';
 import { TaskHub } from '../features/tasks/TaskHub';
 import { RequestHub } from '../features/requests/RequestHub';
 import { ApprovalDashboard } from '../features/approvals/ApprovalDashboard';
-import { NotificationList } from '../features/notifications/NotificationList';
+import { InboxPage } from '../features/notifications/InboxPage';
 import { Dashboard } from '../features/dashboard/Dashboard';
 import { DepartmentDetail } from '../features/departments/DepartmentDetail';
 import { EmployeeDetail } from '../features/employees/EmployeeDetail';
@@ -83,7 +83,7 @@ export const AppRoutes = () => {
             path="notifications" 
             element={
               <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
-                <NotificationList />
+                <InboxPage />
               </ProtectedRoute>
             } 
           />
