@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { useMyModules } from '@/hooks/useModuleAccess';
+import { useMyLinks } from '@/hooks/useModuleAccess';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2,
@@ -29,7 +29,7 @@ const navItems = [
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
-  const { data: myModules } = useMyModules();
+  const { data: myModules } = useMyLinks();
 
   const visibleItems = navItems.filter((item) => {
     if (!user) return false;
