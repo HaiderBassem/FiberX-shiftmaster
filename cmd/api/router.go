@@ -209,12 +209,12 @@ func SetupRouter(
 		{
 			externalLinks.GET("/my-links", moduleAccessH.GetMyModules)
 			
-			// Admin endpoints
-			externalLinks.GET("", middleware.RequireRole("admin"), moduleAccessH.GetAllLinks)
-			externalLinks.POST("", middleware.RequireRole("admin"), moduleAccessH.CreateLink)
-			externalLinks.PUT("/:id", middleware.RequireRole("admin"), moduleAccessH.UpdateLink)
-			externalLinks.DELETE("/:id", middleware.RequireRole("admin"), moduleAccessH.DeleteLink)
-			externalLinks.POST("/:link_id/departments", middleware.RequireRole("admin"), moduleAccessH.SetDepartmentAccess)
+			// Admin & Manager endpoints
+			externalLinks.GET("", middleware.RequireRole("admin", "manager"), moduleAccessH.GetAllLinks)
+			externalLinks.POST("", middleware.RequireRole("admin", "manager"), moduleAccessH.CreateLink)
+			externalLinks.PUT("/:id", middleware.RequireRole("admin", "manager"), moduleAccessH.UpdateLink)
+			externalLinks.DELETE("/:id", middleware.RequireRole("admin", "manager"), moduleAccessH.DeleteLink)
+			externalLinks.POST("/:link_id/departments", middleware.RequireRole("admin", "manager"), moduleAccessH.SetDepartmentAccess)
 			
 			// Supervisor endpoints
 			externalLinks.GET("/:link_id/access", middleware.RequireRole("admin", "manager", "team_leader"), moduleAccessH.GetAccess)

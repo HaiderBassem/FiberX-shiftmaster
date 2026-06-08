@@ -12,8 +12,7 @@ import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLi
 const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users', 'book-open'];
 
 export const ModuleAccessSettings = () => {
-  const { user } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const user = useAuthStore(state => state.user);
   const { data: departmentsResponse } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
@@ -75,11 +74,19 @@ export const ModuleAccessSettings = () => {
     }
   };
 
-  if (!isAdmin && user?.role !== 'manager' && user?.role !== 'team_leader') {
-    return <div className="p-6 text-red-500">Access Denied</div>;
+  const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+  
+  if (!isAdmin && user?.role !== 'team_leader') {
+    return (
+      <div className="p-6 text-center">
+        <ShieldCheck className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+        <p className="text-gray-400">You do not have permission to view external modules settings.</p>
+      </div>
+    );
   }
 
-  // Determine which departments the current user is allowed to manage
+  // Determine which departments this user can manage
   const manageableDepartments = isAdmin 
     ? departments 
     : departments?.filter(d => d.id === user?.department_id);
