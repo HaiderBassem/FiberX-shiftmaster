@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -7,7 +7,7 @@ import {
   useLinkAccess, useSetDepartmentAccess, useSetEmployeeExclusion 
 } from '@/hooks/useModuleAccess';
 import { Switch } from '@/components/ui/switch';
-import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLink, Calendar, Users, BookOpen } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLink, Calendar, Users, BookOpen, AlertCircle } from 'lucide-react';
 
 const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users', 'book-open'];
 
@@ -32,13 +32,14 @@ export const ModuleAccessSettings = () => {
   const employees: any[] = employeesResponse || [];
 
   // Links
-  const { data: allLinks, isLoading: isLoadingLinks } = useAllLinks();
+  const { data: allLinks, isLoading: isLoadingLinks, error: linksError } = useAllLinks();
   const createLink = useCreateLink();
   const deleteLink = useDeleteLink();
 
   // UI State
   const [activeTab, setActiveTab] = useState<'access' | 'links'>('access');
   const [selectedLink, setSelectedLink] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Access data
   const { data: accessData, isLoading: isLoadingAccess } = useLinkAccess(selectedLink || null);
@@ -50,14 +51,33 @@ export const ModuleAccessSettings = () => {
   const [newUrl, setNewUrl] = useState('');
   const [newIcon, setNewIcon] = useState('link');
 
+  // Smart default tab: if no links exist, show "Manage Links" tab
+  useEffect(() => {
+    if (!isLoadingLinks && (!allLinks || allLinks.length === 0)) {
+      setActiveTab('links');
+    }
+  }, [isLoadingLinks, allLinks]);
+
+  // Auto-dismiss error after 5 seconds
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => setErrorMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
   const handleCreateLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle || !newUrl) return;
+    setErrorMessage(null);
     createLink.mutate({ title: newTitle, url: newUrl, icon_name: newIcon }, {
       onSuccess: () => {
         setNewTitle('');
         setNewUrl('');
         setNewIcon('link');
+      },
+      onError: (err: any) => {
+        setErrorMessage(err?.response?.data?.error || err?.message || 'Failed to create link. Please try again.');
       }
     });
   };
@@ -125,6 +145,17 @@ export const ModuleAccessSettings = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
+
+        {/* Error Banner */}
+        {(errorMessage || linksError) && (
+          <div className="mb-4 max-w-4xl flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <p className="text-sm">{errorMessage || 'Failed to load external links. The database tables may not exist yet — try restarting the server.'}</p>
+            {errorMessage && (
+              <button onClick={() => setErrorMessage(null)} className="ml-auto text-red-400 hover:text-red-300 text-xs">✕</button>
+            )}
+          </div>
+        )}
         
         {/* --- LINKS MANAGEMENT TAB --- */}
         {isAdmin && activeTab === 'links' && (
@@ -185,7 +216,9 @@ export const ModuleAccessSettings = () => {
                     <button 
                       onClick={() => {
                         if (confirm('Are you sure you want to delete this link?')) {
-                          deleteLink.mutate(link.id);
+                          deleteLink.mutate(link.id, {
+                            onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to delete link.')
+                          });
                         }
                       }}
                       disabled={deleteLink.isPending}
@@ -248,7 +281,10 @@ export const ModuleAccessSettings = () => {
                               <Switch
                                 checked={isDeptGranted}
                                 onCheckedChange={(checked) => 
-                                  setDepartmentAccess.mutate({ linkId: selectedLink, departmentId: dept.id, grant: checked })
+                                  setDepartmentAccess.mutate(
+                                    { linkId: selectedLink, departmentId: dept.id, grant: checked },
+                                    { onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to update department access.') }
+                                  )
                                 }
                                 disabled={setDepartmentAccess.isPending}
                               />
@@ -286,7 +322,10 @@ export const ModuleAccessSettings = () => {
                                         checked={hasAccess}
                                         onCheckedChange={(checked) => 
                                           // Exclude if checked is false (meaning they shouldn't have access)
-                                          setEmployeeExclusion.mutate({ linkId: selectedLink, employeeId: emp.id, exclude: !checked })
+                                          setEmployeeExclusion.mutate(
+                                            { linkId: selectedLink, employeeId: emp.id, exclude: !checked },
+                                            { onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to update employee access.') }
+                                          )
                                         }
                                         disabled={setEmployeeExclusion.isPending}
                                       />

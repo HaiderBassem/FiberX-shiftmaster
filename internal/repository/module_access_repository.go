@@ -43,33 +43,74 @@ func NewModuleAccessRepository(db *database.DB) ModuleAccessRepository {
 }
 
 func (r *moduleAccessRepo) autoMigrate() {
-	query := `
-	CREATE TABLE IF NOT EXISTS external_links (
-		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-		title VARCHAR(255) NOT NULL,
-		url VARCHAR(2048) NOT NULL,
-		icon_name VARCHAR(100) DEFAULT 'link',
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		created_by UUID REFERENCES employees(id) ON DELETE SET NULL
-	);
-	CREATE TABLE IF NOT EXISTS link_departments (
-		link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
-		department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-		granted_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (link_id, department_id)
-	);
-	CREATE TABLE IF NOT EXISTS link_exclusions (
-		link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
-		employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-		excluded_by UUID REFERENCES employees(id) ON DELETE SET NULL,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (link_id, employee_id)
-	);
-	`
-	_, err := r.db.Exec(context.Background(), query)
+	ctx := context.Background()
+
+	// Step 1: Create external_links table
+	_, err := r.db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS external_links (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			title VARCHAR(255) NOT NULL,
+			url VARCHAR(2048) NOT NULL,
+			icon_name VARCHAR(100) DEFAULT 'link',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			created_by UUID REFERENCES employees(id) ON DELETE SET NULL
+		)
+	`)
 	if err != nil {
-		log.Printf("Failed to auto-migrate external_links tables: %v", err)
+		log.Printf("[ExternalModules] FAILED to create external_links table: %v", err)
+		return
+	}
+	log.Println("[ExternalModules] ✓ external_links table ready")
+
+	// Step 2: Create link_departments table
+	_, err = r.db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS link_departments (
+			link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
+			department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+			granted_by UUID REFERENCES employees(id) ON DELETE SET NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (link_id, department_id)
+		)
+	`)
+	if err != nil {
+		log.Printf("[ExternalModules] FAILED to create link_departments table: %v", err)
+		return
+	}
+	log.Println("[ExternalModules] ✓ link_departments table ready")
+
+	// Step 3: Create link_exclusions table
+	_, err = r.db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS link_exclusions (
+			link_id UUID NOT NULL REFERENCES external_links(id) ON DELETE CASCADE,
+			employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+			excluded_by UUID REFERENCES employees(id) ON DELETE SET NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (link_id, employee_id)
+		)
+	`)
+	if err != nil {
+		log.Printf("[ExternalModules] FAILED to create link_exclusions table: %v", err)
+		return
+	}
+	log.Println("[ExternalModules] ✓ link_exclusions table ready")
+
+	// Step 4: Seed Live Map if no links exist yet
+	var count int
+	err = r.db.QueryRow(ctx, `SELECT COUNT(*) FROM external_links`).Scan(&count)
+	if err != nil {
+		log.Printf("[ExternalModules] Warning: could not check existing links: %v", err)
+		return
+	}
+	if count == 0 {
+		_, err = r.db.Exec(ctx, `
+			INSERT INTO external_links (title, url, icon_name)
+			VALUES ('Live Map', 'https://maps.shift-master.org/', 'map-pin')
+		`)
+		if err != nil {
+			log.Printf("[ExternalModules] Warning: could not seed Live Map: %v", err)
+		} else {
+			log.Println("[ExternalModules] ✓ Seeded default Live Map link")
+		}
 	}
 }
 
