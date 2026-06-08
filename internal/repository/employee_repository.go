@@ -30,6 +30,7 @@ type EmployeeRepository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 	ForceDelete(ctx context.Context, id uuid.UUID) error
 	UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error
+	UpdateFiberxPermission(ctx context.Context, id uuid.UUID, canManage bool) error
 	UpdateAnnouncementPermission(ctx context.Context, id uuid.UUID, canPost bool) error
 	UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
