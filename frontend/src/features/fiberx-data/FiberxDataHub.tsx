@@ -6,12 +6,16 @@ import { fiberxDataService } from '../../services/fiberxDataService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
 import { FiberxDataPermissionsModal } from './FiberxDataPermissionsModal';
+import { FiberxDataGlobalPermissionsModal } from './FiberxDataGlobalPermissionsModal';
+import type { FiberxData } from '@/services/fiberxDataService';
 import { Button } from '@/components/ui/button';
 
 export function FiberxDataHub() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [isGlobalPermissionsOpen, setIsGlobalPermissionsOpen] = useState(false);
   const [selectedDocIdForPerms, setSelectedDocIdForPerms] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'my-dept' | 'shared'>('my-dept');
@@ -57,14 +61,11 @@ export function FiberxDataHub() {
           {canManagePermissions && (
             <Button
               variant="outline"
-              onClick={() => {
-                setSelectedDocIdForPerms(null); // Indicates global permission management if needed, but here we probably want it per doc. We'll disable global button or keep it for general dept settings.
-                setIsPermissionsModalOpen(true);
-              }}
-              className="gap-2 hidden" // Hiding global button, we'll put it on each document
+              onClick={() => setIsGlobalPermissionsOpen(true)}
+              className="gap-2"
             >
               <ShieldAlert className="w-4 h-4" />
-              <span>Manage Permissions</span>
+              <span>Global Permissions</span>
             </Button>
           )}
           {canCreate && (
@@ -79,7 +80,7 @@ export function FiberxDataHub() {
         </div>
       </div>
       
-      {selectedDocIdForPerms && (
+      {isPermissionsModalOpen && selectedDocIdForPerms && (
         <FiberxDataPermissionsModal 
           isOpen={isPermissionsModalOpen} 
           onClose={() => {
@@ -89,6 +90,11 @@ export function FiberxDataHub() {
           documentId={selectedDocIdForPerms}
         />
       )}
+
+      <FiberxDataGlobalPermissionsModal
+        isOpen={isGlobalPermissionsOpen}
+        onClose={() => setIsGlobalPermissionsOpen(false)}
+      />
 
       <div className="bg-card rounded-xl shadow-sm border border-border p-4 flex flex-col sm:flex-row gap-4 justify-between items-center">
         <div className="flex p-1 bg-muted rounded-lg w-full sm:w-auto">

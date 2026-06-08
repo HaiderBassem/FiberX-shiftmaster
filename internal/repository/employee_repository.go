@@ -299,9 +299,15 @@ func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 
 
 
-func (r *employeeRepo) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
+func (r *employeeRepo) UpdateFiberxPermission(ctx context.Context, id uuid.UUID, canManageFiberxData bool) error {
+	query := `UPDATE employees SET can_manage_fiberx_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id, canManageFiberxData)
+	return err
+}
+
+func (r *employeeRepo) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManageHelpDocs bool) error {
 	query := `UPDATE employees SET can_manage_help_docs = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
-	_, err := r.db.Exec(ctx, query, id, canManage)
+	_, err := r.db.Exec(ctx, query, id, canManageHelpDocs)
 	return err
 }
 

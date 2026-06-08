@@ -167,8 +167,12 @@ func (s *EmployeeService) UpdateProfileImage(ctx context.Context, id uuid.UUID, 
 }
 
 
-func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManage bool) error {
-	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManage)
+func (s *EmployeeService) UpdateFiberxPermission(ctx context.Context, id uuid.UUID, canManageFiberxData bool) error {
+	return s.employeeRepo.UpdateFiberxPermission(ctx, id, canManageFiberxData)
+}
+
+func (s *EmployeeService) UpdateHelpPermission(ctx context.Context, id uuid.UUID, canManageHelpDocs bool) error {
+	return s.employeeRepo.UpdateHelpPermission(ctx, id, canManageHelpDocs)
 }
 
 func (s *EmployeeService) UpdateAnnouncementPermission(ctx context.Context, id uuid.UUID, canPost bool) error {
