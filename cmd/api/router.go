@@ -30,6 +30,7 @@ func SetupRouter(
 	pushH *handlers.PushHandler,
 	handoverH *handlers.HandoverHandler,
 	uploadH *handlers.UploadHandler,
+	moduleAccessH *handlers.ModuleAccessHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -201,6 +202,19 @@ func SetupRouter(
 			// Access Management
 			helpDocs.GET("/:id/access", helpDocH.GetAccessList)
 			helpDocs.POST("/:id/access", helpDocH.SetEmployeeAccess)
+		}
+
+		// Module Access
+		modules := protected.Group("/modules")
+		{
+			modules.GET("/my-access", moduleAccessH.GetMyModules)
+			
+			// Admin endpoints
+			modules.POST("/:module_name/departments", middleware.RequireRole("admin"), moduleAccessH.SetDepartmentAccess)
+			
+			// Supervisor endpoints
+			modules.GET("/:module_name/access", middleware.RequireRole("admin", "manager", "team_leader"), moduleAccessH.GetAccess)
+			modules.POST("/:module_name/employees", middleware.RequireRole("manager", "team_leader"), moduleAccessH.SetEmployeeExclusion)
 		}
 
 		// --- Supervisor routes (manager + admin + team_leader) ---

@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
+import { useMyModules } from '@/hooks/useModuleAccess';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2,
@@ -22,11 +23,13 @@ const navItems = [
   { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements' },
+  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
+  const { data: myModules } = useMyModules();
 
   const visibleItems = navItems.filter((item) => {
     if (!user) return false;
@@ -106,6 +109,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       </nav>
 
       {/* ── Live Map Tab ── */}
+      {myModules?.includes('live_map') && (
       <div className="px-3 pb-3">
         <button
           id="live-map-tab"
@@ -172,8 +176,10 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
           />
         </button>
       </div>
+      )}
 
       {/* ── Ticket System Tab ── */}
+      {myModules?.includes('ticket_system') && (
       <div className="px-3 pb-3">
         <button
           id="ticket-system-tab"
@@ -231,6 +237,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
           />
         </button>
       </div>
+      )}
 
       {/* ── Footer ── */}
       <div className="px-5 py-4 border-t border-white/5">

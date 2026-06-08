@@ -24,6 +24,7 @@ import { AnnouncementManager } from '../features/announcements/AnnouncementManag
 import InteractiveCalendar from '../features/calendar/InteractiveCalendar';
 import { LeaveTypeManager } from '../features/leaves/LeaveTypeManager';
 import HandoverBoard from '../features/handovers/HandoverBoard';
+import { ModuleAccessSettings } from '../features/settings/ModuleAccessSettings';
 
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -180,6 +181,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['manager', 'admin']} allowAnnouncementsAccess={true}>
                 <AnnouncementManager />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="module-settings" 
+            element={
+              <ProtectedRoute allowedRoles={['team_leader', 'manager', 'admin']}>
+                <ModuleAccessSettings />
               </ProtectedRoute>
             } 
           />
