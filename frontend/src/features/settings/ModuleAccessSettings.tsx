@@ -346,11 +346,11 @@ const ModuleAccessSettingsInner = () => {
                                   <div key={emp.id} className="flex items-center justify-between py-3">
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs border border-blue-500/30">
-                                        {(emp.name || '?').charAt(0)}
+                                        {(emp.first_name || emp.name || '?').charAt(0)}
                                       </div>
                                       <div>
-                                        <p className="text-sm font-medium text-gray-200">{emp.name || 'Unknown'}</p>
-                                        <p className="text-xs text-gray-500">{emp.role || 'employee'}</p>
+                                        <p className="text-sm font-medium text-gray-200">{emp.first_name ? `${emp.first_name} ${emp.last_name || ''}`.trim() : (emp.name || 'Unknown')}</p>
+                                        <p className="text-xs text-gray-500">{emp.role || emp.position || 'employee'}</p>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-3">
