@@ -98,6 +98,10 @@ func (s *ModuleAccessService) GetMyModules(ctx context.Context, employeeID uuid.
 	if err != nil {
 		return nil, fmt.Errorf("employee not found: %w", err)
 	}
+	if emp.Role == "admin" {
+		return s.repo.GetAllLinks(ctx)
+	}
+	
 	if emp.DepartmentID == nil {
 		return []models.ExternalLink{}, nil
 	}
