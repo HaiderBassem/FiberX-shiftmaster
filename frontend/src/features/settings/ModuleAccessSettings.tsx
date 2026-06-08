@@ -218,7 +218,7 @@ export const ModuleAccessSettings = () => {
                 ) : (
                   manageableDepartments?.map((dept) => {
                     // Check if department is granted
-                    const isDeptGranted = accessData?.departments.includes(dept.id);
+                    const isDeptGranted = (accessData?.departments || []).includes(dept.id);
                     // Get all employees for this dept
                     const deptEmployees = employees?.filter(e => e.department_id === dept.id) || [];
 
@@ -257,7 +257,7 @@ export const ModuleAccessSettings = () => {
                             ) : (
                               deptEmployees.map(emp => {
                                 // If they are IN excluded_employees, they DON'T have access
-                                const isExcluded = accessData?.excluded_employees.includes(emp.id);
+                                const isExcluded = (accessData?.excluded_employees || []).includes(emp.id);
                                 const hasAccess = !isExcluded;
 
                                 return (
