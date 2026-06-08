@@ -108,111 +108,101 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
       </nav>
 
-      {/* ── Dynamic External Tools ── */}
-      {myModules && (() => {
-        const otherLinks = myModules.filter(link => !(['Live Map'].includes(link.title) || link.url.includes('maps.shift-master.org')));
-        if (otherLinks.length === 0) return null;
-        
-        return (
-          <div className="px-3 pb-3">
-            <div className="p-2 bg-white/5 border border-white/5 rounded-xl space-y-1">
-              <h3 className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">External Tools</h3>
-              {otherLinks.map(link => {
-                const Icon = (() => {
-                  switch (link.icon_name) {
-                    case 'map-pin': return MapPin;
-                    case 'ticket': return Ticket;
-                    case 'external-link': return ExternalLink;
-                    case 'calendar': return Calendar;
-                    case 'users': return Users;
-                    case 'book-open': return BookOpen;
-                    default: return LinkIcon;
-                  }
-                })();
-                
+      {/* ── External Tools (dynamic, access-controlled) ── */}
+      {myModules && myModules.length > 0 && (
+        <div className="px-3 pb-3">
+          <div className="p-2 bg-white/5 border border-white/5 rounded-xl space-y-1">
+            <h3 className="px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">External Tools</h3>
+            {myModules.map(link => {
+              const isLiveMap = link.title === 'Live Map' || link.url.includes('maps.shift-master.org');
+              
+              const Icon = (() => {
+                switch (link.icon_name) {
+                  case 'map-pin': return MapPin;
+                  case 'ticket': return Ticket;
+                  case 'external-link': return ExternalLink;
+                  case 'calendar': return Calendar;
+                  case 'users': return Users;
+                  case 'book-open': return BookOpen;
+                  default: return LinkIcon;
+                }
+              })();
+
+              const handleClick = () => {
+                if (isLiveMap) {
+                  // Auto-login logic: admin/manager/team_leader get sys credentials, employees get emp credentials
+                  const sysRoles = ['admin', 'manager', 'team_leader'];
+                  const isSys = user && sysRoles.includes(user.role);
+                  const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
+                  const p = isSys ? 'fibersysX' : 'empfiberX';
+                  const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
+                  window.open(url, '_blank', 'noopener,noreferrer');
+                } else {
+                  window.open(link.url, '_blank', 'noopener,noreferrer');
+                }
+              };
+
+              // Live Map gets a premium style
+              if (isLiveMap) {
                 return (
                   <button
                     key={link.id}
-                    onClick={() => window.open(link.url, '_blank', 'noopener,noreferrer')}
-                    className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-colors group text-left"
+                    onClick={handleClick}
+                    className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(12,204,204,0.18) 0%, rgba(1,163,163,0.10) 100%)',
+                      border: '1px solid rgba(12,204,204,0.30)',
+                      boxShadow: '0 0 18px rgba(12,204,204,0.10), inset 0 1px 0 rgba(255,255,255,0.06)',
+                    }}
                   >
-                    <Icon className="w-4 h-4 text-gray-400 group-hover:text-purple-400 transition-colors" />
-                    <span className="flex-1 truncate">{link.title}</span>
-                    <ExternalLink className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="relative flex-shrink-0">
+                      <span
+                        className="absolute inset-0 rounded-lg animate-ping"
+                        style={{ background: 'rgba(12,204,204,0.20)', animationDuration: '2.5s' }}
+                      />
+                      <div
+                        className="relative w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{
+                          background: 'linear-gradient(135deg, #0CCCCC 0%, #01A3A3 100%)',
+                          boxShadow: '0 0 14px rgba(12,204,204,0.45)',
+                          clipPath: 'polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%)',
+                        }}
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-black" />
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <p className="text-sm font-semibold leading-tight" style={{ color: '#0CCCCC' }}>
+                        {link.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        maps.shift-master.org
+                      </p>
+                    </div>
+                    <ExternalLink
+                      className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                      style={{ color: 'rgba(12,204,204,0.70)' }}
+                    />
                   </button>
                 );
-              })}
-            </div>
+              }
+
+              // Regular links
+              return (
+                <button
+                  key={link.id}
+                  onClick={handleClick}
+                  className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm text-gray-300 hover:text-white hover:bg-white/10 transition-colors group text-left"
+                >
+                  <Icon className="w-4 h-4 text-gray-400 group-hover:text-purple-400 transition-colors" />
+                  <span className="flex-1 truncate">{link.title}</span>
+                  <ExternalLink className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              );
+            })}
           </div>
-        );
-      })()}
-
-      {/* ── Live Map Tab ── */}
-      {(user?.role === 'admin' || myModules?.some(link => link.title === 'Live Map' || link.url.includes('maps.shift-master.org'))) && (
-      <div className="px-3 pb-3">
-        <button
-          id="live-map-tab"
-          onClick={() => {
-            const sysRoles = ['admin', 'manager', 'team_leader'];
-            const isSys = user && sysRoles.includes(user.role);
-            const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
-            const p = isSys ? 'fibersysX' : 'empfiberX';
-            const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }}
-          className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-3 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
-          style={{
-            background: 'linear-gradient(135deg, rgba(12,204,204,0.18) 0%, rgba(1,163,163,0.10) 100%)',
-            border: '1px solid rgba(12,204,204,0.30)',
-            boxShadow: '0 0 18px rgba(12,204,204,0.10), inset 0 1px 0 rgba(255,255,255,0.06)',
-          }}
-        >
-          <svg
-            className="absolute right-0 top-0 opacity-10 transition-opacity duration-300 group-hover:opacity-20"
-            width="80" height="56" viewBox="0 0 80 56" fill="none"
-            aria-hidden="true"
-          >
-            <polygon points="56,4 76,16 76,40 56,52 36,40 36,16" stroke="#0CCCCC" strokeWidth="1.2" fill="rgba(12,204,204,0.08)" />
-            <polygon points="72,0 80,4 80,12 72,16 64,12 64,4" stroke="#0CCCCC" strokeWidth="0.8" fill="none" />
-            <polygon points="40,10 52,17 52,31 40,38 28,31 28,17" stroke="#01A3A3" strokeWidth="0.6" fill="none" />
-          </svg>
-
-          <div className="relative flex-shrink-0">
-            <span
-              className="absolute inset-0 rounded-lg animate-ping"
-              style={{ background: 'rgba(12,204,204,0.20)', animationDuration: '2.5s' }}
-            />
-            <div
-              className="relative w-9 h-9 rounded-lg flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, #0CCCCC 0%, #01A3A3 100%)',
-                boxShadow: '0 0 14px rgba(12,204,204,0.45)',
-                clipPath: 'polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%)',
-              }}
-            >
-              <MapPin className="w-4 h-4 text-black" />
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0 text-left">
-            <p className="text-sm font-semibold leading-tight" style={{ color: '#0CCCCC' }}>
-              Live Map
-            </p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              maps.shift-master.org
-            </p>
-          </div>
-
-          <ExternalLink
-            className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            style={{ color: 'rgba(12,204,204,0.70)' }}
-          />
-        </button>
-      </div>
+        </div>
       )}
-
-
-
       {/* ── Footer ── */}
       <div className="px-5 py-4 border-t border-white/5">
         <p className="text-[10px] text-muted-foreground/50 text-center">
