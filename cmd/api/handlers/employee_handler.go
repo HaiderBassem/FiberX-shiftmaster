@@ -195,6 +195,7 @@ type createEmployeeRequest struct {
 	CanCoverNightShift   bool       `json:"can_cover_night_shift"`
 	CanManageHelpDocs    bool       `json:"can_manage_help_docs"`
 	CanPostAnnouncements bool       `json:"can_post_announcements"`
+	CanManageFiberxData  bool       `json:"can_manage_fiberx_data"`
 	Status               string     `json:"status"`
 	ProfileImage         *string    `json:"profile_image"`
 	SecondaryPhone       *string    `json:"secondary_phone"`
@@ -308,6 +309,7 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 		CanCoverNightShift:   req.CanCoverNightShift,
 		CanManageHelpDocs:    req.CanManageHelpDocs,
 		CanPostAnnouncements: req.CanPostAnnouncements,
+		CanManageFiberxData:  req.CanManageFiberxData,
 		Status:               req.Status,
 		ProfileImage:         req.ProfileImage,
 		SecondaryPhone:       req.SecondaryPhone,
@@ -337,6 +339,7 @@ type updateEmployeeRequest struct {
 	CanCoverNightShift   bool       `json:"can_cover_night_shift"`
 	CanManageHelpDocs    *bool      `json:"can_manage_help_docs"`
 	CanPostAnnouncements *bool      `json:"can_post_announcements"`
+	CanManageFiberxData  *bool      `json:"can_manage_fiberx_data"`
 	Status               string     `json:"status"`
 	ProfileImage         *string    `json:"profile_image"`
 	SecondaryPhone       *string    `json:"secondary_phone"`
@@ -474,6 +477,7 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		// or omitted from the update payload
 		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
 		CanPostAnnouncements: func() bool { if req.CanPostAnnouncements != nil { return *req.CanPostAnnouncements }; return current.CanPostAnnouncements }(),
+		CanManageFiberxData:  func() bool { if req.CanManageFiberxData != nil { return *req.CanManageFiberxData }; return current.CanManageFiberxData }(),
 		CanCreateTables:    current.CanCreateTables,
 		UIPreferences:      current.UIPreferences,
 		Status:             req.Status,
