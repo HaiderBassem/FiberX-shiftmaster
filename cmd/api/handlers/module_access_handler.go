@@ -17,7 +17,81 @@ func NewModuleAccessHandler(svc *service.ModuleAccessService) *ModuleAccessHandl
 	return &ModuleAccessHandler{svc: svc}
 }
 
-// GetMyModules returns the list of modules the current user is allowed to access
+// ---- Link CRUD (Admin Only) ----
+func (h *ModuleAccessHandler) CreateLink(c *gin.Context) {
+	var req struct {
+		Title    string `json:"title" binding:"required"`
+		URL      string `json:"url" binding:"required"`
+		IconName string `json:"icon_name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	link, err := h.svc.CreateLink(c.Request.Context(), req.Title, req.URL, req.IconName, &empID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": link})
+}
+
+func (h *ModuleAccessHandler) UpdateLink(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
+		return
+	}
+
+	var req struct {
+		Title    string `json:"title" binding:"required"`
+		URL      string `json:"url" binding:"required"`
+		IconName string `json:"icon_name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	if err := h.svc.UpdateLink(c.Request.Context(), id, req.Title, req.URL, req.IconName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *ModuleAccessHandler) DeleteLink(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
+		return
+	}
+
+	if err := h.svc.DeleteLink(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *ModuleAccessHandler) GetAllLinks(c *gin.Context) {
+	links, err := h.svc.GetAllLinks(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": links})
+}
+
+// ---- Access Management ----
+
 func (h *ModuleAccessHandler) GetMyModules(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
@@ -31,17 +105,16 @@ func (h *ModuleAccessHandler) GetMyModules(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": modules})
 }
 
-// GetAccess returns access config for a specific module (filtered by department context if not admin)
 func (h *ModuleAccessHandler) GetAccess(c *gin.Context) {
-	moduleName := c.Param("module_name")
+	linkID, err := uuid.Parse(c.Param("link_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
+		return
+	}
 	
-	// If the user is manager/TL, we only care about exclusions in their department
 	depID := getDepartmentID(c) 
-	
-	// Wait, if it's an admin requesting WITHOUT a department ID, depID is nil, and GetExcludedEmployees will return all.
-	// If it's a manager, depID is populated by the middleware, so it scopes properly.
 
-	resp, err := h.svc.GetModuleAccess(c.Request.Context(), moduleName, depID)
+	resp, err := h.svc.GetLinkAccess(c.Request.Context(), linkID, depID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -51,7 +124,12 @@ func (h *ModuleAccessHandler) GetAccess(c *gin.Context) {
 }
 
 func (h *ModuleAccessHandler) SetDepartmentAccess(c *gin.Context) {
-	moduleName := c.Param("module_name")
+	linkID, err := uuid.Parse(c.Param("link_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
+		return
+	}
+
 	var req struct {
 		DepartmentID uuid.UUID `json:"department_id"`
 		Grant        bool      `json:"grant"`
@@ -64,7 +142,7 @@ func (h *ModuleAccessHandler) SetDepartmentAccess(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	if err := h.svc.SetDepartmentAccess(c.Request.Context(), moduleName, req.DepartmentID, req.Grant, &empID); err != nil {
+	if err := h.svc.SetDepartmentAccess(c.Request.Context(), linkID, req.DepartmentID, req.Grant, &empID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -73,7 +151,12 @@ func (h *ModuleAccessHandler) SetDepartmentAccess(c *gin.Context) {
 }
 
 func (h *ModuleAccessHandler) SetEmployeeExclusion(c *gin.Context) {
-	moduleName := c.Param("module_name")
+	linkID, err := uuid.Parse(c.Param("link_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
+		return
+	}
+
 	var req struct {
 		EmployeeID uuid.UUID `json:"employee_id"`
 		Exclude    bool      `json:"exclude"` // true means they CANNOT see it
@@ -85,11 +168,8 @@ func (h *ModuleAccessHandler) SetEmployeeExclusion(c *gin.Context) {
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
-
-	// TODO: verify that the employee belongs to the manager's department (department context middleware handles most of this indirectly if we passed depID, but here we just toggle it. We assume the frontend only shows employees from their department).
-	// To be perfectly secure, we should verify EmployeeID belongs to depID.
 	
-	if err := h.svc.SetEmployeeExclusion(c.Request.Context(), moduleName, req.EmployeeID, req.Exclude, &empID); err != nil {
+	if err := h.svc.SetEmployeeExclusion(c.Request.Context(), linkID, req.EmployeeID, req.Exclude, &empID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}

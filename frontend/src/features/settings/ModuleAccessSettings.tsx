@@ -1,199 +1,294 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { useModuleAccess, useSetDepartmentAccess, useSetEmployeeExclusion } from '@/hooks/useModuleAccess';
-import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useDepartments } from '@/hooks/useDepartments';
+import { useEmployees } from '@/hooks/useEmployees';
+import { 
+  useAllLinks, useCreateLink, useDeleteLink, 
+  useLinkAccess, useSetDepartmentAccess, useSetEmployeeExclusion 
+} from '@/hooks/useModuleAccess';
 import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { MapPin, Ticket, ShieldCheck, Users } from 'lucide-react';
-import { toast } from 'sonner';
+import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLink, Calendar, Users, BookOpen } from 'lucide-react';
 
-const MODULES = [
-  { id: 'live_map', name: 'Live Map', icon: MapPin },
-  { id: 'ticket_system', name: 'Ticket System', icon: Ticket },
-];
+const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users', 'book-open'];
 
 export const ModuleAccessSettings = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const isSupervisor = ['admin', 'manager', 'team_leader'].includes(user?.role || '');
+  const { data: departments } = useDepartments();
+  const { data: employees } = useEmployees();
 
-  const [selectedModule, setSelectedModule] = useState(MODULES[0].id);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
+  // Links
+  const { data: allLinks, isLoading: isLoadingLinks } = useAllLinks();
+  const createLink = useCreateLink();
+  const deleteLink = useDeleteLink();
 
-  // Fetch departments if admin
-  const { data: departments } = useQuery({
-    queryKey: ['departments'],
-    queryFn: async () => {
-      const res = await api.get('/departments');
-      return res.data?.data || [];
-    },
-    enabled: isAdmin,
-  });
+  // UI State
+  const [activeTab, setActiveTab] = useState<'access' | 'links'>('access');
+  const [selectedLink, setSelectedLink] = useState<string>('');
+  
+  // Access data
+  const { data: accessData, isLoading: isLoadingAccess } = useLinkAccess(selectedLink || null);
+  const setDepartmentAccess = useSetDepartmentAccess();
+  const setEmployeeExclusion = useSetEmployeeExclusion();
 
-  // Determine which department we are managing
-  // Admin selects from list, Manager/TL manages their own department context
-  const activeDepartmentId = isAdmin ? selectedDepartmentId : user?.department_id;
+  // Form State
+  const [newTitle, setNewTitle] = useState('');
+  const [newUrl, setNewUrl] = useState('');
+  const [newIcon, setNewIcon] = useState('link');
 
-  // Fetch employees for the active department
-  const { data: employees } = useQuery({
-    queryKey: ['employees', 'department', activeDepartmentId],
-    queryFn: async () => {
-      if (!activeDepartmentId) return [];
-      const res = await api.get(`/employees?department_id=${activeDepartmentId}`);
-      return res.data?.data || [];
-    },
-    enabled: !!activeDepartmentId,
-  });
+  const handleCreateLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle || !newUrl) return;
+    createLink.mutate({ title: newTitle, url: newUrl, icon_name: newIcon }, {
+      onSuccess: () => {
+        setNewTitle('');
+        setNewUrl('');
+        setNewIcon('link');
+      }
+    });
+  };
 
-  // Fetch module access data
-  const { data: accessData, isLoading: accessLoading } = useModuleAccess(selectedModule);
+  const getIconComponent = (name: string) => {
+    switch (name) {
+      case 'map-pin': return <MapPin className="w-4 h-4" />;
+      case 'ticket': return <Ticket className="w-4 h-4" />;
+      case 'external-link': return <ExternalLink className="w-4 h-4" />;
+      case 'calendar': return <Calendar className="w-4 h-4" />;
+      case 'users': return <Users className="w-4 h-4" />;
+      case 'book-open': return <BookOpen className="w-4 h-4" />;
+      default: return <LinkIcon className="w-4 h-4" />;
+    }
+  };
 
-  const { mutateAsync: setDeptAccess } = useSetDepartmentAccess(selectedModule);
-  const { mutateAsync: setEmpExclusion } = useSetEmployeeExclusion(selectedModule);
-
-  if (!isSupervisor) {
-    return <div className="p-8 text-center text-muted-foreground">You do not have access to this page.</div>;
+  if (!isAdmin && user?.role !== 'manager' && user?.role !== 'team_leader') {
+    return <div className="p-6 text-red-500">Access Denied</div>;
   }
 
-  const handleToggleDept = async (deptId: string, grant: boolean) => {
-    try {
-      await setDeptAccess({ departmentId: deptId, grant });
-      toast.success(grant ? 'Module enabled for department' : 'Module disabled for department');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update department access');
-    }
-  };
-
-  const handleToggleEmp = async (empId: string, exclude: boolean) => {
-    try {
-      await setEmpExclusion({ employeeId: empId, exclude });
-      toast.success(exclude ? 'Access revoked for employee' : 'Access restored for employee');
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to update employee access');
-    }
-  };
-
-  const isModuleEnabledForActiveDept = activeDepartmentId && accessData?.departments?.includes(activeDepartmentId);
+  // Determine which departments the current user is allowed to manage
+  const manageableDepartments = isAdmin 
+    ? departments 
+    : departments?.filter(d => d.id === user?.department_id);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-12">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-          <ShieldCheck className="w-6 h-6 text-primary" />
+    <div className="flex flex-col h-full bg-[#0B0F19] text-white">
+      {/* Header */}
+      <div className="flex-none p-6 border-b border-white/5 bg-white/[0.02]">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
+            <ShieldCheck className="w-5 h-5 text-purple-400" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">External Tools Management</h1>
+            <p className="text-sm text-muted-foreground">Manage dynamic links and control access</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">External Modules Access</h2>
-          <p className="text-muted-foreground">Manage who can see Live Maps and Ticket System</p>
-        </div>
+
+        {/* Tabs */}
+        {isAdmin && (
+          <div className="flex gap-4 mt-6 border-b border-white/10">
+            <button
+              onClick={() => setActiveTab('access')}
+              className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'access' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Access Control
+            </button>
+            <button
+              onClick={() => setActiveTab('links')}
+              className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'links' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
+            >
+              Manage Links
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="flex gap-4 border-b border-border/50 pb-4">
-        {MODULES.map(m => (
-          <Button
-            key={m.id}
-            variant={selectedModule === m.id ? 'default' : 'outline'}
-            onClick={() => setSelectedModule(m.id)}
-            className="gap-2"
-          >
-            <m.icon className="w-4 h-4" /> {m.name}
-          </Button>
-        ))}
-      </div>
-
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Access</CardTitle>
-            <CardDescription>Select which departments have this module enabled by default.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {departments?.map((dept: any) => {
-                const isEnabled = accessData?.departments?.includes(dept.id);
-                return (
-                  <div key={dept.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-muted/20">
-                    <div>
-                      <div className="font-medium text-foreground">{dept.name}</div>
-                      <div className="text-sm text-muted-foreground">{dept.department_code}</div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setSelectedDepartmentId(dept.id)}
-                        className={selectedDepartmentId === dept.id ? "bg-primary/10 border-primary/30" : ""}
-                      >
-                        Manage Employees
-                      </Button>
-                      <Switch
-                        checked={isEnabled}
-                        onCheckedChange={(checked) => handleToggleDept(dept.id, checked)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeDepartmentId && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-primary" />
-              Employee Access Control
-            </CardTitle>
-            <CardDescription>
-              {isModuleEnabledForActiveDept 
-                ? "The module is enabled for this department. You can explicitly revoke access for specific employees." 
-                : "The module is currently disabled for this department. Employees will not see it even if allowed here."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isModuleEnabledForActiveDept && (
-              <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">
-                Warning: The module must be enabled for the department by an Admin before any employee can access it.
+      <div className="flex-1 overflow-y-auto p-6">
+        
+        {/* --- LINKS MANAGEMENT TAB --- */}
+        {isAdmin && activeTab === 'links' && (
+          <div className="space-y-6 max-w-4xl">
+            {/* Create form */}
+            <form onSubmit={handleCreateLink} className="p-5 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1 w-full">
+                <label className="text-xs text-gray-400 mb-1 block">Title</label>
+                <input 
+                  type="text" required value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white" 
+                  placeholder="e.g. HR Portal" 
+                />
               </div>
-            )}
-            
-            <div className="grid sm:grid-cols-2 gap-4">
-              {employees?.map((emp: any) => {
-                const isExcluded = accessData?.excluded_employees?.includes(emp.id);
-                const hasAccess = !isExcluded;
-                
-                return (
-                  <div key={emp.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors">
-                    <div>
-                      <div className="font-medium text-foreground flex items-center gap-2">
-                        {emp.first_name} {emp.last_name}
-                        {emp.role !== 'employee' && (
-                          <span className="text-[10px] uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                            {emp.role.replace('_', ' ')}
-                          </span>
+              <div className="flex-1 w-full">
+                <label className="text-xs text-gray-400 mb-1 block">URL</label>
+                <input 
+                  type="url" required value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white" 
+                  placeholder="https://..." 
+                />
+              </div>
+              <div className="w-32 shrink-0">
+                <label className="text-xs text-gray-400 mb-1 block">Icon</label>
+                <select 
+                  value={newIcon} onChange={e => setNewIcon(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white appearance-none"
+                >
+                  {ICONS.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+              <button 
+                type="submit" disabled={createLink.isPending}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-50 h-[38px]"
+              >
+                <Plus className="w-4 h-4" /> Add Link
+              </button>
+            </form>
+
+            {/* List */}
+            <div className="grid gap-3">
+              {isLoadingLinks ? (
+                <div className="text-center text-gray-500 py-10">Loading...</div>
+              ) : allLinks?.length === 0 ? (
+                <div className="text-center text-gray-500 py-10">No external links found.</div>
+              ) : (
+                allLinks?.map(link => (
+                  <div key={link.id} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-black/40 flex items-center justify-center border border-white/10">
+                        {getIconComponent(link.icon_name)}
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white">{link.title}</h3>
+                        <p className="text-xs text-blue-400">{link.url}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this link?')) {
+                          deleteLink.mutate(link.id);
+                        }
+                      }}
+                      disabled={deleteLink.isPending}
+                      className="text-red-400 hover:bg-red-400/10 p-2 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- ACCESS MANAGEMENT TAB --- */}
+        {activeTab === 'access' && (
+          <div className="space-y-6 max-w-4xl">
+            {/* Module Selector */}
+            <div className="p-5 rounded-xl bg-white/5 border border-white/10">
+              <label className="text-sm font-medium text-gray-300 mb-2 block">Select Tool to Manage Access</label>
+              <select
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-3 text-white appearance-none cursor-pointer"
+                value={selectedLink}
+                onChange={(e) => setSelectedLink(e.target.value)}
+              >
+                <option value="" disabled>-- Select a Tool --</option>
+                {allLinks?.map((m) => (
+                  <option key={m.id} value={m.id}>{m.title}</option>
+                ))}
+              </select>
+            </div>
+
+            {selectedLink && (
+              <div className="space-y-6">
+                {isLoadingAccess ? (
+                  <div className="text-center py-10 text-gray-500">Loading access data...</div>
+                ) : (
+                  manageableDepartments?.map((dept) => {
+                    // Check if department is granted
+                    const isDeptGranted = accessData?.departments.includes(dept.id);
+                    // Get all employees for this dept
+                    const deptEmployees = employees?.filter(e => e.department_id === dept.id) || [];
+
+                    return (
+                      <div key={dept.id} className="border border-white/10 rounded-xl overflow-hidden">
+                        {/* Department Header */}
+                        <div className="bg-white/[0.03] p-4 flex items-center justify-between border-b border-white/5">
+                          <div>
+                            <h3 className="font-semibold text-white text-lg">{dept.name}</h3>
+                            <p className="text-xs text-gray-400">
+                              {isDeptGranted 
+                                ? 'Tool is ENABLED for this department' 
+                                : 'Tool is DISABLED for this department'}
+                            </p>
+                          </div>
+                          
+                          {isAdmin && (
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-gray-300">Dept. Access</span>
+                              <Switch
+                                checked={isDeptGranted}
+                                onCheckedChange={(checked) => 
+                                  setDepartmentAccess.mutate({ linkId: selectedLink, departmentId: dept.id, grant: checked })
+                                }
+                                disabled={setDepartmentAccess.isPending}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Employees List */}
+                        {isDeptGranted ? (
+                          <div className="p-4 bg-black/20 divide-y divide-white/5">
+                            {deptEmployees.length === 0 ? (
+                              <p className="text-sm text-gray-500 py-2">No employees found in this department.</p>
+                            ) : (
+                              deptEmployees.map(emp => {
+                                // If they are IN excluded_employees, they DON'T have access
+                                const isExcluded = accessData?.excluded_employees.includes(emp.id);
+                                const hasAccess = !isExcluded;
+
+                                return (
+                                  <div key={emp.id} className="flex items-center justify-between py-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs border border-blue-500/30">
+                                        {emp.name.charAt(0)}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-200">{emp.name}</p>
+                                        <p className="text-xs text-gray-500">{emp.role}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <span className={`text-xs font-medium px-2 py-1 rounded-md ${hasAccess ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                                        {hasAccess ? 'Visible' : 'Hidden'}
+                                      </span>
+                                      <Switch
+                                        checked={hasAccess}
+                                        onCheckedChange={(checked) => 
+                                          // Exclude if checked is false (meaning they shouldn't have access)
+                                          setEmployeeExclusion.mutate({ linkId: selectedLink, employeeId: emp.id, exclude: !checked })
+                                        }
+                                        disabled={setEmployeeExclusion.isPending}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-4 bg-black/20 text-sm text-gray-500">
+                            Enable department access first to manage individual employees.
+                          </div>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">{emp.employee_code}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground mr-2">
-                        {hasAccess ? 'Allowed' : 'Denied'}
-                      </span>
-                      <Switch
-                        checked={hasAccess}
-                        onCheckedChange={(checked) => handleToggleEmp(emp.id, !checked)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };

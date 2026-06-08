@@ -1,59 +1,125 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api from '../api';
 
-export const useMyModules = () => {
-  return useQuery({
-    queryKey: ['my-modules'],
+export interface ExternalLink {
+  id: string;
+  title: string;
+  url: string;
+  icon_name: string;
+  created_at: string;
+  created_by: string | null;
+}
+
+export interface LinkAccessResponse {
+  link_id: string;
+  title: string;
+  departments: string[];
+  excluded_employees: string[];
+}
+
+export const useMyLinks = () => {
+  return useQuery<ExternalLink[]>({
+    queryKey: ['my-links'],
     queryFn: async () => {
-      const { data } = await api.get('/modules/my-access');
-      return data.data as string[];
+      const { data } = await api.get('/external-links/my-links');
+      return data.data || [];
     },
-    staleTime: 5 * 60 * 1000,
   });
 };
 
-export const useModuleAccess = (moduleName: string) => {
-  return useQuery({
-    queryKey: ['module-access', moduleName],
+export const useAllLinks = () => {
+  return useQuery<ExternalLink[]>({
+    queryKey: ['all-links'],
     queryFn: async () => {
-      const { data } = await api.get(`/modules/${moduleName}/access`);
-      return data.data as {
-        module_name: string;
-        departments: string[];
-        excluded_employees: string[];
-      };
+      const { data } = await api.get('/external-links');
+      return data.data || [];
     },
   });
 };
 
-export const useSetDepartmentAccess = (moduleName: string) => {
+export const useCreateLink = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ departmentId, grant }: { departmentId: string; grant: boolean }) => {
-      await api.post(`/modules/${moduleName}/departments`, {
+    mutationFn: async (payload: { title: string; url: string; icon_name: string }) => {
+      const { data } = await api.post('/external-links', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-links'] });
+      queryClient.invalidateQueries({ queryKey: ['my-links'] });
+    },
+  });
+};
+
+export const useUpdateLink = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: { id: string; title: string; url: string; icon_name: string }) => {
+      const { data } = await api.put(`/external-links/${id}`, payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-links'] });
+      queryClient.invalidateQueries({ queryKey: ['my-links'] });
+    },
+  });
+};
+
+export const useDeleteLink = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.delete(`/external-links/${id}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-links'] });
+      queryClient.invalidateQueries({ queryKey: ['my-links'] });
+    },
+  });
+};
+
+export const useLinkAccess = (linkId: string | null) => {
+  return useQuery<LinkAccessResponse>({
+    queryKey: ['link-access', linkId],
+    queryFn: async () => {
+      const { data } = await api.get(`/external-links/${linkId}/access`);
+      return data.data;
+    },
+    enabled: !!linkId,
+  });
+};
+
+export const useSetDepartmentAccess = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ linkId, departmentId, grant }: { linkId: string; departmentId: string; grant: boolean }) => {
+      const { data } = await api.post(`/external-links/${linkId}/departments`, {
         department_id: departmentId,
         grant,
       });
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['module-access', moduleName] });
-      queryClient.invalidateQueries({ queryKey: ['my-modules'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['link-access', variables.linkId] });
+      queryClient.invalidateQueries({ queryKey: ['my-links'] });
     },
   });
 };
 
-export const useSetEmployeeExclusion = (moduleName: string) => {
+export const useSetEmployeeExclusion = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ employeeId, exclude }: { employeeId: string; exclude: boolean }) => {
-      await api.post(`/modules/${moduleName}/employees`, {
+    mutationFn: async ({ linkId, employeeId, exclude }: { linkId: string; employeeId: string; exclude: boolean }) => {
+      const { data } = await api.post(`/external-links/${linkId}/employees`, {
         employee_id: employeeId,
         exclude,
       });
+      return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['module-access', moduleName] });
-      queryClient.invalidateQueries({ queryKey: ['my-modules'] });
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['link-access', variables.linkId] });
+      queryClient.invalidateQueries({ queryKey: ['my-links'] });
     },
   });
 };

@@ -5,22 +5,30 @@ import (
 
 	"github.com/google/uuid"
 
+	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/pkg/database"
 )
 
 type ModuleAccessRepository interface {
+	// Link CRUD
+	CreateLink(ctx context.Context, link *models.ExternalLink) error
+	UpdateLink(ctx context.Context, link *models.ExternalLink) error
+	DeleteLink(ctx context.Context, id uuid.UUID) error
+	GetAllLinks(ctx context.Context) ([]models.ExternalLink, error)
+	GetLinkByID(ctx context.Context, id uuid.UUID) (*models.ExternalLink, error)
+
 	// Department access
-	AddDepartmentAccess(ctx context.Context, moduleName string, departmentID uuid.UUID, grantedBy *uuid.UUID) error
-	RemoveDepartmentAccess(ctx context.Context, moduleName string, departmentID uuid.UUID) error
-	GetDepartmentsWithAccess(ctx context.Context, moduleName string) ([]uuid.UUID, error)
+	AddDepartmentAccess(ctx context.Context, linkID uuid.UUID, departmentID uuid.UUID, grantedBy *uuid.UUID) error
+	RemoveDepartmentAccess(ctx context.Context, linkID uuid.UUID, departmentID uuid.UUID) error
+	GetDepartmentsWithAccess(ctx context.Context, linkID uuid.UUID) ([]uuid.UUID, error)
 
 	// Employee exclusions
-	AddEmployeeExclusion(ctx context.Context, moduleName string, employeeID uuid.UUID, excludedBy *uuid.UUID) error
-	RemoveEmployeeExclusion(ctx context.Context, moduleName string, employeeID uuid.UUID) error
-	GetExcludedEmployees(ctx context.Context, moduleName string, departmentID *uuid.UUID) ([]uuid.UUID, error)
+	AddEmployeeExclusion(ctx context.Context, linkID uuid.UUID, employeeID uuid.UUID, excludedBy *uuid.UUID) error
+	RemoveEmployeeExclusion(ctx context.Context, linkID uuid.UUID, employeeID uuid.UUID) error
+	GetExcludedEmployees(ctx context.Context, linkID uuid.UUID, departmentID *uuid.UUID) ([]uuid.UUID, error)
 
 	// Employee specific
-	GetEmployeeAllowedModules(ctx context.Context, employeeID uuid.UUID, departmentID *uuid.UUID) ([]string, error)
+	GetEmployeeAllowedLinks(ctx context.Context, employeeID uuid.UUID, departmentID *uuid.UUID) ([]models.ExternalLink, error)
 }
 
 type moduleAccessRepo struct {
@@ -31,25 +39,81 @@ func NewModuleAccessRepository(db *database.DB) ModuleAccessRepository {
 	return &moduleAccessRepo{db: db}
 }
 
-func (r *moduleAccessRepo) AddDepartmentAccess(ctx context.Context, moduleName string, departmentID uuid.UUID, grantedBy *uuid.UUID) error {
+func (r *moduleAccessRepo) CreateLink(ctx context.Context, link *models.ExternalLink) error {
 	query := `
-		INSERT INTO module_departments (module_name, department_id, granted_by)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (module_name, department_id) DO NOTHING
+		INSERT INTO external_links (id, title, url, icon_name, created_by)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at
 	`
-	_, err := r.db.Exec(ctx, query, moduleName, departmentID, grantedBy)
+	if link.ID == uuid.Nil {
+		link.ID = uuid.New()
+	}
+	return r.db.QueryRow(ctx, query, link.ID, link.Title, link.URL, link.IconName, link.CreatedBy).Scan(&link.CreatedAt)
+}
+
+func (r *moduleAccessRepo) UpdateLink(ctx context.Context, link *models.ExternalLink) error {
+	query := `
+		UPDATE external_links
+		SET title = $1, url = $2, icon_name = $3
+		WHERE id = $4
+	`
+	_, err := r.db.Exec(ctx, query, link.Title, link.URL, link.IconName, link.ID)
 	return err
 }
 
-func (r *moduleAccessRepo) RemoveDepartmentAccess(ctx context.Context, moduleName string, departmentID uuid.UUID) error {
-	query := `DELETE FROM module_departments WHERE module_name = $1 AND department_id = $2`
-	_, err := r.db.Exec(ctx, query, moduleName, departmentID)
+func (r *moduleAccessRepo) DeleteLink(ctx context.Context, id uuid.UUID) error {
+	query := `DELETE FROM external_links WHERE id = $1`
+	_, err := r.db.Exec(ctx, query, id)
 	return err
 }
 
-func (r *moduleAccessRepo) GetDepartmentsWithAccess(ctx context.Context, moduleName string) ([]uuid.UUID, error) {
-	query := `SELECT department_id FROM module_departments WHERE module_name = $1`
-	rows, err := r.db.Query(ctx, query, moduleName)
+func (r *moduleAccessRepo) GetAllLinks(ctx context.Context) ([]models.ExternalLink, error) {
+	query := `SELECT id, title, url, icon_name, created_at, created_by FROM external_links ORDER BY created_at ASC`
+	rows, err := r.db.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var links []models.ExternalLink
+	for rows.Next() {
+		var l models.ExternalLink
+		if err := rows.Scan(&l.ID, &l.Title, &l.URL, &l.IconName, &l.CreatedAt, &l.CreatedBy); err == nil {
+			links = append(links, l)
+		}
+	}
+	return links, nil
+}
+
+func (r *moduleAccessRepo) GetLinkByID(ctx context.Context, id uuid.UUID) (*models.ExternalLink, error) {
+	query := `SELECT id, title, url, icon_name, created_at, created_by FROM external_links WHERE id = $1`
+	var l models.ExternalLink
+	err := r.db.QueryRow(ctx, query, id).Scan(&l.ID, &l.Title, &l.URL, &l.IconName, &l.CreatedAt, &l.CreatedBy)
+	if err != nil {
+		return nil, err
+	}
+	return &l, nil
+}
+
+func (r *moduleAccessRepo) AddDepartmentAccess(ctx context.Context, linkID uuid.UUID, departmentID uuid.UUID, grantedBy *uuid.UUID) error {
+	query := `
+		INSERT INTO link_departments (link_id, department_id, granted_by)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (link_id, department_id) DO NOTHING
+	`
+	_, err := r.db.Exec(ctx, query, linkID, departmentID, grantedBy)
+	return err
+}
+
+func (r *moduleAccessRepo) RemoveDepartmentAccess(ctx context.Context, linkID uuid.UUID, departmentID uuid.UUID) error {
+	query := `DELETE FROM link_departments WHERE link_id = $1 AND department_id = $2`
+	_, err := r.db.Exec(ctx, query, linkID, departmentID)
+	return err
+}
+
+func (r *moduleAccessRepo) GetDepartmentsWithAccess(ctx context.Context, linkID uuid.UUID) ([]uuid.UUID, error) {
+	query := `SELECT department_id FROM link_departments WHERE link_id = $1`
+	rows, err := r.db.Query(ctx, query, linkID)
 	if err != nil {
 		return nil, err
 	}
@@ -65,31 +129,31 @@ func (r *moduleAccessRepo) GetDepartmentsWithAccess(ctx context.Context, moduleN
 	return deps, nil
 }
 
-func (r *moduleAccessRepo) AddEmployeeExclusion(ctx context.Context, moduleName string, employeeID uuid.UUID, excludedBy *uuid.UUID) error {
+func (r *moduleAccessRepo) AddEmployeeExclusion(ctx context.Context, linkID uuid.UUID, employeeID uuid.UUID, excludedBy *uuid.UUID) error {
 	query := `
-		INSERT INTO module_exclusions (module_name, employee_id, excluded_by)
+		INSERT INTO link_exclusions (link_id, employee_id, excluded_by)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (module_name, employee_id) DO NOTHING
+		ON CONFLICT (link_id, employee_id) DO NOTHING
 	`
-	_, err := r.db.Exec(ctx, query, moduleName, employeeID, excludedBy)
+	_, err := r.db.Exec(ctx, query, linkID, employeeID, excludedBy)
 	return err
 }
 
-func (r *moduleAccessRepo) RemoveEmployeeExclusion(ctx context.Context, moduleName string, employeeID uuid.UUID) error {
-	query := `DELETE FROM module_exclusions WHERE module_name = $1 AND employee_id = $2`
-	_, err := r.db.Exec(ctx, query, moduleName, employeeID)
+func (r *moduleAccessRepo) RemoveEmployeeExclusion(ctx context.Context, linkID uuid.UUID, employeeID uuid.UUID) error {
+	query := `DELETE FROM link_exclusions WHERE link_id = $1 AND employee_id = $2`
+	_, err := r.db.Exec(ctx, query, linkID, employeeID)
 	return err
 }
 
-func (r *moduleAccessRepo) GetExcludedEmployees(ctx context.Context, moduleName string, departmentID *uuid.UUID) ([]uuid.UUID, error) {
+func (r *moduleAccessRepo) GetExcludedEmployees(ctx context.Context, linkID uuid.UUID, departmentID *uuid.UUID) ([]uuid.UUID, error) {
 	query := `
 		SELECT me.employee_id 
-		FROM module_exclusions me
+		FROM link_exclusions me
 		JOIN employees e ON me.employee_id = e.id
-		WHERE me.module_name = $1
+		WHERE me.link_id = $1
 	`
 	var args []interface{}
-	args = append(args, moduleName)
+	args = append(args, linkID)
 
 	if departmentID != nil {
 		query += ` AND e.department_id = $2`
@@ -112,16 +176,18 @@ func (r *moduleAccessRepo) GetExcludedEmployees(ctx context.Context, moduleName 
 	return emps, nil
 }
 
-func (r *moduleAccessRepo) GetEmployeeAllowedModules(ctx context.Context, employeeID uuid.UUID, departmentID *uuid.UUID) ([]string, error) {
+func (r *moduleAccessRepo) GetEmployeeAllowedLinks(ctx context.Context, employeeID uuid.UUID, departmentID *uuid.UUID) ([]models.ExternalLink, error) {
 	if departmentID == nil {
-		return []string{}, nil
+		return []models.ExternalLink{}, nil
 	}
 
 	query := `
-		SELECT md.module_name
-		FROM module_departments md
-		LEFT JOIN module_exclusions me ON md.module_name = me.module_name AND me.employee_id = $1
+		SELECT DISTINCT el.id, el.title, el.url, el.icon_name, el.created_at, el.created_by
+		FROM external_links el
+		JOIN link_departments md ON el.id = md.link_id
+		LEFT JOIN link_exclusions me ON el.id = me.link_id AND me.employee_id = $1
 		WHERE md.department_id = $2 AND me.employee_id IS NULL
+		ORDER BY el.created_at ASC
 	`
 	rows, err := r.db.Query(ctx, query, employeeID, *departmentID)
 	if err != nil {
@@ -129,12 +195,12 @@ func (r *moduleAccessRepo) GetEmployeeAllowedModules(ctx context.Context, employ
 	}
 	defer rows.Close()
 
-	var modules []string
+	var links []models.ExternalLink
 	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err == nil {
-			modules = append(modules, name)
+		var l models.ExternalLink
+		if err := rows.Scan(&l.ID, &l.Title, &l.URL, &l.IconName, &l.CreatedAt, &l.CreatedBy); err == nil {
+			links = append(links, l)
 		}
 	}
-	return modules, nil
+	return links, nil
 }
