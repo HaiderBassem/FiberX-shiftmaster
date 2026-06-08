@@ -209,16 +209,14 @@ func SetupRouter(
 		{
 			externalLinks.GET("/my-links", moduleAccessH.GetMyModules)
 			
-			// Admin & Manager endpoints
-			externalLinks.GET("", middleware.RequireRole("admin", "manager"), moduleAccessH.GetAllLinks)
-			externalLinks.POST("", middleware.RequireRole("admin", "manager"), moduleAccessH.CreateLink)
-			externalLinks.PUT("/:id", middleware.RequireRole("admin", "manager"), moduleAccessH.UpdateLink)
-			externalLinks.DELETE("/:id", middleware.RequireRole("admin", "manager"), moduleAccessH.DeleteLink)
-			externalLinks.POST("/:link_id/departments", middleware.RequireRole("admin", "manager"), moduleAccessH.SetDepartmentAccess)
-			
-			// Supervisor endpoints
-			externalLinks.GET("/:link_id/access", middleware.RequireRole("admin", "manager", "team_leader"), moduleAccessH.GetAccess)
-			externalLinks.POST("/:link_id/employees", middleware.RequireRole("manager", "team_leader"), moduleAccessH.SetEmployeeExclusion)
+			// Admin-only endpoints
+			externalLinks.GET("", middleware.RequireRole("admin"), moduleAccessH.GetAllLinks)
+			externalLinks.POST("", middleware.RequireRole("admin"), moduleAccessH.CreateLink)
+			externalLinks.PUT("/:id", middleware.RequireRole("admin"), moduleAccessH.UpdateLink)
+			externalLinks.DELETE("/:id", middleware.RequireRole("admin"), moduleAccessH.DeleteLink)
+			externalLinks.POST("/:link_id/departments", middleware.RequireRole("admin"), moduleAccessH.SetDepartmentAccess)
+			externalLinks.GET("/:link_id/access", middleware.RequireRole("admin"), moduleAccessH.GetAccess)
+			externalLinks.POST("/:link_id/employees", middleware.RequireRole("admin"), moduleAccessH.SetEmployeeExclusion)
 		}
 
 		// --- Supervisor routes (manager + admin + team_leader) ---
