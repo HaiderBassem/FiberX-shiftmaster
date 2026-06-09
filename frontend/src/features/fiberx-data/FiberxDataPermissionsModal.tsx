@@ -63,6 +63,9 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
       queryClient.invalidateQueries({ queryKey: ['fiberx-data'] });
       setSelectedEmployee('');
     },
+    onError: (err: any) => {
+      alert(err?.response?.data?.error || 'Failed to update access');
+    },
   });
 
   const updateShareMutation = useMutation({
@@ -72,6 +75,9 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
       queryClient.invalidateQueries({ queryKey: ['fiberx-data-shares', documentId] });
       queryClient.invalidateQueries({ queryKey: ['fiberx-data'] });
       setSelectedDepartment('');
+    },
+    onError: (err: any) => {
+      alert(err?.response?.data?.error || 'Failed to update share');
     },
   });
 
