@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Building2, Crown, Plus, Edit3, Trash2, Save, X } from 'lucide-react';
+import { Building2, Crown, Plus, Edit3, Trash2, Save, X, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ interface Department {
   department_code: string;
   name: string;
   description: string | null;
+  fiberx_enabled: boolean;
   manager_ids: string[]; // now an array (multi-manager support)
   created_at: string;
 }
@@ -319,6 +320,30 @@ export const DepartmentList = () => {
                           {primaryManagerLabel(dept)}
                         </span>
                       </div>
+                      {isAdmin && (
+                        <div 
+                          className="flex items-center justify-between p-2.5 mt-2 rounded-lg bg-muted/40 border border-border/50"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Database className="w-4 h-4 text-indigo-500" />
+                            <span className="text-xs font-medium text-foreground">FiberX Data</span>
+                          </div>
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="sr-only peer"
+                              checked={dept.fiberx_enabled}
+                              onChange={(e) => {
+                                api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: e.target.checked }).then(() => {
+                                  queryClient.invalidateQueries({ queryKey: ['departments'] });
+                                });
+                              }}
+                            />
+                            <div className="w-9 h-5 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                          </label>
+                        </div>
+                      )}
                     </>
                   )}
                 </CardContent>
