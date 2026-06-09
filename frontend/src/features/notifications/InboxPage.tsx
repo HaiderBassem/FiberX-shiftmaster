@@ -8,8 +8,17 @@ import {
   Bell, Megaphone, CheckCircle2, Loader2,
   Info, AlertTriangle, AlertCircle, Zap,
   BellOff, ArrowRightLeft, CalendarClock, ClipboardCheck, RefreshCw,
-  CheckCheck, Filter
+  CheckCheck, Filter, X
 } from 'lucide-react';
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+const getImageUrl = (url: string) => {
+  if (url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
+  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
+};
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Notification {
@@ -50,53 +59,97 @@ const getNotifStyle = (n: Notification) => {
   return NOTIF_TYPE_CONFIG.default;
 };
 
+// ─── Image Lightbox ───────────────────────────────────────────────────────────
+const ImageLightbox = ({ src, onClose }: { src: string; onClose: () => void }) => (
+  <div
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200"
+    onClick={onClose}
+  >
+    <button
+      className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+      onClick={onClose}
+    >
+      <X className="w-5 h-5" />
+    </button>
+    <img
+      src={src}
+      alt="Full size"
+      className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-200"
+      onClick={(e) => e.stopPropagation()}
+    />
+  </div>
+);
+
 // ─── Announcement Card ────────────────────────────────────────────────────────
-const AnnouncementCard = ({ a }: { a: Announcement }) => {
+const AnnouncementCard = ({ a, onImageClick }: { a: Announcement; onImageClick: (url: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const cfg = PRIORITY_CONFIG[a.priority] || PRIORITY_CONFIG.normal;
   const PriorityIcon = cfg.icon;
 
   return (
     <div
-      className={`relative rounded-2xl border ${cfg.bg} p-5 transition-all duration-300 hover:border-white/20 cursor-pointer`}
+      className={`relative rounded-2xl border ${cfg.bg} p-4 sm:p-5 transition-all duration-300 hover:border-white/20 cursor-pointer`}
       onClick={() => setExpanded(e => !e)}
     >
       {/* Active badge */}
       {a.is_active && (
-        <span className="absolute top-3 right-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2.5 py-0.5">
+        <span className="absolute top-3 right-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 sm:px-2.5 py-0.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           Active
         </span>
       )}
 
-      <div className="flex items-start gap-4 pr-16">
+      <div className="flex items-start gap-3 sm:gap-4 pr-12 sm:pr-16">
         {/* Icon */}
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg} border`}>
-          <PriorityIcon className={`w-5 h-5 ${cfg.text}`} />
+        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${cfg.bg} border`}>
+          <PriorityIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${cfg.text}`} />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`text-xs font-bold uppercase tracking-wider ${cfg.text}`}>
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${cfg.text}`}>
               {cfg.label}
             </span>
             <span className={`w-1 h-1 rounded-full ${cfg.dot}`} />
-            <span className="text-xs text-gray-500">{fmtDateTime(a.created_at)}</span>
+            <span className="text-[10px] sm:text-xs text-gray-500">{fmtDateTime(a.created_at)}</span>
           </div>
-          <h3 className="font-semibold text-white text-[15px] leading-snug">{a.title}</h3>
+          <h3 className="font-semibold text-white text-sm sm:text-[15px] leading-snug">{a.title}</h3>
           {a.creator_name && (
-            <p className="text-xs text-gray-500 mt-0.5">By {a.creator_name}</p>
+            <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">By {a.creator_name}</p>
           )}
           {expanded && (
-            <p className="text-sm text-gray-300 mt-3 leading-relaxed border-t border-white/5 pt-3">
+            <p className="text-xs sm:text-sm text-gray-300 mt-3 leading-relaxed border-t border-white/5 pt-3">
               {a.message}
             </p>
           )}
           {!expanded && (
-            <p className="text-sm text-gray-400 mt-2 line-clamp-2">{a.message}</p>
+            <p className="text-xs sm:text-sm text-gray-400 mt-2 line-clamp-2">{a.message}</p>
           )}
-          <button className={`mt-2 text-xs font-medium ${cfg.text} hover:opacity-70 transition-opacity`}>
+
+          {/* Images */}
+          {a.images && a.images.length > 0 && (
+            <div
+              className="flex gap-2 mt-3 overflow-x-auto pb-1 -mx-1 px-1"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {a.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onImageClick(getImageUrl(img))}
+                  className="relative flex-shrink-0 group rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
+                >
+                  <img
+                    src={getImageUrl(img)}
+                    alt={`Attachment ${idx + 1}`}
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover transition-transform group-hover:scale-105"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button className={`mt-2 text-[10px] sm:text-xs font-medium ${cfg.text} hover:opacity-70 transition-opacity`}>
             {expanded ? 'Show less ↑' : 'Read more ↓'}
           </button>
         </div>
@@ -111,31 +164,31 @@ const NotifCard = ({ n, onMarkRead }: { n: Notification; onMarkRead: (id: string
   const { Icon } = style;
 
   return (
-    <div className={`relative rounded-2xl border transition-all duration-300 hover:border-white/20 p-5 ${
+    <div className={`relative rounded-2xl border transition-all duration-300 hover:border-white/20 p-4 sm:p-5 ${
       n.is_read ? 'bg-white/[0.02] border-white/5' : `${style.bg}`
     }`}>
       {!n.is_read && (
-        <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_6px_2px_rgba(59,130,246,0.4)]" />
+        <span className="absolute top-3 sm:top-4 right-3 sm:right-4 w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_6px_2px_rgba(59,130,246,0.4)]" />
       )}
-      <div className="flex items-start gap-4 pr-8">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+      <div className="flex items-start gap-3 sm:gap-4 pr-6 sm:pr-8">
+        <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
           n.is_read ? 'bg-white/5 border border-white/10' : `${style.bg} border`
         }`}>
-          <Icon className={`w-5 h-5 ${n.is_read ? 'text-gray-500' : style.color}`} />
+          <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${n.is_read ? 'text-gray-500' : style.color}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className={`font-medium text-[15px] leading-snug ${n.is_read ? 'text-gray-400' : 'text-white'}`}>
+          <p className={`font-medium text-sm sm:text-[15px] leading-snug ${n.is_read ? 'text-gray-400' : 'text-white'}`}>
             {n.title || n.type || 'Notification'}
           </p>
-          <p className={`text-sm mt-1 leading-relaxed ${n.is_read ? 'text-gray-600' : 'text-gray-300'}`}>
+          <p className={`text-xs sm:text-sm mt-1 leading-relaxed ${n.is_read ? 'text-gray-600' : 'text-gray-300'}`}>
             {n.message}
           </p>
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-gray-600">{fmtDateTime(n.created_at)}</span>
+          <div className="flex items-center justify-between mt-2 sm:mt-3 flex-wrap gap-2">
+            <span className="text-[10px] sm:text-xs text-gray-600">{fmtDateTime(n.created_at)}</span>
             {!n.is_read && (
               <button
                 onClick={() => onMarkRead(n.id)}
-                className="flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg px-2.5 py-1"
+                className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-medium text-blue-400 hover:text-blue-300 transition-colors bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg px-2 sm:px-2.5 py-0.5 sm:py-1"
               >
                 <CheckCircle2 className="w-3 h-3" />
                 Mark read
@@ -154,6 +207,7 @@ export const InboxPage = () => {
   const [activeTab, setActiveTab] = useState<'notifications' | 'announcements'>('notifications');
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   // ── Notifications ──
   const { data: notifications = [], isLoading: loadingNotifs } = useQuery<Notification[]>({
@@ -204,16 +258,16 @@ export const InboxPage = () => {
   const isLoading = activeTab === 'notifications' ? loadingNotifs : loadingAnnouncements;
 
   return (
-    <div className="min-h-screen bg-[#080C16] text-white p-6 md:p-8">
+    <div className="min-h-screen bg-[#080C16] text-white p-4 sm:p-6 md:p-8">
       {/* ── Header ── */}
-      <div className="mb-8">
+      <div className="mb-5 sm:mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/30 to-purple-500/30 border border-blue-500/20 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-blue-400" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-500/30 to-purple-500/30 border border-blue-500/20 flex items-center justify-center">
+            <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Inbox</h1>
-            <p className="text-sm text-gray-500">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">Inbox</h1>
+            <p className="text-xs sm:text-sm text-gray-500">
               {unreadCount > 0
                 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}`
                 : 'All caught up!'}
@@ -223,24 +277,25 @@ export const InboxPage = () => {
       </div>
 
       {/* ── Tabs ── */}
-      <div className="flex items-center gap-2 mb-6 bg-white/5 border border-white/10 rounded-2xl p-1.5 w-fit">
+      <div className="flex items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6 bg-white/5 border border-white/10 rounded-xl sm:rounded-2xl p-1 sm:p-1.5 w-full sm:w-fit overflow-x-auto">
         {[
-          { id: 'notifications', label: 'Notifications', icon: Bell, count: unreadCount },
-          { id: 'announcements', label: 'Announcements', icon: Megaphone, count: announcements.length },
+          { id: 'notifications', label: 'Notifications', shortLabel: 'Notifs', icon: Bell, count: unreadCount },
+          { id: 'announcements', label: 'Announcements', shortLabel: 'Announce', icon: Megaphone, count: announcements.length },
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex-1 sm:flex-initial justify-center sm:justify-start whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/20'
                 : 'text-gray-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <tab.icon className="w-4 h-4" />
-            {tab.label}
+            <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">{tab.label}</span>
+            <span className="sm:hidden">{tab.shortLabel}</span>
             {tab.count > 0 && (
-              <span className={`text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center ${
+              <span className={`text-[10px] sm:text-xs font-bold rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center ${
                 activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-white/10 text-gray-400'
               }`}>
                 {tab.count > 9 ? '9+' : tab.count}
@@ -251,15 +306,15 @@ export const InboxPage = () => {
       </div>
 
       {/* ── Toolbar ── */}
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div className="flex items-center justify-between mb-4 sm:mb-5 flex-wrap gap-2 sm:gap-3">
         {activeTab === 'notifications' ? (
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500" />
             {(['all', 'unread'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all ${
                   filter === f
                     ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                     : 'text-gray-500 hover:text-gray-300 bg-white/5 border border-white/10'
@@ -270,13 +325,13 @@ export const InboxPage = () => {
             ))}
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1">
+            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
             {(['all', 'critical', 'important', 'normal', 'info'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPriorityFilter(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-all ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium capitalize transition-all whitespace-nowrap flex-shrink-0 ${
                   priorityFilter === p
                     ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
                     : 'text-gray-500 hover:text-gray-300 bg-white/5 border border-white/10'
@@ -292,38 +347,39 @@ export const InboxPage = () => {
           <button
             onClick={() => markAllRead.mutate()}
             disabled={markAllRead.isPending}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-gray-400 hover:text-white transition-all"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm text-gray-400 hover:text-white transition-all"
           >
             {markAllRead.isPending
-              ? <RefreshCw className="w-4 h-4 animate-spin" />
-              : <CheckCheck className="w-4 h-4" />
+              ? <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+              : <CheckCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             }
-            Mark all read
+            <span className="hidden xs:inline">Mark all read</span>
+            <span className="xs:hidden">All read</span>
           </button>
         )}
       </div>
 
       {/* ── Content ── */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-24 text-gray-600">
-          <Loader2 className="w-10 h-10 animate-spin mb-4" />
-          <p className="text-sm">Loading...</p>
+        <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-gray-600">
+          <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 animate-spin mb-4" />
+          <p className="text-xs sm:text-sm">Loading...</p>
         </div>
       ) : activeTab === 'notifications' ? (
         filteredNotifs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-600">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-              <BellOff className="w-8 h-8 opacity-40" />
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-gray-600">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+              <BellOff className="w-7 h-7 sm:w-8 sm:h-8 opacity-40" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-400 mb-1">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-400 mb-1">
               {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-xs sm:text-sm text-gray-600 text-center px-4">
               {filter === 'unread' ? "You're all caught up!" : "We'll notify you when something happens."}
             </p>
           </div>
         ) : (
-          <div className="space-y-3 max-w-3xl">
+          <div className="space-y-2 sm:space-y-3 max-w-3xl">
             {filteredNotifs.map(n => (
               <NotifCard key={n.id} n={n} onMarkRead={(id) => markRead.mutate(id)} />
             ))}
@@ -331,21 +387,24 @@ export const InboxPage = () => {
         )
       ) : (
         filteredAnnouncements.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-600">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-              <Megaphone className="w-8 h-8 opacity-40" />
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-gray-600">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
+              <Megaphone className="w-7 h-7 sm:w-8 sm:h-8 opacity-40" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-400 mb-1">No announcements</h3>
-            <p className="text-sm text-gray-600">Your department has no announcements yet.</p>
+            <h3 className="text-base sm:text-lg font-semibold text-gray-400 mb-1">No announcements</h3>
+            <p className="text-xs sm:text-sm text-gray-600 text-center px-4">Your department has no announcements yet.</p>
           </div>
         ) : (
-          <div className="space-y-4 max-w-3xl">
+          <div className="space-y-3 sm:space-y-4 max-w-3xl">
             {filteredAnnouncements.map(a => (
-              <AnnouncementCard key={a.id} a={a} />
+              <AnnouncementCard key={a.id} a={a} onImageClick={(url) => setLightboxSrc(url)} />
             ))}
           </div>
         )
       )}
+
+      {/* ── Lightbox ── */}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 };

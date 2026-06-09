@@ -7,6 +7,7 @@ export interface Announcement {
   message: string;
   priority: 'info' | 'normal' | 'important' | 'critical';
   is_active: boolean;
+  images: string[];
   created_by: string;
   creator_name?: string;
   created_at: string;
@@ -24,9 +25,28 @@ export const announcementService = {
     return data.data as Announcement[];
   },
 
-  create: async (announcement: Partial<Announcement>) => {
-    const { data } = await api.post('/announcements', announcement);
-    return data.data as Announcement;
+  create: async (announcement: Partial<Announcement>, imageFiles?: File[]) => {
+    if (imageFiles && imageFiles.length > 0) {
+      // Use FormData for multipart upload
+      const formData = new FormData();
+      formData.append('title', announcement.title || '');
+      formData.append('message', announcement.message || '');
+      formData.append('priority', announcement.priority || 'normal');
+      formData.append('is_active', String(announcement.is_active ?? true));
+
+      for (const file of imageFiles) {
+        formData.append('images', file);
+      }
+
+      const { data } = await api.post('/announcements', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.data as Announcement;
+    } else {
+      // Plain JSON (no images)
+      const { data } = await api.post('/announcements', announcement);
+      return data.data as Announcement;
+    }
   },
 
   delete: async (id: string) => {

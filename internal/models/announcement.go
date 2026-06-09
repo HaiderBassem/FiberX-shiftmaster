@@ -13,6 +13,7 @@ type Announcement struct {
 	Message      string    `json:"message"`
 	Priority     string    `json:"priority"` // 'info', 'normal', 'important', 'critical'
 	IsActive     bool      `json:"is_active"`
+	Images       []string  `json:"images"`
 	CreatedBy    uuid.UUID `json:"created_by"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

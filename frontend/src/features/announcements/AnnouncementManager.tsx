@@ -1,9 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Power, AlertCircle, Loader, Shield } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Plus, Trash2, Power, AlertCircle, Loader, Shield, ImagePlus, X } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
 import { AnnouncementPermissionsModal } from './AnnouncementPermissionsModal';
 import { useAuthStore } from '@/store/authStore';
+
+const getImageUrl = (url: string) => {
+  if (url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL.replace('/api', '')
+    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
+  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
+};
 
 export const AnnouncementManager: React.FC = () => {
   const { user } = useAuthStore();
@@ -18,11 +26,24 @@ export const AnnouncementManager: React.FC = () => {
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'info' | 'normal' | 'important' | 'critical'>('normal');
   const [isActive, setIsActive] = useState(true);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Lightbox state
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAnnouncements();
   }, []);
+
+  // Generate previews when files change
+  useEffect(() => {
+    const urls = imageFiles.map(f => URL.createObjectURL(f));
+    setImagePreviews(urls);
+    return () => urls.forEach(u => URL.revokeObjectURL(u));
+  }, [imageFiles]);
 
   const fetchAnnouncements = async () => {
     try {
@@ -36,16 +57,41 @@ export const AnnouncementManager: React.FC = () => {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const total = imageFiles.length + files.length;
+    if (total > 5) {
+      alert('Maximum 5 images allowed per announcement.');
+      return;
+    }
+    // Validate each file
+    for (const f of files) {
+      if (f.size > 5 * 1024 * 1024) {
+        alert(`Image "${f.name}" exceeds 5MB limit.`);
+        return;
+      }
+      if (!f.type.startsWith('image/')) {
+        alert(`File "${f.name}" is not an image.`);
+        return;
+      }
+    }
+    setImageFiles(prev => [...prev, ...files]);
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeImage = (idx: number) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSubmitting(true);
-      await announcementService.create({
-        title,
-        message,
-        priority,
-        is_active: isActive,
-      });
+      await announcementService.create(
+        { title, message, priority, is_active: isActive },
+        imageFiles.length > 0 ? imageFiles : undefined
+      );
       setIsModalOpen(false);
       resetForm();
       fetchAnnouncements();
@@ -83,6 +129,7 @@ export const AnnouncementManager: React.FC = () => {
     setMessage('');
     setPriority('normal');
     setIsActive(true);
+    setImageFiles([]);
   };
 
   if (loading) {
@@ -95,7 +142,7 @@ export const AnnouncementManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Announcements</h2>
           <p className="text-muted-foreground">Manage department announcements</p>
@@ -134,8 +181,8 @@ export const AnnouncementManager: React.FC = () => {
             {announcements.map((a) => (
               <div key={a.id} className={`p-4 transition-colors ${a.is_active ? 'bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-muted/50 border-l-4 border-l-transparent'}`}>
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 flex-wrap gap-1">
                       <h4 className="font-semibold text-lg">{a.title}</h4>
                       {a.is_active && (
                         <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
@@ -151,12 +198,32 @@ export const AnnouncementManager: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap max-w-4xl">{a.message}</p>
+                    
+                    {/* Display images */}
+                    {a.images && a.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {a.images.map((img, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setLightboxImg(getImageUrl(img))}
+                            className="relative group rounded-lg overflow-hidden border border-border hover:border-primary/50 transition-colors"
+                          >
+                            <img
+                              src={getImageUrl(img)}
+                              alt={`Attachment ${idx + 1}`}
+                              className="w-20 h-20 object-cover transition-transform group-hover:scale-105"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="text-xs text-muted-foreground/80 mt-2">
                       Created by {a.creator_name || 'Management'} on {new Date(a.created_at).toLocaleString()}
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 ml-4">
+                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
                     {!a.is_active && (
                       <button
                         onClick={() => handleToggleActive(a.id)}
@@ -181,10 +248,10 @@ export const AnnouncementManager: React.FC = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-xl bg-background p-6 shadow-xl animate-in zoom-in-95 duration-200">
+          <div className="w-full max-w-lg rounded-xl bg-background p-6 shadow-xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <h3 className="mb-4 text-lg font-semibold">New Announcement</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -194,7 +261,7 @@ export const AnnouncementManager: React.FC = () => {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
                   placeholder="e.g., Office Closure"
                 />
               </div>
@@ -206,9 +273,58 @@ export const AnnouncementManager: React.FC = () => {
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
-                  className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none bg-background"
                   placeholder="Details of the announcement..."
                 />
+              </div>
+
+              {/* Image Upload */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium">Images (optional)</label>
+                <div className="space-y-3">
+                  {/* Preview grid */}
+                  {imagePreviews.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {imagePreviews.map((url, idx) => (
+                        <div key={idx} className="relative group">
+                          <img
+                            src={url}
+                            alt={`Preview ${idx + 1}`}
+                            className="w-20 h-20 object-cover rounded-lg border border-border"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(idx)}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Upload button */}
+                  {imageFiles.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all"
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                      Add Images ({imageFiles.length}/5)
+                    </button>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <p className="text-xs text-muted-foreground">Max 5 images, 5MB each. Supports JPG, PNG, WebP.</p>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -217,7 +333,7 @@ export const AnnouncementManager: React.FC = () => {
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as any)}
-                    className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
                   >
                     <option value="info">Info</option>
                     <option value="normal">Normal</option>
@@ -246,7 +362,7 @@ export const AnnouncementManager: React.FC = () => {
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); resetForm(); }}
                   className="rounded-md px-4 py-2 text-sm font-medium hover:bg-muted"
                 >
                   Cancel
@@ -261,6 +377,27 @@ export const AnnouncementManager: React.FC = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200"
+          onClick={() => setLightboxImg(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+            onClick={() => setLightboxImg(null)}
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <img
+            src={lightboxImg}
+            alt="Full size"
+            className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 

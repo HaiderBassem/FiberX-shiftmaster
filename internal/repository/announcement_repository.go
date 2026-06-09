@@ -29,8 +29,8 @@ func NewAnnouncementRepository(db *pgxpool.Pool) AnnouncementRepository {
 
 func (r *announcementRepository) Create(ctx context.Context, a *models.Announcement) error {
 	query := `
-		INSERT INTO announcements (department_id, title, message, priority, is_active, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO announcements (department_id, title, message, priority, is_active, created_by, images)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id, created_at, updated_at
 	`
 	err := r.db.QueryRow(ctx, query,
@@ -40,6 +40,7 @@ func (r *announcementRepository) Create(ctx context.Context, a *models.Announcem
 		a.Priority,
 		a.IsActive,
 		a.CreatedBy,
+		a.Images,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
 	return err
 }
@@ -47,7 +48,8 @@ func (r *announcementRepository) Create(ctx context.Context, a *models.Announcem
 func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error) {
 	query := `
 		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.created_by, a.created_at, a.updated_at,
-		       e.first_name || ' ' || e.last_name as creator_name
+		       e.first_name || ' ' || e.last_name as creator_name,
+		       COALESCE(a.images, '{}')
 		FROM announcements a
 		LEFT JOIN employees e ON a.created_by = e.id
 		WHERE a.department_id = $1 AND a.is_active = true
@@ -66,6 +68,7 @@ func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, depa
 		&a.CreatedAt,
 		&a.UpdatedAt,
 		&a.CreatorName,
+		&a.Images,
 	)
 	if err == pgx.ErrNoRows {
 		return nil, nil // Return nil, nil if no active announcement
@@ -79,7 +82,8 @@ func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, depa
 func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Announcement, error) {
 	query := `
 		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.created_by, a.created_at, a.updated_at,
-		       e.first_name || ' ' || e.last_name as creator_name
+		       e.first_name || ' ' || e.last_name as creator_name,
+		       COALESCE(a.images, '{}')
 		FROM announcements a
 		LEFT JOIN employees e ON a.created_by = e.id
 		WHERE a.department_id = $1
@@ -105,6 +109,7 @@ func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departm
 			&a.CreatedAt,
 			&a.UpdatedAt,
 			&a.CreatorName,
+			&a.Images,
 		)
 		if err != nil {
 			return nil, err
