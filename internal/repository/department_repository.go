@@ -28,6 +28,9 @@ type DepartmentRepository interface {
 
 	// GetByManagerID returns all departments that a given manager is assigned to.
 	GetByManagerID(ctx context.Context, managerID uuid.UUID) ([]models.Department, error)
+
+	// FiberX toggle
+	UpdateFiberxEnabled(ctx context.Context, id uuid.UUID, enabled bool) error
 }
 
 type departmentRepo struct {
@@ -66,10 +69,10 @@ func (r *departmentRepo) loadManagerIDs(ctx context.Context, departmentID uuid.U
 func (r *departmentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Department, error) {
 	var dept models.Department
 	err := r.db.QueryRow(ctx,
-		`SELECT id, department_code, name, description, created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
 		 FROM departments WHERE id = $1`, id,
 	).Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-		&dept.CreatedAt, &dept.UpdatedAt)
+		&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("department not found: %w", err)
@@ -87,10 +90,10 @@ func (r *departmentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Dep
 func (r *departmentRepo) GetByCode(ctx context.Context, code string) (*models.Department, error) {
 	var dept models.Department
 	err := r.db.QueryRow(ctx,
-		`SELECT id, department_code, name, description, created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
 		 FROM departments WHERE department_code = $1`, code,
 	).Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-		&dept.CreatedAt, &dept.UpdatedAt)
+		&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("department not found: %w", err)
@@ -107,7 +110,7 @@ func (r *departmentRepo) GetByCode(ctx context.Context, code string) (*models.De
 
 func (r *departmentRepo) GetAll(ctx context.Context) ([]models.Department, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, department_code, name, description, created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
 		 FROM departments ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("get all departments: %w", err)
@@ -118,7 +121,7 @@ func (r *departmentRepo) GetAll(ctx context.Context) ([]models.Department, error
 	for rows.Next() {
 		var dept models.Department
 		if err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-			&dept.CreatedAt, &dept.UpdatedAt); err != nil {
+			&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan department: %w", err)
 		}
 		departments = append(departments, dept)
@@ -223,7 +226,7 @@ func (r *departmentRepo) GetManagers(ctx context.Context, departmentID uuid.UUID
 // via the department_managers junction table.
 func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID) ([]models.Department, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT d.id, d.department_code, d.name, d.description, d.created_at, d.updated_at
+		`SELECT d.id, d.department_code, d.name, d.description, COALESCE(d.fiberx_enabled, false), d.created_at, d.updated_at
 		 FROM departments d
 		 INNER JOIN department_managers dm ON dm.department_id = d.id
 		 WHERE dm.manager_id = $1
@@ -239,7 +242,7 @@ func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID
 	for rows.Next() {
 		var dept models.Department
 		if err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-			&dept.CreatedAt, &dept.UpdatedAt); err != nil {
+			&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan department: %w", err)
 		}
 		departments = append(departments, dept)
@@ -260,4 +263,12 @@ func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID
 		departments = []models.Department{}
 	}
 	return departments, nil
+}
+
+// UpdateFiberxEnabled toggles fiberx_enabled for a department (admin only).
+func (r *departmentRepo) UpdateFiberxEnabled(ctx context.Context, id uuid.UUID, enabled bool) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE departments SET fiberx_enabled = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+		enabled, id)
+	return err
 }

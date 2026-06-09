@@ -140,7 +140,7 @@ export const AppRoutes = () => {
           <Route 
             path="fiberx-data/new" 
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'team_leader']}>
                 <FiberxDataEditor />
               </ProtectedRoute>
             }
@@ -148,7 +148,7 @@ export const AppRoutes = () => {
           <Route 
             path="fiberx-data/:id/edit" 
             element={
-              <ProtectedRoute allowedRoles={['admin', 'manager']}>
+              <ProtectedRoute allowedRoles={['admin', 'manager', 'team_leader']}>
                 <FiberxDataEditor />
               </ProtectedRoute>
             }

@@ -108,8 +108,8 @@ func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, t
 	if err != nil {
 		return err
 	}
-	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
-		return errors.New("only managers and authorized employees can manage access")
+	if role != "manager" && role != "admin" && role != "team_leader" {
+		return errors.New("only managers and team leaders can manage access")
 	}
 
 	// targetEmp, err := s.empRepo.GetByID(ctx, targetEmployeeID) // if we needed to verify target emp
@@ -137,8 +137,8 @@ func (s *FiberxDataService) GetEmployeeAccessList(ctx context.Context, documentI
 	if err != nil {
 		return nil, err
 	}
-	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
-		return nil, errors.New("only managers and authorized employees can view access lists")
+	if role != "manager" && role != "admin" && role != "team_leader" {
+		return nil, errors.New("only managers and team leaders can view access lists")
 	}
 	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")
@@ -159,8 +159,8 @@ func (s *FiberxDataService) SetDepartmentShare(ctx context.Context, documentID, 
 	if err != nil {
 		return err
 	}
-	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
-		return errors.New("only managers and authorized employees can manage shares")
+	if role != "manager" && role != "admin" && role != "team_leader" {
+		return errors.New("only managers and team leaders can manage shares")
 	}
 
 	if departmentID == nil {
@@ -185,8 +185,8 @@ func (s *FiberxDataService) GetDepartmentShares(ctx context.Context, documentID 
 	if err != nil {
 		return nil, err
 	}
-	if role != "manager" && role != "admin" && role != "team_leader" && !emp.CanManageFiberxData {
-		return nil, errors.New("only managers and authorized employees can view shares")
+	if role != "manager" && role != "admin" && role != "team_leader" {
+		return nil, errors.New("only managers and team leaders can view shares")
 	}
 	if departmentID == nil {
 		return nil, errors.New("employee does not belong to a department")

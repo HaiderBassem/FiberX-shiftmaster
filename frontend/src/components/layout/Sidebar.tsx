@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useMyLinks } from '@/hooks/useModuleAccess';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/lib/api';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2, Database,
@@ -22,7 +24,7 @@ const navItems = [
   { to: '/leave-config', label: 'Leave Config', icon: CalendarDays, roles: ['admin'] },
   { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
   { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'] },
+  { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true },
   { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements' },
   { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'] },
 ];
@@ -31,6 +33,16 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
   const { data: myModules } = useMyLinks();
+
+  // Fetch the user's department to check fiberx_enabled
+  const { data: userDepartment } = useQuery({
+    queryKey: ['my-department', user?.department_id],
+    queryFn: async () => {
+      const res = await api.get(`/departments/${user?.department_id}`);
+      return res.data?.data;
+    },
+    enabled: !!user?.department_id,
+  });
 
   const visibleItems = navItems.filter((item) => {
     if (!user) return false;
@@ -42,6 +54,13 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     if (!hasAccess && (item as any).permission) {
       if ((item as any).permission === 'can_post_announcements' && (user as any).can_post_announcements) {
         hasAccess = true;
+      }
+    }
+
+    // FiberX Data: only show if department has fiberx_enabled or user is admin
+    if ((item as any).requiresFiberx && hasAccess) {
+      if (user.role !== 'admin' && !userDepartment?.fiberx_enabled) {
+        hasAccess = false;
       }
     }
     

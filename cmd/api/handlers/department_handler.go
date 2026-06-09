@@ -256,3 +256,28 @@ func (h *DepartmentHandler) RemoveManager(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "manager removed"}})
 }
+
+// ToggleFiberxData enables or disables FiberX Data for a department.
+// PUT /departments/:id/fiberx-toggle   body: {"enabled": true/false}
+func (h *DepartmentHandler) ToggleFiberxData(c *gin.Context) {
+	deptID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid department ID"})
+		return
+	}
+
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	if err := h.deptRepo.UpdateFiberxEnabled(c.Request.Context(), deptID, body.Enabled); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "FiberX Data toggled", "enabled": body.Enabled}})
+}

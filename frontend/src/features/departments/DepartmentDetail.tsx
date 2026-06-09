@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building2, Users, Crown, ArrowLeft } from 'lucide-react';
+import { Building2, Users, Crown, ArrowLeft, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type Department = {
@@ -11,6 +11,7 @@ type Department = {
   department_code: string;
   name: string;
   description: string | null;
+  fiberx_enabled: boolean;
   manager_ids: string[]; // array from department_managers junction table
   created_at: string;
 };
@@ -32,6 +33,7 @@ type Shift = { id: string; name: string; shift_code: string };
 
 export const DepartmentDetail = () => {
   const { id } = useParams();
+  const queryClient = useQueryClient();
 
   const { data: dept, isLoading: deptLoading } = useQuery<Department>({
     queryKey: ['department', id],
@@ -155,6 +157,45 @@ export const DepartmentDetail = () => {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* FiberX Data toggle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-indigo-500" />
+            FiberX Data Access
+          </CardTitle>
+          <CardDescription>Control whether this department can access FiberX Data</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
+            <div>
+              <p className="font-semibold text-foreground">
+                {dept.fiberx_enabled ? 'FiberX Data is enabled' : 'FiberX Data is disabled'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {dept.fiberx_enabled
+                  ? 'Department members can access FiberX Data documents'
+                  : 'Enable to allow this department to access FiberX Data'
+                }
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={dept.fiberx_enabled}
+                onChange={(e) => {
+                  api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: e.target.checked }).then(() => {
+                    queryClient.invalidateQueries({ queryKey: ['department', id] });
+                  });
+                }}
+              />
+              <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
+          </div>
         </CardContent>
       </Card>
 

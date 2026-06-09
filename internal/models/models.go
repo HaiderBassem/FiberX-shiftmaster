@@ -12,6 +12,7 @@ type Department struct {
 	DepartmentCode string      `json:"department_code"`
 	Name           string      `json:"name"`
 	Description    *string     `json:"description"`
+	FiberxEnabled  bool        `json:"fiberx_enabled"`
 	ManagerIDs     []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
 	CreatedAt      time.Time   `json:"created_at"`
 	UpdatedAt      time.Time   `json:"updated_at"`

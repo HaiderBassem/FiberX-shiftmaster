@@ -28,7 +28,7 @@ export function FiberxDataHub() {
   const documents = Array.isArray(data) ? data : [];
 
   const canCreate = user?.role === 'manager' || user?.role === 'admin' || user?.role === 'team_leader' || (user as any)?.can_manage_fiberx_data;
-  const canManagePermissions = user?.role === 'manager' || user?.role === 'admin' || user?.role === 'team_leader' || (user as any)?.can_manage_fiberx_data;
+  const canManagePermissions = user?.role === 'manager' || user?.role === 'admin' || user?.role === 'team_leader';
 
   if (isLoading) {
     return <div className="p-8 text-center text-muted-foreground">Loading...</div>;

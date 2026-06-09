@@ -352,6 +352,7 @@ func SetupRouter(
 				adminDept.DELETE("/:id", deptH.Delete)
 				adminDept.POST("/:id/managers", deptH.AddManager)
 				adminDept.DELETE("/:id/managers/:manager_id", deptH.RemoveManager)
+				adminDept.PUT("/:id/fiberx-toggle", deptH.ToggleFiberxData)
 			}
 		}
 
