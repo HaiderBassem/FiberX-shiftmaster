@@ -57,9 +57,10 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       }
     }
 
-    // FiberX Data: only show if department has fiberx_enabled or user is admin
+    // FiberX Data: managers/TL/admin always see it; employees only if department has fiberx_enabled
     if ((item as any).requiresFiberx && hasAccess) {
-      if (user.role !== 'admin' && !userDepartment?.fiberx_enabled) {
+      const isLeadership = user.role === 'admin' || user.role === 'manager' || user.role === 'team_leader';
+      if (!isLeadership && !userDepartment?.fiberx_enabled) {
         hasAccess = false;
       }
     }
