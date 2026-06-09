@@ -33,6 +33,7 @@ type ScheduleRepository interface {
 	// Employee Shifts (daily assignments)
 	GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsByEmployee(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error)
+	GetEmployeeShiftsInRange(ctx context.Context, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error)
 	CreateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	UpdateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
@@ -238,6 +239,17 @@ func (r *scheduleRepo) GetEmployeeShiftsByEmployee(ctx context.Context, employee
 		 WHERE employee_id = $1 AND shift_date BETWEEN $2 AND $3 ORDER BY shift_date`, employeeID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("get shifts by employee: %w", err)
+	}
+	defer rows.Close()
+	return r.scanEmployeeShifts(rows)
+}
+
+func (r *scheduleRepo) GetEmployeeShiftsInRange(ctx context.Context, from, to time.Time) ([]models.EmployeeShift, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+employeeShiftColumns+` FROM employee_shifts
+		 WHERE shift_date BETWEEN $1 AND $2 ORDER BY employee_id, shift_date`, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("get shifts in range: %w", err)
 	}
 	defer rows.Close()
 	return r.scanEmployeeShifts(rows)

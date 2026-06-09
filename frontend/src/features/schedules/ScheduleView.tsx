@@ -59,13 +59,14 @@ export const ScheduleView = () => {
     },
   });
 
+  const weekStartKey = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
   const weekStart = useMemo(
     () => startOfWeek(new Date(), { weekStartsOn: 0 }),
-    [],
+    [weekStartKey],
   );
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx)),
-    [weekStart],
+    [weekStartKey, weekStart],
   );
 
   const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({

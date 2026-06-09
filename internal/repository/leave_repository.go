@@ -18,6 +18,7 @@ type LeaveRepository interface {
 	GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error)
 	GetByStatus(ctx context.Context, status string) ([]models.Leave, error)
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
+	GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string, approverID uuid.UUID, approverRole string) error
@@ -107,6 +108,21 @@ func (r *leaveRepo) GetByDateRange(ctx context.Context, from, to time.Time) ([]m
 		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.start_date <= $2 AND l.end_date >= $1 ORDER BY l.start_date`, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("get leaves by date range: %w", err)
+	}
+	defer rows.Close()
+	return r.scanLeaves(rows)
+}
+
+// GetApprovedForSchedule returns fully approved leaves overlapping a date range (for schedule overlay).
+func (r *leaveRepo) GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+leaveColumns+` FROM leaves l
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE l.status = 'approved_by_manager'
+		   AND l.start_date <= $2::date AND l.end_date >= $1::date
+		 ORDER BY l.start_date`, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("get approved leaves for schedule: %w", err)
 	}
 	defer rows.Close()
 	return r.scanLeaves(rows)
