@@ -335,7 +335,11 @@ export const DepartmentList = () => {
                               className="sr-only peer"
                               checked={dept.fiberx_enabled}
                               onChange={(e) => {
-                                api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: e.target.checked }).then(() => {
+                                const newVal = e.target.checked;
+                                api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: newVal }).then(() => {
+                                  queryClient.invalidateQueries({ queryKey: ['departments'] });
+                                }).catch((err: any) => {
+                                  alert(err?.response?.data?.error || 'Failed to toggle FiberX Data');
                                   queryClient.invalidateQueries({ queryKey: ['departments'] });
                                 });
                               }}

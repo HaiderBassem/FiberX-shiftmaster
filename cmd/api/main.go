@@ -34,6 +34,15 @@ func main() {
 	}
 	defer db.Close()
 
+	// Auto-migrate: ensure fiberx_enabled column exists on departments
+	if _, err := db.Exec(context.Background(),
+		`ALTER TABLE departments ADD COLUMN IF NOT EXISTS fiberx_enabled BOOLEAN DEFAULT false`); err != nil {
+		log.Printf("WARN: fiberx_enabled migration skipped: %v", err)
+	} else {
+		// Enable for all existing departments (safe to run multiple times since default is false for new ones)
+		db.Exec(context.Background(), `UPDATE departments SET fiberx_enabled = true WHERE fiberx_enabled IS NULL`)
+	}
+
 	// --- Initialize Repositories ---
 	employeeRepo := repository.NewEmployeeRepository(db)
 	departmentRepo := repository.NewDepartmentRepository(db)
