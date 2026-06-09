@@ -214,7 +214,7 @@ func (r *employeeRepo) Create(ctx context.Context, emp *models.Employee) error {
 		`INSERT INTO employees (employee_code, first_name, last_name, gender, phone, email, password_hash,
 			hire_date, role, department_id, position, default_shift_id, weekly_off_days,
 			can_cover_night_shift, status, profile_image, secondary_phone, secondary_email, can_create_tables, can_manage_help_docs, can_post_announcements, can_manage_fiberx_data, ui_preferences, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
 		 RETURNING id, created_at, updated_at`,
 		emp.EmployeeCode, emp.FirstName, emp.LastName, emp.Gender, emp.Phone, emp.Email, emp.PasswordHash,
 		emp.HireDate, emp.Role, emp.DepartmentID, emp.Position, emp.DefaultShiftID, emp.WeeklyOffDays,
@@ -227,8 +227,9 @@ func (r *employeeRepo) Update(ctx context.Context, emp *models.Employee) error {
 		`UPDATE employees SET first_name=$1, last_name=$2, gender=$3, phone=$4, email=$5,
 			role=$6, department_id=$7, position=$8, default_shift_id=$9, weekly_off_days=$10,
 			can_cover_night_shift=$11, status=$12, profile_image=$13,
-			secondary_phone=$14, secondary_email=$15, can_create_tables=$16, can_manage_help_docs=$17, ui_preferences=$18, updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$19`,
+			secondary_phone=$14, secondary_email=$15, can_create_tables=$16, can_manage_help_docs=$17,
+			can_post_announcements=$18, can_manage_fiberx_data=$19, ui_preferences=$20, updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$21`,
 		emp.FirstName, emp.LastName, emp.Gender, emp.Phone, emp.Email,
 		emp.Role, emp.DepartmentID, emp.Position, emp.DefaultShiftID, emp.WeeklyOffDays,
 		emp.CanCoverNightShift, emp.Status, emp.ProfileImage,
