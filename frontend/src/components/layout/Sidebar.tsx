@@ -1,13 +1,57 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useMyLinks } from '@/hooks/useModuleAccess';
+import type { ExternalLink as ExternalLinkType } from '@/hooks/useModuleAccess';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2, Database,
-  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, User, Link as LinkIcon
+  Clock, X, MapPin, ExternalLink, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, User, Link as LinkIcon,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+type LinkTheme = { c1: string; c2: string };
+
+function getLinkTheme(iconName: string): LinkTheme {
+  switch (iconName) {
+    case 'map-pin': return { c1: '#0CCCCC', c2: '#01A3A3' };
+    case 'ticket': return { c1: '#F59E0B', c2: '#D97706' };
+    case 'calendar': return { c1: '#8B5CF6', c2: '#7C3AED' };
+    case 'users': return { c1: '#3B82F6', c2: '#2563EB' };
+    case 'book-open': return { c1: '#10B981', c2: '#059669' };
+    case 'external-link': return { c1: '#EC4899', c2: '#DB2777' };
+    default: return { c1: '#A78BFA', c2: '#7C3AED' };
+  }
+}
+
+function getLinkIcon(iconName: string): LucideIcon {
+  switch (iconName) {
+    case 'map-pin': return MapPin;
+    case 'ticket': return Ticket;
+    case 'external-link': return ExternalLink;
+    case 'calendar': return Calendar;
+    case 'users': return Users;
+    case 'book-open': return BookOpen;
+    default: return LinkIcon;
+  }
+}
+
+function openExternalLink(link: ExternalLinkType, userRole?: string) {
+  const isLiveMap = link.title === 'Live Map' || link.url.includes('maps.shift-master.org');
+  if (isLiveMap) {
+    const sysRoles = ['admin', 'manager', 'team_leader'];
+    const isSys = userRole && sysRoles.includes(userRole);
+    const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
+    const p = isSys ? 'fibersysX' : 'empfiberX';
+    const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    window.open(link.url, '_blank', 'noopener,noreferrer');
+  }
+}
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'] },
@@ -33,6 +77,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   const { user } = useAuthStore();
   const location = useLocation();
   const { data: myModules } = useMyLinks();
+  const [externalToolsOpen, setExternalToolsOpen] = useState(false);
 
   // Fetch the user's department to check fiberx_enabled
   const { data: userDepartment } = useQuery({
@@ -129,93 +174,53 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
       </nav>
 
-      {/* ── External Tools (dynamic, access-controlled) ── */}
+      {/* ── External Tools (collapsible dropdown) ── */}
       {myModules && myModules.length > 0 && (
-        <div className="px-3 pb-3 space-y-2">
-          <h3 className="px-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">External Tools</h3>
-          {myModules.map(link => {
-            const isLiveMap = link.title === 'Live Map' || link.url.includes('maps.shift-master.org');
-            
-            // Color theme per icon type
-            const theme = (() => {
-              switch (link.icon_name) {
-                case 'map-pin': return { c1: '#0CCCCC', c2: '#01A3A3', bg1: 'rgba(12,204,204,0.15)', bg2: 'rgba(1,163,163,0.08)', border: 'rgba(12,204,204,0.25)', glow: 'rgba(12,204,204,0.35)' };
-                case 'ticket': return { c1: '#F59E0B', c2: '#D97706', bg1: 'rgba(245,158,11,0.15)', bg2: 'rgba(217,119,6,0.08)', border: 'rgba(245,158,11,0.25)', glow: 'rgba(245,158,11,0.35)' };
-                case 'calendar': return { c1: '#8B5CF6', c2: '#7C3AED', bg1: 'rgba(139,92,246,0.15)', bg2: 'rgba(124,58,237,0.08)', border: 'rgba(139,92,246,0.25)', glow: 'rgba(139,92,246,0.35)' };
-                case 'users': return { c1: '#3B82F6', c2: '#2563EB', bg1: 'rgba(59,130,246,0.15)', bg2: 'rgba(37,99,235,0.08)', border: 'rgba(59,130,246,0.25)', glow: 'rgba(59,130,246,0.35)' };
-                case 'book-open': return { c1: '#10B981', c2: '#059669', bg1: 'rgba(16,185,129,0.15)', bg2: 'rgba(5,150,105,0.08)', border: 'rgba(16,185,129,0.25)', glow: 'rgba(16,185,129,0.35)' };
-                case 'external-link': return { c1: '#EC4899', c2: '#DB2777', bg1: 'rgba(236,72,153,0.15)', bg2: 'rgba(219,39,119,0.08)', border: 'rgba(236,72,153,0.25)', glow: 'rgba(236,72,153,0.35)' };
-                default: return { c1: '#A78BFA', c2: '#7C3AED', bg1: 'rgba(167,139,250,0.15)', bg2: 'rgba(124,58,237,0.08)', border: 'rgba(167,139,250,0.25)', glow: 'rgba(167,139,250,0.35)' };
-              }
-            })();
+        <div className="px-3 pb-3 border-t border-white/5 pt-3">
+          <button
+            type="button"
+            onClick={() => setExternalToolsOpen((open) => !open)}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200"
+            aria-expanded={externalToolsOpen}
+          >
+            <LinkIcon className="w-[18px] h-[18px] flex-shrink-0" />
+            <span className="flex-1 text-left">External Tools</span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-white/10 text-muted-foreground tabular-nums">
+              {myModules.length}
+            </span>
+            {externalToolsOpen
+              ? <ChevronUp className="w-4 h-4 flex-shrink-0 opacity-60" />
+              : <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-60" />}
+          </button>
 
-            const Icon = (() => {
-              switch (link.icon_name) {
-                case 'map-pin': return MapPin;
-                case 'ticket': return Ticket;
-                case 'external-link': return ExternalLink;
-                case 'calendar': return Calendar;
-                case 'users': return Users;
-                case 'book-open': return BookOpen;
-                default: return LinkIcon;
-              }
-            })();
+          {externalToolsOpen && (
+            <div className="mt-1 ml-2 pl-3 border-l border-white/10 space-y-0.5 max-h-52 overflow-y-auto">
+              {myModules.map((link) => {
+                const theme = getLinkTheme(link.icon_name);
+                const Icon = getLinkIcon(link.icon_name);
 
-            const handleClick = () => {
-              if (isLiveMap) {
-                const sysRoles = ['admin', 'manager', 'team_leader'];
-                const isSys = user && sysRoles.includes(user.role);
-                const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
-                const p = isSys ? 'fibersysX' : 'empfiberX';
-                const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
-                window.open(url, '_blank', 'noopener,noreferrer');
-              } else {
-                window.open(link.url, '_blank', 'noopener,noreferrer');
-              }
-            };
-
-            // Extract domain for subtitle
-            const domain = (() => {
-              try { return new URL(link.url).hostname; } catch { return link.url; }
-            })();
-
-            return (
-              <button
-                key={link.id}
-                onClick={handleClick}
-                className="group relative flex items-center gap-3 w-full overflow-hidden rounded-xl px-3 py-2.5 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
-                style={{
-                  background: `linear-gradient(135deg, ${theme.bg1} 0%, ${theme.bg2} 100%)`,
-                  border: `1px solid ${theme.border}`,
-                  boxShadow: `0 0 12px ${theme.bg2}, inset 0 1px 0 rgba(255,255,255,0.05)`,
-                }}
-              >
-                <div className="relative flex-shrink-0">
-                  <div
-                    className="relative w-8 h-8 rounded-lg flex items-center justify-center transition-shadow duration-300 group-hover:shadow-lg"
-                    style={{
-                      background: `linear-gradient(135deg, ${theme.c1} 0%, ${theme.c2} 100%)`,
-                      boxShadow: `0 0 10px ${theme.glow}`,
-                    }}
+                return (
+                  <button
+                    key={link.id}
+                    type="button"
+                    onClick={() => openExternalLink(link, user?.role)}
+                    className="group flex items-center gap-2.5 w-full rounded-lg px-2 py-2 text-left hover:bg-white/5 transition-colors"
                   >
-                    <Icon className="w-3.5 h-3.5 text-white" />
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-semibold leading-tight transition-colors" style={{ color: theme.c1 }}>
-                    {link.title}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground truncate">
-                    {domain}
-                  </p>
-                </div>
-                <ExternalLink
-                  className="w-3.5 h-3.5 flex-shrink-0 transition-all duration-300 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                  style={{ color: theme.c1 }}
-                />
-              </button>
-            );
-          })}
+                    <div
+                      className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
+                      style={{ background: `linear-gradient(135deg, ${theme.c1} 0%, ${theme.c2} 100%)` }}
+                    >
+                      <Icon className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="flex-1 min-w-0 text-xs font-medium truncate" style={{ color: theme.c1 }}>
+                      {link.title}
+                    </span>
+                    <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: theme.c1 }} />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
       {/* ── Footer ── */}
