@@ -30,7 +30,7 @@ echo ""
 # ── 1. Create directories ──
 echo "→ Creating directories..."
 sudo mkdir -p "$APP_DIR/frontend" "$APP_DIR/uploads" "$LOG_DIR" "$CADDY_LOG_DIR"
-sudo chown -R cpper:cpper "$APP_DIR" "$LOG_DIR" || true
+sudo chown -R usernameofyourserver:usernameofyourserver "$APP_DIR" "$LOG_DIR" || true
 
 # ── 2. Build Go binary ──
 echo "→ Building Go backend..."
@@ -47,7 +47,7 @@ npm install --production=false --legacy-peer-deps
 npx vite build
 sudo rm -rf "$APP_DIR/frontend/dist"
 sudo cp -r dist "$APP_DIR/frontend/"
-sudo chown -R cpper:cpper "$APP_DIR/frontend"
+sudo chown -R usernameofyourserver:usernameofyourserver "$APP_DIR/frontend"
 
 # ── 4. Copy config files ──
 echo "→ Copying configuration..."
