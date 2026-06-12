@@ -57,15 +57,15 @@ export function HelpDocumentList() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Info Bank</h1>
-          <p className="text-gray-500 text-sm mt-1">Quick access to guides and instructions for your department</p>
+          <h1 className="text-2xl font-bold text-foreground">Info Bank</h1>
+          <p className="text-muted-foreground text-sm mt-1">Quick access to guides and instructions for your department</p>
         </div>
         
         <div className="flex items-center gap-2">
           {canManagePermissions && (
             <button
               onClick={() => setIsPermissionsModalOpen(true)}
-              className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 bg-card text-foreground border border-border px-4 py-2 rounded-lg hover:bg-accent transition-colors"
             >
               <ShieldAlert className="w-4 h-4" />
               <span>Manage Permissions</span>
@@ -74,7 +74,7 @@ export function HelpDocumentList() {
           {canCreate && (
             <button
               onClick={() => navigate('/help/new')}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>New Document</span>
@@ -88,26 +88,26 @@ export function HelpDocumentList() {
         onClose={() => setIsPermissionsModalOpen(false)} 
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search documents..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
           />
         </div>
       </div>
 
       {documents.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FileText className="w-8 h-8 text-gray-400" />
+        <div className="bg-card rounded-xl border border-border p-12 text-center">
+          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No Documents</h3>
-          <p className="text-gray-500 max-w-sm mx-auto">
+          <h3 className="text-lg font-medium text-foreground mb-1">No Documents</h3>
+          <p className="text-muted-foreground max-w-sm mx-auto">
             No help documents have been added for your department yet, or you don't have access to them.
           </p>
         </div>
@@ -120,23 +120,23 @@ export function HelpDocumentList() {
           onItemClick={(doc) => navigate(`/help/${doc.id}`)}
           renderItem={(doc) => (
             <div 
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group h-full flex flex-col"
+              className="bg-card rounded-xl border border-border p-6 hover:shadow-md hover:border-primary/50 transition-all cursor-pointer group h-full flex flex-col"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <div className="p-3 bg-primary/10 text-primary rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                   <FileText className="w-6 h-6" />
                 </div>
                 {doc.access_level === 'write' && (
-                  <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2 py-1 rounded-full flex items-center gap-1">
+                  <span className="text-xs font-medium bg-amber-500/20 text-amber-500 dark:text-amber-400 px-2 py-1 rounded-full flex items-center gap-1">
                     <ShieldAlert className="w-3 h-3" />
                     Editor
                   </span>
                 )}
               </div>
               
-              <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 flex-grow">{doc.title}</h3>
+              <h3 className="text-lg font-bold text-foreground mb-2 line-clamp-2 flex-grow">{doc.title}</h3>
               
-              <div className="text-xs text-gray-500 mt-4 flex items-center justify-between border-t border-gray-100 pt-4">
+              <div className="text-xs text-muted-foreground mt-4 flex items-center justify-between border-t border-border pt-4">
                 <span>Created at: {format(new Date(doc.created_at), 'yyyy-MM-dd')}</span>
               </div>
             </div>
