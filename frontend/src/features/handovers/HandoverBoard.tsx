@@ -17,6 +17,7 @@ export type Handover = {
   updated_at: string;
   creator_name?: string;
   claimer_name?: string;
+  claimer_notes?: string;
 };
 
 export default function HandoverBoard() {
@@ -40,6 +41,24 @@ export default function HandoverBoard() {
   const completeMutation = useMutation({
     mutationFn: async (id: string) => api.put(`/handovers/${id}/complete`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['handovers'] }),
+  });
+
+  const unclaimMutation = useMutation({
+    mutationFn: async (id: string) => api.put(`/handovers/${id}/unclaim`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['handovers'] }),
+  });
+
+  const [commentingOnId, setCommentingOnId] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
+
+  const addCommentMutation = useMutation({
+    mutationFn: async ({ id, comment }: { id: string; comment: string }) => 
+      api.post(`/handovers/${id}/comments`, { comment }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['handovers'] });
+      setCommentingOnId(null);
+      setCommentText('');
+    },
   });
 
   const activeHandovers = handovers?.filter((h) => h.status !== 'completed') || [];
@@ -105,6 +124,44 @@ export default function HandoverBoard() {
                       <span className="font-semibold">Claimed by:</span> {h.claimer_name}
                     </div>
                   )}
+                  {h.claimer_notes && (
+                    <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md">
+                      <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-1">Claimer Notes:</h4>
+                      <div className="text-sm text-blue-900 dark:text-blue-200 whitespace-pre-wrap">
+                        {h.claimer_notes}
+                      </div>
+                    </div>
+                  )}
+
+                  {commentingOnId === h.id && (
+                    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <textarea
+                        className="w-full text-sm border-gray-300 dark:border-gray-600 dark:bg-gray-700 rounded-md shadow-sm focus:ring-primary-500 focus:border-primary-500"
+                        rows={3}
+                        placeholder="Type your comment/notes here..."
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                      />
+                      <div className="mt-2 flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setCommentingOnId(null);
+                            setCommentText('');
+                          }}
+                          className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => addCommentMutation.mutate({ id: h.id, comment: commentText })}
+                          disabled={!commentText.trim() || addCommentMutation.isPending}
+                          className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+                        >
+                          Save Comment
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-b-xl border-t border-gray-100 dark:border-gray-700 flex justify-end gap-2">
                   {h.status === 'open' && (
@@ -118,14 +175,33 @@ export default function HandoverBoard() {
                     </button>
                   )}
                   {h.status === 'claimed' && h.claimed_by === user?.id && (
-                    <button
-                      onClick={() => completeMutation.mutate(h.id)}
-                      disabled={completeMutation.isPending}
-                      className="flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Mark as Done
-                    </button>
+                    <>
+                      <button
+                        onClick={() => unclaimMutation.mutate(h.id)}
+                        disabled={unclaimMutation.isPending}
+                        className="flex items-center px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-colors text-sm font-medium"
+                      >
+                        Unclaim
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCommentingOnId(h.id);
+                          setCommentText('');
+                        }}
+                        disabled={commentingOnId === h.id}
+                        className="flex items-center px-3 py-1.5 border border-primary-200 text-primary-600 hover:bg-primary-50 dark:border-primary-900/50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-lg transition-colors text-sm font-medium"
+                      >
+                        Add Comment
+                      </button>
+                      <button
+                        onClick={() => completeMutation.mutate(h.id)}
+                        disabled={completeMutation.isPending}
+                        className="flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors text-sm font-medium"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark as Done
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
