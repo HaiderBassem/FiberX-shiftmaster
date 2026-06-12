@@ -20,6 +20,7 @@ type ScheduleService struct {
 	shiftRepo    repository.ShiftRepository
 	leaveRepo    repository.LeaveRepository
 	notifService *NotificationService
+	emailService *EmailService
 	db           *database.DB
 }
 
@@ -29,6 +30,7 @@ func NewScheduleService(
 	shiftRepo repository.ShiftRepository,
 	leaveRepo repository.LeaveRepository,
 	notifService *NotificationService,
+	emailService *EmailService,
 	db *database.DB,
 ) *ScheduleService {
 	return &ScheduleService{
@@ -37,6 +39,7 @@ func NewScheduleService(
 		shiftRepo:    shiftRepo,
 		leaveRepo:    leaveRepo,
 		notifService: notifService,
+		emailService: emailService,
 		db:           db,
 	}
 }
@@ -315,17 +318,60 @@ func (s *ScheduleService) AssignReplacement(ctx context.Context, shiftID uuid.UU
 		return err
 	}
 
-	// Notify the replacement employee
-	_ = s.notifService.SendNotification(ctx, &models.Notification{
-		RecipientID:       replacementEmployeeID,
-		SenderID:          &approvedBy,
-		Type:              "shift_change",
-		Title:             "Replacement Assignment",
-		Message:           strPtr("You have been assigned as a replacement for a shift"),
-		RelatedEntityType: strPtr("schedule"),
-		RelatedEntityID:   &shiftID,
-		Priority:          "high",
-	})
+	// Fetch shift details for the notification
+	es, err := s.scheduleRepo.GetEmployeeShiftByID(ctx, shiftID)
+	if err == nil && es != nil {
+		origEmp, _ := s.employeeRepo.GetByID(ctx, es.EmployeeID)
+		var shiftName, shiftTimes string
+		if es.ShiftID != nil {
+			sh, _ := s.shiftRepo.GetByID(ctx, *es.ShiftID)
+			if sh != nil {
+				shiftName = sh.Name
+				shiftTimes = fmt.Sprintf("%s - %s", sh.StartTime.Format("15:04"), sh.EndTime.Format("15:04"))
+			}
+		}
+
+		shiftDateStr := es.ShiftDate.Format("2006-01-02")
+		origName := "an employee"
+		if origEmp != nil {
+			origName = fmt.Sprintf("%s %s", origEmp.FirstName, origEmp.LastName)
+		}
+
+		msg := fmt.Sprintf("You have been assigned as a replacement for %s on %s. Shift: %s (%s)", origName, shiftDateStr, shiftName, shiftTimes)
+
+		// Notify the replacement employee
+		_ = s.notifService.SendNotification(ctx, &models.Notification{
+			RecipientID:       replacementEmployeeID,
+			SenderID:          &approvedBy,
+			Type:              "shift_change",
+			Title:             "Replacement Assignment",
+			Message:           strPtr(msg),
+			RelatedEntityType: strPtr("schedule"),
+			RelatedEntityID:   &shiftID,
+			Priority:          "high",
+		})
+
+		// Send email if possible
+		if s.emailService != nil && replacement.Email != "" {
+			s.emailService.SendEmailAsync(
+				[]string{replacement.Email},
+				"Shift Replacement Assignment",
+				msg,
+			)
+		}
+	} else {
+		// Fallback if unable to fetch details
+		_ = s.notifService.SendNotification(ctx, &models.Notification{
+			RecipientID:       replacementEmployeeID,
+			SenderID:          &approvedBy,
+			Type:              "shift_change",
+			Title:             "Replacement Assignment",
+			Message:           strPtr("You have been assigned as a replacement for a shift"),
+			RelatedEntityType: strPtr("schedule"),
+			RelatedEntityID:   &shiftID,
+			Priority:          "high",
+		})
+	}
 
 	return nil
 }

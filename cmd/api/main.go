@@ -68,7 +68,7 @@ func main() {
 	notifService := service.NewNotificationService(notifRepo)
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
-	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifService, db)
+	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifService, emailService, db)
 	
 	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
 	

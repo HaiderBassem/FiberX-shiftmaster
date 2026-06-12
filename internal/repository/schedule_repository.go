@@ -35,6 +35,7 @@ type ScheduleRepository interface {
 	GetEmployeeShiftsByEmployee(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsInRange(ctx context.Context, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error)
+	GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (*models.EmployeeShift, error)
 	CreateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	UpdateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	UpdateShiftStatus(ctx context.Context, id uuid.UUID, status string, reason *string) error
@@ -271,6 +272,26 @@ func (r *scheduleRepo) GetEmployeeShift(ctx context.Context, employeeID uuid.UUI
 			return nil, fmt.Errorf("employee shift not found: %w", err)
 		}
 		return nil, fmt.Errorf("get employee shift: %w", err)
+	}
+	return &es, nil
+}
+
+func (r *scheduleRepo) GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (*models.EmployeeShift, error) {
+	var es models.EmployeeShift
+	err := r.db.QueryRow(ctx,
+		`SELECT `+employeeShiftColumns+` FROM employee_shifts WHERE id = $1`,
+		id,
+	).Scan(
+		&es.ID, &es.ScheduleID, &es.EmployeeID, &es.ShiftID, &es.ShiftDate,
+		&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
+		&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
+		&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("employee shift not found by id: %w", err)
+		}
+		return nil, fmt.Errorf("get employee shift by id: %w", err)
 	}
 	return &es, nil
 }
