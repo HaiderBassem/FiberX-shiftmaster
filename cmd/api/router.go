@@ -362,6 +362,8 @@ func SetupRouter(
 			handovers.POST("", handoverH.CreateHandover)
 			handovers.GET("", handoverH.GetHandovers)
 			handovers.PUT("/:id/claim", handoverH.ClaimHandover)
+			handovers.PUT("/:id/unclaim", handoverH.UnclaimHandover)
+			handovers.POST("/:id/comments", handoverH.AddHandoverComment)
 			handovers.PUT("/:id/complete", handoverH.CompleteHandover)
 		}
 

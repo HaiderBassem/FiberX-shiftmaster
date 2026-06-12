@@ -119,6 +119,52 @@ func (h *HandoverHandler) ClaimHandover(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func (h *HandoverHandler) UnclaimHandover(c *gin.Context) {
+	handoverID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid handover id"})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	if err := h.handoverRepo.Unclaim(c.Request.Context(), handoverID, empID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unclaim handover"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+type addCommentRequest struct {
+	Comment string `json:"comment" binding:"required"`
+}
+
+func (h *HandoverHandler) AddHandoverComment(c *gin.Context) {
+	handoverID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid handover id"})
+		return
+	}
+
+	var req addCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	if err := h.handoverRepo.AddComment(c.Request.Context(), handoverID, empID, req.Comment); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add comment to handover"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 func (h *HandoverHandler) CompleteHandover(c *gin.Context) {
 	handoverID, err := uuid.Parse(c.Param("id"))
 	if err != nil {

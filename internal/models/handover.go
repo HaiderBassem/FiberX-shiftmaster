@@ -14,6 +14,7 @@ type Handover struct {
 	PendingIssues string     `json:"pending_issues"`
 	Status        string     `json:"status"` // open, claimed, completed
 	ClaimedBy     *uuid.UUID `json:"claimed_by"`
+	ClaimerNotes  *string    `json:"claimer_notes"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 

@@ -13,6 +13,8 @@ type HandoverRepository interface {
 	Create(ctx context.Context, handover *models.Handover) error
 	GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error)
 	Claim(ctx context.Context, id, employeeID uuid.UUID) error
+	Unclaim(ctx context.Context, id, employeeID uuid.UUID) error
+	AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error
 	Complete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -34,9 +36,9 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 		Scan(&handover.ID, &handover.CreatedAt, &handover.UpdatedAt)
 }
 
-func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
+	func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
 	query := `
-		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.created_at, h.updated_at,
+		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.claimer_notes, h.created_at, h.updated_at,
 		       c.first_name || ' ' || c.last_name as creator_name,
 		       cl.first_name || ' ' || cl.last_name as claimer_name
 		FROM shift_handovers h
@@ -55,7 +57,7 @@ func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UU
 	for rows.Next() {
 		var h models.Handover
 		if err := rows.Scan(
-			&h.ID, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.CreatedAt, &h.UpdatedAt,
+			&h.ID, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.ClaimerNotes, &h.CreatedAt, &h.UpdatedAt,
 			&h.CreatorName, &h.ClaimerName,
 		); err != nil {
 			return nil, err
@@ -72,6 +74,30 @@ func (r *handoverRepo) Claim(ctx context.Context, id, employeeID uuid.UUID) erro
 		WHERE id = $2 AND status = 'open'
 	`
 	_, err := r.db.Exec(ctx, query, employeeID, id)
+	return err
+}
+
+func (r *handoverRepo) Unclaim(ctx context.Context, id, employeeID uuid.UUID) error {
+	query := `
+		UPDATE shift_handovers
+		SET status = 'open', claimed_by = NULL, claimer_notes = NULL, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND claimed_by = $2 AND status = 'claimed'
+	`
+	_, err := r.db.Exec(ctx, query, id, employeeID)
+	return err
+}
+
+func (r *handoverRepo) AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error {
+	query := `
+		UPDATE shift_handovers
+		SET claimer_notes = CASE 
+			WHEN claimer_notes IS NULL OR claimer_notes = '' THEN $1
+			ELSE claimer_notes || E'\n\n' || $1
+		END,
+		updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2 AND claimed_by = $3 AND status = 'claimed'
+	`
+	_, err := r.db.Exec(ctx, query, comment, id, employeeID)
 	return err
 }
 
