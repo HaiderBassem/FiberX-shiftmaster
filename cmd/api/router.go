@@ -379,6 +379,7 @@ func SetupRouter(
 		announcements := protected.Group("/announcements")
 		{
 			announcements.GET("/active", announcementH.GetActive)
+			announcements.GET("/active-ticker", announcementH.GetActiveTicker)
 			announcements.GET("", announcementH.GetAll)
 			announcements.POST("", announcementH.Create)
 			announcements.DELETE("/:id", announcementH.Delete)

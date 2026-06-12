@@ -13,8 +13,10 @@ import (
 type AnnouncementRepository interface {
 	Create(ctx context.Context, announcement *models.Announcement) error
 	GetActiveByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error)
+	GetActiveTickerByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error)
 	GetAllByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Announcement, error)
 	SetInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error
+	SetTickerInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error
 	SetActive(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) error
 }
@@ -29,8 +31,8 @@ func NewAnnouncementRepository(db *pgxpool.Pool) AnnouncementRepository {
 
 func (r *announcementRepository) Create(ctx context.Context, a *models.Announcement) error {
 	query := `
-		INSERT INTO announcements (department_id, title, message, priority, is_active, created_by, images)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO announcements (department_id, title, message, priority, is_active, is_ticker, created_by, images)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
 	err := r.db.QueryRow(ctx, query,
@@ -39,6 +41,7 @@ func (r *announcementRepository) Create(ctx context.Context, a *models.Announcem
 		a.Message,
 		a.Priority,
 		a.IsActive,
+		a.IsTicker,
 		a.CreatedBy,
 		a.Images,
 	).Scan(&a.ID, &a.CreatedAt, &a.UpdatedAt)
@@ -47,7 +50,7 @@ func (r *announcementRepository) Create(ctx context.Context, a *models.Announcem
 
 func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error) {
 	query := `
-		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.created_by, a.created_at, a.updated_at,
+		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.is_ticker, a.created_by, a.created_at, a.updated_at,
 		       e.first_name || ' ' || e.last_name as creator_name,
 		       COALESCE(a.images, '{}')
 		FROM announcements a
@@ -64,6 +67,7 @@ func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, depa
 		&a.Message,
 		&a.Priority,
 		&a.IsActive,
+		&a.IsTicker,
 		&a.CreatedBy,
 		&a.CreatedAt,
 		&a.UpdatedAt,
@@ -71,7 +75,42 @@ func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, depa
 		&a.Images,
 	)
 	if err == pgx.ErrNoRows {
-		return nil, nil // Return nil, nil if no active announcement
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (r *announcementRepository) GetActiveTickerByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error) {
+	query := `
+		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.is_ticker, a.created_by, a.created_at, a.updated_at,
+		       e.first_name || ' ' || e.last_name as creator_name,
+		       COALESCE(a.images, '{}')
+		FROM announcements a
+		LEFT JOIN employees e ON a.created_by = e.id
+		WHERE a.department_id = $1 AND a.is_ticker = true
+		ORDER BY a.created_at DESC
+		LIMIT 1
+	`
+	a := &models.Announcement{}
+	err := r.db.QueryRow(ctx, query, departmentID).Scan(
+		&a.ID,
+		&a.DepartmentID,
+		&a.Title,
+		&a.Message,
+		&a.Priority,
+		&a.IsActive,
+		&a.IsTicker,
+		&a.CreatedBy,
+		&a.CreatedAt,
+		&a.UpdatedAt,
+		&a.CreatorName,
+		&a.Images,
+	)
+	if err == pgx.ErrNoRows {
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err
@@ -81,7 +120,7 @@ func (r *announcementRepository) GetActiveByDepartment(ctx context.Context, depa
 
 func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Announcement, error) {
 	query := `
-		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.created_by, a.created_at, a.updated_at,
+		SELECT a.id, a.department_id, a.title, a.message, a.priority, a.is_active, a.is_ticker, a.created_by, a.created_at, a.updated_at,
 		       e.first_name || ' ' || e.last_name as creator_name,
 		       COALESCE(a.images, '{}')
 		FROM announcements a
@@ -105,6 +144,7 @@ func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departm
 			&a.Message,
 			&a.Priority,
 			&a.IsActive,
+			&a.IsTicker,
 			&a.CreatedBy,
 			&a.CreatedAt,
 			&a.UpdatedAt,
@@ -121,6 +161,12 @@ func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departm
 
 func (r *announcementRepository) SetInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error {
 	query := `UPDATE announcements SET is_active = false WHERE department_id = $1`
+	_, err := r.db.Exec(ctx, query, departmentID)
+	return err
+}
+
+func (r *announcementRepository) SetTickerInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error {
+	query := `UPDATE announcements SET is_ticker = false WHERE department_id = $1`
 	_, err := r.db.Exec(ctx, query, departmentID)
 	return err
 }

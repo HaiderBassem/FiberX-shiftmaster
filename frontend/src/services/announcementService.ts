@@ -7,6 +7,7 @@ export interface Announcement {
   message: string;
   priority: 'info' | 'normal' | 'important' | 'critical';
   is_active: boolean;
+  is_ticker: boolean;
   images: string[];
   created_by: string;
   creator_name?: string;
@@ -17,6 +18,11 @@ export interface Announcement {
 export const announcementService = {
   getActive: async () => {
     const { data } = await api.get('/announcements/active');
+    return data.data as Announcement | null;
+  },
+
+  getActiveTicker: async () => {
+    const { data } = await api.get('/announcements/active-ticker');
     return data.data as Announcement | null;
   },
 
@@ -33,6 +39,7 @@ export const announcementService = {
       formData.append('message', announcement.message || '');
       formData.append('priority', announcement.priority || 'normal');
       formData.append('is_active', String(announcement.is_active ?? true));
+      formData.append('is_ticker', String(announcement.is_ticker ?? false));
 
       for (const file of imageFiles) {
         formData.append('images', file);

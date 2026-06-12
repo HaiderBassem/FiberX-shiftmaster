@@ -26,6 +26,7 @@ export const AnnouncementManager: React.FC = () => {
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'info' | 'normal' | 'important' | 'critical'>('normal');
   const [isActive, setIsActive] = useState(true);
+  const [isTicker, setIsTicker] = useState(false);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -89,7 +90,7 @@ export const AnnouncementManager: React.FC = () => {
     try {
       setSubmitting(true);
       await announcementService.create(
-        { title, message, priority, is_active: isActive },
+        { title, message, priority, is_active: isActive, is_ticker: isTicker },
         imageFiles.length > 0 ? imageFiles : undefined
       );
       setIsModalOpen(false);
@@ -129,6 +130,7 @@ export const AnnouncementManager: React.FC = () => {
     setMessage('');
     setPriority('normal');
     setIsActive(true);
+    setIsTicker(false);
     setImageFiles([]);
   };
 
@@ -187,6 +189,11 @@ export const AnnouncementManager: React.FC = () => {
                       {a.is_active && (
                         <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                           Active
+                        </span>
+                      )}
+                      {a.is_ticker && (
+                        <span className="inline-flex items-center rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-0.5 text-xs font-medium border border-indigo-200">
+                          Ticker
                         </span>
                       )}
                       <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium uppercase tracking-wider
@@ -342,7 +349,7 @@ export const AnnouncementManager: React.FC = () => {
                   </select>
                 </div>
                 
-                <div className="flex items-center mt-6">
+                <div className="flex flex-col gap-3 mt-6">
                   <label className="flex items-center space-x-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -350,13 +357,23 @@ export const AnnouncementManager: React.FC = () => {
                       onChange={(e) => setIsActive(e.target.checked)}
                       className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
                     />
-                    <span className="text-sm font-medium">Set as Active</span>
+                    <span className="text-sm font-medium">Set as Main Active (Banner)</span>
+                  </label>
+
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isTicker}
+                      onChange={(e) => setIsTicker(e.target.checked)}
+                      className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span className="text-sm font-medium">Set as Ticker (شريط متحرك)</span>
                   </label>
                 </div>
               </div>
 
               <div className="mt-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                Note: Setting this as Active will deactivate the currently active announcement (only 1 can be active). Active announcements will also send an email to all department members.
+                Note: Setting Main Active or Ticker will deactivate any currently active announcement of the same type. Active announcements send emails.
               </div>
 
               <div className="mt-6 flex justify-end space-x-3">

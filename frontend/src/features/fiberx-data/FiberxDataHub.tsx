@@ -7,13 +7,11 @@ import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
 import { FiberxDataPermissionsModal } from './FiberxDataPermissionsModal';
 import { FiberxDataGlobalPermissionsModal } from './FiberxDataGlobalPermissionsModal';
-import type { FiberxData } from '@/services/fiberxDataService';
 import { Button } from '@/components/ui/button';
 
 export function FiberxDataHub() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [isGlobalPermissionsOpen, setIsGlobalPermissionsOpen] = useState(false);
   const [selectedDocIdForPerms, setSelectedDocIdForPerms] = useState<string | null>(null);

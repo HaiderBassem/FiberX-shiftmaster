@@ -54,6 +54,14 @@ func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.
 		}
 	}
 
+	// If the new announcement is a ticker, deactivate old tickers
+	if a.IsTicker {
+		err := s.announcementRepo.SetTickerInactiveByDepartment(ctx, a.DepartmentID)
+		if err != nil {
+			return fmt.Errorf("failed to deactivate old tickers: %w", err)
+		}
+	}
+
 	err := s.announcementRepo.Create(ctx, a)
 	if err != nil {
 		return err

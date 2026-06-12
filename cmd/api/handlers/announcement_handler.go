@@ -44,6 +44,22 @@ func (h *AnnouncementHandler) GetActive(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": announcement})
 }
 
+func (h *AnnouncementHandler) GetActiveTicker(c *gin.Context) {
+	depID := getDepartmentID(c)
+	if depID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
+		return
+	}
+
+	announcement, err := h.announcementRepo.GetActiveTickerByDepartment(c.Request.Context(), *depID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": announcement})
+}
+
 func (h *AnnouncementHandler) GetAll(c *gin.Context) {
 	depID := getDepartmentID(c)
 	if depID == nil {
@@ -85,6 +101,7 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 			req.Priority = "normal"
 		}
 		req.IsActive = c.PostForm("is_active") == "true"
+		req.IsTicker = c.PostForm("is_ticker") == "true"
 
 		// Handle image uploads
 		form, _ := c.MultipartForm()
