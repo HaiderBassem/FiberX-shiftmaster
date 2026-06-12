@@ -296,8 +296,8 @@ func (s *ScheduleService) PublishSchedule(ctx context.Context, scheduleID uuid.U
 
 // GetAvailableReplacements returns employees who were off/on-leave the previous day.
 // These employees are the best candidates to cover a morning shift today.
-func (s *ScheduleService) GetAvailableReplacements(ctx context.Context, date time.Time) ([]models.Employee, error) {
-	return s.scheduleRepo.GetAvailableReplacements(ctx, date)
+func (s *ScheduleService) GetAvailableReplacements(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.Employee, error) {
+	return s.scheduleRepo.GetAvailableReplacements(ctx, date, departmentID)
 }
 
 // AssignReplacement assigns a replacement employee for a shift, marking the original as replaced.

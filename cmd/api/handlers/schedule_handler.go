@@ -169,7 +169,9 @@ func (h *ScheduleHandler) AvailableReplacements(c *gin.Context) {
 		return
 	}
 
-	employees, err := h.scheduleSvc.GetAvailableReplacements(c.Request.Context(), date)
+	deptID := getDepartmentID(c)
+
+	employees, err := h.scheduleSvc.GetAvailableReplacements(c.Request.Context(), date, deptID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
