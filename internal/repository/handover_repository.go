@@ -80,7 +80,7 @@ func (r *handoverRepo) Claim(ctx context.Context, id, employeeID uuid.UUID) erro
 func (r *handoverRepo) Unclaim(ctx context.Context, id, employeeID uuid.UUID) error {
 	query := `
 		UPDATE shift_handovers
-		SET status = 'open', claimed_by = NULL, claimer_notes = NULL, updated_at = CURRENT_TIMESTAMP
+		SET status = 'open', claimed_by = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $1 AND claimed_by = $2 AND status = 'claimed'
 	`
 	_, err := r.db.Exec(ctx, query, id, employeeID)
