@@ -48,11 +48,11 @@ export default function CreateHandoverModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-gray-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl overflow-hidden">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Create Shift Handover</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl overflow-hidden border border-border">
+        <div className="flex justify-between items-center p-6 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">Create Shift Handover</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -62,8 +62,8 @@ export default function CreateHandoverModal({
             {error && <div className="p-3 bg-red-500/10 text-red-500 rounded-md text-sm">{error}</div>}
 
             <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-900 dark:text-white">Shift Summary <span className="text-red-500">*</span></label>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">What happened during your shift? Any major events?</p>
+              <label className="block text-sm font-semibold text-foreground">Shift Summary <span className="text-destructive">*</span></label>
+              <p className="text-xs text-muted-foreground mb-1">What happened during your shift? Any major events?</p>
               <RichTextEditor
                 value={shiftSummary}
                 onChange={setShiftSummary}
@@ -74,7 +74,7 @@ export default function CreateHandoverModal({
 
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-orange-500">Pending Issues</label>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">What is left for the next shift to handle?</p>
+              <p className="text-xs text-muted-foreground mb-1">What is left for the next shift to handle?</p>
               <RichTextEditor
                 value={pendingIssues}
                 onChange={setPendingIssues}
@@ -84,18 +84,18 @@ export default function CreateHandoverModal({
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3">
+          <div className="p-6 border-t border-border bg-muted/30 flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 border border-border text-foreground rounded-lg hover:bg-accent transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors shadow-sm font-medium"
+              className="px-6 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm font-medium"
             >
               {mutation.isPending ? 'Submitting...' : 'Submit Handover'}
             </button>
