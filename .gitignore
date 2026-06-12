@@ -96,7 +96,7 @@ Icon
 # Root node_modules and other scratch/tmp files
 node_modules/
 scratch/
-api
+/api
 tmp_build
 tmp_migration.sql
 backend_add_*.py
