@@ -34,15 +34,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Auto-migrate: ensure fiberx_enabled column exists on departments
-	if _, err := db.Exec(context.Background(),
-		`ALTER TABLE departments ADD COLUMN IF NOT EXISTS fiberx_enabled BOOLEAN DEFAULT false`); err != nil {
-		log.Printf("WARN: fiberx_enabled migration skipped: %v", err)
-	} else {
-		// Enable for all existing departments (safe to run multiple times since default is false for new ones)
-		db.Exec(context.Background(), `UPDATE departments SET fiberx_enabled = true WHERE fiberx_enabled IS NULL`)
-	}
-
 	// --- Initialize Repositories ---
 	employeeRepo := repository.NewEmployeeRepository(db)
 	departmentRepo := repository.NewDepartmentRepository(db)
@@ -69,9 +60,9 @@ func main() {
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifService, emailService, db)
-	
+
 	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
-	
+
 	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
