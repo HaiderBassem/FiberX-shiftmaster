@@ -121,48 +121,55 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     })
   );
 
-  // Initialize layout if empty or sync with items
+  // Initialize layout if empty or sync with items, and self-heal any duplicates
   const normalizedLayout = useMemo(() => {
     if (!layout || !layout.order) {
       return { folders: {} as Record<string, LayoutFolder>, order: items.map(i => i.id) };
     }
     
     const existingIds = new Set(items.map(i => i.id));
-    const newOrder = [...layout.order];
     const newFolders: Record<string, LayoutFolder> = { ...layout.folders };
+    const seenItems = new Set<string>();
+    const cleanedOrder: string[] = [];
 
-    // Remove deleted items from order and folders
-    const orderWithoutDeleted = newOrder.filter(id => {
-      if (newFolders[id]) return true; // Keep folders
-      return existingIds.has(id); // Keep existing items
-    });
-
-    // Clean up folders
+    // Clean up folders and register items inside them
     for (const fId in newFolders) {
       const folder = newFolders[fId];
-      const validItems = folder.itemIds ? folder.itemIds.filter(id => existingIds.has(id)) : [];
-      if (validItems.length !== (folder.itemIds?.length || 0)) {
-        newFolders[fId] = { ...folder, itemIds: validItems };
-      }
+      const validItems = (folder.itemIds || []).filter(id => {
+        if (!existingIds.has(id)) return false; // Must exist in items
+        if (seenItems.has(id)) return false; // Prevent duplicates across folders
+        seenItems.add(id);
+        return true;
+      });
+      newFolders[fId] = { ...folder, itemIds: validItems };
     }
 
-    // Add new items not in layout
-    const itemsInLayout = new Set<string>();
-    orderWithoutDeleted.forEach(id => {
+    // Process root order, deduplicate folders and root items
+    layout.order.forEach(id => {
       if (newFolders[id]) {
-        newFolders[id].itemIds.forEach(itemId => itemsInLayout.add(itemId));
+        // It's a folder, keep it if we haven't seen this folder ID yet
+        if (!seenItems.has(id)) {
+          seenItems.add(id);
+          cleanedOrder.push(id);
+        }
       } else {
-        itemsInLayout.add(id);
+        // It's an item, keep if it exists and we haven't seen it yet
+        if (existingIds.has(id) && !seenItems.has(id)) {
+          seenItems.add(id);
+          cleanedOrder.push(id);
+        }
       }
     });
 
+    // Add any remaining items that weren't anywhere in the layout
     items.forEach(item => {
-      if (!itemsInLayout.has(item.id)) {
-        orderWithoutDeleted.push(item.id);
+      if (!seenItems.has(item.id)) {
+        seenItems.add(item.id);
+        cleanedOrder.push(item.id);
       }
     });
 
-    return { folders: newFolders, order: orderWithoutDeleted };
+    return { folders: newFolders, order: cleanedOrder };
   }, [items, layout]);
 
   useEffect(() => {
