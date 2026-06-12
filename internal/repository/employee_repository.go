@@ -35,6 +35,8 @@ type EmployeeRepository interface {
 	UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
 	GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error)
+	IncrementFailedLogin(ctx context.Context, email string) (int, error)
+	ResetFailedLogin(ctx context.Context, id uuid.UUID) error
 }
 
 type employeeRepo struct {
@@ -351,4 +353,18 @@ func (r *employeeRepo) GetEmailsByDepartment(ctx context.Context, departmentID u
 		}
 	}
 	return emails, nil
+}
+
+func (r *employeeRepo) IncrementFailedLogin(ctx context.Context, email string) (int, error) {
+	var attempts int
+	err := r.db.QueryRow(ctx, `UPDATE employees SET failed_login_attempts = failed_login_attempts + 1 WHERE email = $1 RETURNING failed_login_attempts`, email).Scan(&attempts)
+	if err != nil {
+		return 0, err
+	}
+	return attempts, nil
+}
+
+func (r *employeeRepo) ResetFailedLogin(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE employees SET failed_login_attempts = 0 WHERE id = $1`, id)
+	return err
 }

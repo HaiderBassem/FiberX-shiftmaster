@@ -48,8 +48,16 @@ func (s *AuthService) Authenticate(ctx context.Context, email, password string) 
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*emp.PasswordHash), []byte(password)); err != nil {
+		attempts, _ := s.employeeRepo.IncrementFailedLogin(ctx, email)
+		if attempts >= 10 {
+			_ = s.employeeRepo.UpdateStatus(ctx, emp.ID, "inactive")
+			return nil, ErrAccountLocked
+		}
 		return nil, ErrInvalidCredentials
 	}
+
+	// Reset failed attempts on success
+	_ = s.employeeRepo.ResetFailedLogin(ctx, emp.ID)
 
 	// Update last login
 	_ = s.employeeRepo.UpdateLastLogin(ctx, emp.ID)
