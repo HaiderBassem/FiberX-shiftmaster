@@ -32,6 +32,7 @@ func SetupRouter(
 	uploadH *handlers.UploadHandler,
 	moduleAccessH *handlers.ModuleAccessHandler,
 	fiberxDataH *handlers.FiberxDataHandler,
+	securityH *handlers.SecurityHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -353,6 +354,13 @@ func SetupRouter(
 				adminDept.POST("/:id/managers", deptH.AddManager)
 				adminDept.DELETE("/:id/managers/:manager_id", deptH.RemoveManager)
 				adminDept.PUT("/:id/fiberx-toggle", deptH.ToggleFiberxData)
+			}
+
+			// Security (IP Blocking)
+			security := adminOnly.Group("/security")
+			{
+				security.GET("/blocked-ips", securityH.GetBlockedIPs)
+				security.DELETE("/blocked-ips/:ip", securityH.UnblockIP)
 			}
 		}
 

@@ -19,23 +19,25 @@ var (
 	ErrEmployeeNotFound   = errors.New("employee not found")
 )
 
-// AuthService handles authentication and password management.
 type AuthService struct {
-	employeeRepo repository.EmployeeRepository
-	bcryptCost   int
+	employeeRepo    repository.EmployeeRepository
+	securityService *SecurityService
+	bcryptCost      int
 }
 
-func NewAuthService(employeeRepo repository.EmployeeRepository, bcryptCost int) *AuthService {
+func NewAuthService(employeeRepo repository.EmployeeRepository, securityService *SecurityService, bcryptCost int) *AuthService {
 	return &AuthService{
-		employeeRepo: employeeRepo,
-		bcryptCost:   bcryptCost,
+		employeeRepo:    employeeRepo,
+		securityService: securityService,
+		bcryptCost:      bcryptCost,
 	}
 }
 
 // Authenticate verifies email and password, returns the employee if valid.
-func (s *AuthService) Authenticate(ctx context.Context, email, password string) (*models.Employee, error) {
+func (s *AuthService) Authenticate(ctx context.Context, email, password, ip string) (*models.Employee, error) {
 	emp, err := s.employeeRepo.GetByEmail(ctx, email)
 	if err != nil {
+		_ = s.securityService.RecordFailedLogin(ctx, ip)
 		return nil, ErrInvalidCredentials
 	}
 
@@ -44,20 +46,27 @@ func (s *AuthService) Authenticate(ctx context.Context, email, password string) 
 	}
 
 	if emp.PasswordHash == nil {
+		_ = s.securityService.RecordFailedLogin(ctx, ip)
 		return nil, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(*emp.PasswordHash), []byte(password)); err != nil {
+		// Increment employee failed attempts
 		attempts, _ := s.employeeRepo.IncrementFailedLogin(ctx, email)
 		if attempts >= 10 {
 			_ = s.employeeRepo.UpdateStatus(ctx, emp.ID, "inactive")
 			return nil, ErrAccountLocked
 		}
+		
+		// Record IP failure
+		_ = s.securityService.RecordFailedLogin(ctx, ip)
+		
 		return nil, ErrInvalidCredentials
 	}
 
 	// Reset failed attempts on success
 	_ = s.employeeRepo.ResetFailedLogin(ctx, emp.ID)
+	s.securityService.ResetFailedLogin(ip)
 
 	// Update last login
 	_ = s.employeeRepo.UpdateLastLogin(ctx, emp.ID)

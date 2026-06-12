@@ -52,7 +52,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	emp, err := h.authService.Authenticate(c.Request.Context(), req.Email, req.Password)
+	emp, err := h.authService.Authenticate(c.Request.Context(), req.Email, req.Password, c.ClientIP())
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": err.Error()})
 		return

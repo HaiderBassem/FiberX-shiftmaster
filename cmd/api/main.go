@@ -14,6 +14,7 @@ import (
 
 	"shiftmaster-backend/cmd/api/handlers"
 	"shiftmaster-backend/internal/config"
+	"shiftmaster-backend/internal/middleware"
 	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
@@ -53,9 +54,11 @@ func main() {
 	handoverRepo := repository.NewHandoverRepository(db)
 	moduleAccessRepo := repository.NewModuleAccessRepository(db)
 	fiberxDataRepo := repository.NewFiberxDataRepository(db)
+	securityRepo := repository.NewSecurityRepository(db)
 
 	// --- Initialize Services ---
-	authService := service.NewAuthService(employeeRepo, cfg.JWT.BcryptCost)
+	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
+	authService := service.NewAuthService(employeeRepo, securityService, cfg.JWT.BcryptCost)
 	notifService := service.NewNotificationService(notifRepo)
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
@@ -94,6 +97,7 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler()
 	moduleAccessHandler := handlers.NewModuleAccessHandler(moduleAccessService)
 	fiberxDataHandler := handlers.NewFiberxDataHandler(fiberxDataService)
+	securityHandler := handlers.NewSecurityHandler(securityService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -113,6 +117,9 @@ func main() {
 		MaxAge:           time.Duration(cfg.CORS.MaxAge) * time.Second,
 	}))
 
+	// Security Middleware (IP Blocker)
+	r.Use(middleware.IPBlockerMiddleware(securityService))
+
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		if err := db.HealthCheck(c.Request.Context()); err != nil {
@@ -125,7 +132,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler,
 	)
 
 	// --- Start HTTP Server ---
