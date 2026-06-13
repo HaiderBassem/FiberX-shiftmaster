@@ -24,14 +24,14 @@ export const AnnouncementTicker: React.FC = () => {
   if (!ticker) return null;
 
   return (
-    <div className="bg-primary text-primary-foreground flex items-center overflow-hidden h-10 border-b border-primary-foreground/10 sticky top-0 z-50 w-full">
-      <div className="flex-1 overflow-hidden relative h-full flex items-center min-w-0">
-        {/* CSS Marquee Animation using absolute positioning to prevent layout stretching */}
+    <div className="bg-primary text-primary-foreground flex items-center overflow-hidden h-10 border-b border-primary-foreground/10 sticky top-0 z-30 w-full">
+      <div className="flex-1 overflow-hidden relative h-full">
+        {/* Reliable CSS Marquee Animation */}
         <div 
-          className="whitespace-nowrap absolute font-medium px-4 flex items-center"
+          className="whitespace-nowrap absolute top-0 h-full flex items-center font-medium px-4"
           style={{
-            animation: 'marquee 30s linear infinite',
-            willChange: 'transform'
+            animation: 'marquee 25s linear infinite',
+            left: '100%'
           }}
         >
           <span className="opacity-70 mr-2">[{ticker.priority.toUpperCase()}]</span>
@@ -41,8 +41,8 @@ export const AnnouncementTicker: React.FC = () => {
 
       <style>{`
         @keyframes marquee {
-          0% { transform: translateX(100vw); }
-          100% { transform: translateX(-100%); }
+          0% { left: 100%; transform: translateX(0); }
+          100% { left: -100%; transform: translateX(-100%); }
         }
       `}</style>
     </div>
