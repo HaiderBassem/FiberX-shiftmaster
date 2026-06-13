@@ -5,8 +5,8 @@ Wants=postgresql.service
 
 [Service]
 Type=simple
-User=usernameofyourserver
-Group=useyourgroup
+User=techsupport
+Group=techsupport
 WorkingDirectory=/opt/shiftmaster
 EnvironmentFile=/opt/shiftmaster/.env
 ExecStart=/opt/shiftmaster/shiftmaster-api
