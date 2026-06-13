@@ -1,0 +1,53 @@
+# =============================================================================
+# ShiftMaster & KMZ Map Configuration - Production Environment
+# =============================================================================
+
+# Listen on port 80 universally. This is CRITICAL for Cloudflare Tunnel
+# which routes to 127.0.0.1:80. The old "http://192.168.16.138:80" caused
+# the 502 Bad Gateway because Caddy was ignoring requests from 127.0.0.1.
+:80 {
+    # ── Compression ──
+    encode gzip zstd
+
+    # ── API Reverse Proxy → Go Backend ──
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # ── Health Check Route ──
+    handle /health {
+        reverse_proxy 127.0.0.1:8080
+    }
+
+    # ── KMZ Map Service (Node.js) ──
+    # handle_path strips the "/maps" prefix before forwarding to port 9999
+    handle_path /maps/* {
+        reverse_proxy 127.0.0.1:9999
+    }
+
+    # ── Frontend Static Files (React) ──
+    handle {
+        # Using Linux production path
+        root * /opt/shiftmaster/frontend/dist
+        try_files {path} /index.html
+        file_server
+    }
+
+    # ── Security Headers ──
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # ── Logging ──
+    log {
+        output file /var/log/caddy/shiftmaster.log {
+            roll_size 10mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+}

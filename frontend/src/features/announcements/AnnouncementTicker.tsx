@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Megaphone } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
 
@@ -25,20 +24,14 @@ export const AnnouncementTicker: React.FC = () => {
   if (!ticker) return null;
 
   return (
-    <div className="bg-primary text-primary-foreground flex items-center overflow-hidden h-10 border-b border-primary-foreground/10 sticky top-0 z-50">
-      <div className="bg-primary-foreground/10 px-4 h-full flex items-center z-10 font-bold whitespace-nowrap shadow-md">
-        <Megaphone className="w-4 h-4 mr-2" />
-        آخر الأخبار
-      </div>
-      
-      <div className="flex-1 overflow-hidden relative h-full flex items-center">
-        {/* CSS Marquee Animation */}
+    <div className="bg-primary text-primary-foreground flex items-center overflow-hidden h-10 border-b border-primary-foreground/10 sticky top-0 z-50 w-full">
+      <div className="flex-1 overflow-hidden relative h-full flex items-center min-w-0">
+        {/* CSS Marquee Animation using absolute positioning to prevent layout stretching */}
         <div 
-          className="whitespace-nowrap inline-block font-medium px-4"
+          className="whitespace-nowrap absolute font-medium px-4 flex items-center"
           style={{
-            animation: 'marquee 25s linear infinite',
-            // To ensure animation plays even if content is short
-            minWidth: '100%'
+            animation: 'marquee 30s linear infinite',
+            willChange: 'transform'
           }}
         >
           <span className="opacity-70 mr-2">[{ticker.priority.toUpperCase()}]</span>
@@ -48,7 +41,7 @@ export const AnnouncementTicker: React.FC = () => {
 
       <style>{`
         @keyframes marquee {
-          0% { transform: translateX(100%); }
+          0% { transform: translateX(100vw); }
           100% { transform: translateX(-100%); }
         }
       `}</style>
