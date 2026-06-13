@@ -44,6 +44,15 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
+@keyframes marquee {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+@utility animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
 @utility container {
   margin-inline: auto;
   padding-inline: 2rem;
