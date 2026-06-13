@@ -367,7 +367,7 @@ export const AnnouncementManager: React.FC = () => {
                       onChange={(e) => setIsTicker(e.target.checked)}
                       className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
                     />
-                    <span className="text-sm font-medium">Set as Ticker (شريط متحرك)</span>
+                    <span className="text-sm font-medium">Set as Ticker</span>
                   </label>
                 </div>
               </div>
