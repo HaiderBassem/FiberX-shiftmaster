@@ -173,6 +173,7 @@ export const ScheduleView = () => {
       if (st === 'working') base.working++;
       else if (st === 'off') base.off++;
       else if (st === 'leave') base.leave++;
+      else if (st === 'hourly') base.other++; // we could track hourly separately, but for now we put it under other, or we can just count it in working.
       else if (st === 'vacation') base.vacation++;
       else base.other++;
     });
@@ -385,6 +386,7 @@ export const ScheduleView = () => {
                           status === 'off' ? 'text-amber-500' :
                           status === 'leave' ? 'text-rose-500' :
                           status === 'vacation' ? 'text-blue-500' :
+                          status === 'hourly' ? 'text-blue-500' :
                           'text-muted-foreground';
 
                         return (
@@ -474,7 +476,8 @@ export const ScheduleView = () => {
                             : d.status === 'off' ? 'text-amber-500 border-amber-500/30 bg-amber-500/5'
                               : d.status === 'leave' ? 'text-rose-500 border-rose-500/30 bg-rose-500/5'
                                 : d.status === 'vacation' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
-                                  : 'text-muted-foreground border-border bg-muted/20';
+                                  : d.status === 'hourly' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
+                                    : 'text-muted-foreground border-border bg-muted/20';
 
                         return (
                           <td key={`${row.employee.id}-${d.date}`} className="p-3">

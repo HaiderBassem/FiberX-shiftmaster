@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { RichTextEditor } from '@/components/RichTextEditor';
 import {
   Users, CheckCircle2, Clock, Play, CalendarDays, Shield, BarChart3,
-  CheckSquare, TrendingUp, Briefcase, AlertCircle
+  CheckSquare, TrendingUp, Briefcase, AlertCircle, X, AlertTriangle
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
 import { fmtDateTime } from '@/lib/dateUtils';
@@ -30,6 +32,74 @@ const itemVariants: any = {
 };
 
 // ───────────────────────────────────────────────────────────
+// Completion Dialog
+// ───────────────────────────────────────────────────────────
+
+const CompletionDialog = ({
+  task,
+  onClose,
+  onComplete,
+  isPending,
+}: {
+  task: any;
+  onClose: () => void;
+  onComplete: (completionType: string, notes: string) => void;
+  isPending: boolean;
+}) => {
+  const [notes, setNotes] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground">Complete Task</h3>
+            <p className="text-sm text-muted-foreground">{task.task_title}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+            <X className="w-5 h-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <div className="px-6 py-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Notes & Attachments (optional)</label>
+            <div className="overflow-y-auto max-h-[30vh]">
+              <RichTextEditor
+                value={notes}
+                onChange={setNotes}
+                placeholder="Add any remarks, details, or paste screenshots..."
+                height={200}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <Button
+              onClick={() => onComplete('without_issue', notes)}
+              disabled={isPending}
+              className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-white gap-2.5 text-sm font-semibold rounded-xl"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              Complete — Without Issue
+            </Button>
+            <Button
+              onClick={() => onComplete('with_issue', notes)}
+              disabled={isPending}
+              variant="outline"
+              className="w-full h-12 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 gap-2.5 text-sm font-semibold rounded-xl"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              Complete — With Issue
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ───────────────────────────────────────────────────────────
 // Dashboard
 // ───────────────────────────────────────────────────────────
 
@@ -47,8 +117,11 @@ export const Dashboard = () => {
 
 const EmployeeDashboard = () => {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
+
+  const [completingTask, setCompletingTask] = useState<any>(null);
 
   const { data: weeklyTasks } = useQuery({
     queryKey: ['my-weekly-tasks', weekStart],
@@ -74,6 +147,24 @@ const EmployeeDashboard = () => {
     },
   });
 
+  const startTask = useMutation({
+    mutationFn: async (executionId: string) => { await api.post(`/tasks/executions/${executionId}/start`); },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] }),
+  });
+
+  const completeTask = useMutation({
+    mutationFn: async ({ executionId, completionType, notes }: { executionId: string; completionType: string; notes?: string }) => {
+      await api.post(`/tasks/executions/${executionId}/complete`, {
+        completion_type: completionType,
+        notes: notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] });
+      setCompletingTask(null);
+    },
+  });
+
   const totalTasks = weeklyTasks?.length || 0;
   const completedTasks = (weeklyTasks || []).filter((t: any) => t.status === 'completed').length;
   const inProgressTasks = (weeklyTasks || []).filter((t: any) => t.status === 'in_progress').length;
@@ -96,6 +187,19 @@ const EmployeeDashboard = () => {
       initial="hidden"
       animate="show"
     >
+      {completingTask && (
+        <CompletionDialog
+          task={completingTask}
+          onClose={() => setCompletingTask(null)}
+          onComplete={(completionType, notes) => {
+            if (completingTask.execution_id) {
+              completeTask.mutate({ executionId: completingTask.execution_id, completionType, notes });
+            }
+          }}
+          isPending={completeTask.isPending}
+        />
+      )}
+
       {/* Header */}
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
@@ -205,13 +309,28 @@ const EmployeeDashboard = () => {
                         )}
                       </div>
                       
-                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider shrink-0 ${
-                        task.status === 'completed' ? 'text-emerald-500 bg-emerald-500/20' :
-                        task.status === 'in_progress' ? 'text-amber-500 bg-amber-500/20' :
-                        'text-muted-foreground bg-muted'
-                      }`}>
-                        {task.status === 'completed' ? 'Done' : task.status === 'in_progress' ? 'Active' : 'Pending'}
-                      </span>
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider text-center ${
+                          task.status === 'completed' ? 'text-emerald-500 bg-emerald-500/10' :
+                          task.status === 'in_progress' ? 'text-amber-500 bg-amber-500/10' :
+                          'text-muted-foreground bg-muted'
+                        }`}>
+                          {task.status === 'completed' ? 'Done' : task.status === 'in_progress' ? 'Active' : 'Pending'}
+                        </span>
+                        
+                        {task.execution_id && task.status === 'pending' && (
+                          <Button size="sm" onClick={() => startTask.mutate(task.execution_id!)} disabled={startTask.isPending}
+                            className="bg-amber-500 hover:bg-amber-400 text-white gap-1.5 text-xs h-7 px-2">
+                            <Play className="w-3 h-3" /> Start
+                          </Button>
+                        )}
+                        {task.execution_id && task.status === 'in_progress' && (
+                          <Button size="sm" onClick={() => setCompletingTask(task)}
+                            className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-7 px-2">
+                            <CheckCircle2 className="w-3 h-3" /> Complete
+                          </Button>
+                        )}
+                      </div>
                     </motion.div>
                   ))}
                 </div>

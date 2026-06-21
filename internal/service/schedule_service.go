@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -179,12 +180,17 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 				shiftID = emp.DefaultShiftID
 			}
 
+			shiftStatus := "leave"
+			if leave.LeaveTypeNameEn != nil && (strings.ToLower(*leave.LeaveTypeNameEn) == "hourly" || strings.ToLower(*leave.LeaveTypeNameEn) == "زمنية") {
+				shiftStatus = "hourly"
+			}
+
 			es := &models.EmployeeShift{
 				ScheduleID:  ws.ID,
 				EmployeeID:  leave.EmployeeID,
 				ShiftID:     shiftID,
 				ShiftDate:   d,
-				ShiftStatus: "leave",
+				ShiftStatus: shiftStatus,
 				LeaveReason: leaveReasonPtr,
 			}
 			if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
@@ -413,7 +419,7 @@ func (s *ScheduleService) GetEmployeeShifts(ctx context.Context, employeeID uuid
 // SetEmployeeShift upserts a single employee shift for a day.
 // If the weekly schedule record for that week doesn't exist, it will be created as a draft.
 func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID, creatorRole string) (*models.EmployeeShift, error) {
-	valid := map[string]bool{"working": true, "off": true, "leave": true, "vacation": true}
+	valid := map[string]bool{"working": true, "off": true, "leave": true, "vacation": true, "hourly": true}
 	if !valid[shiftStatus] {
 		return nil, fmt.Errorf("invalid shift_status: %s", shiftStatus)
 	}

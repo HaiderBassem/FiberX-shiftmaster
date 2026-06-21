@@ -266,10 +266,11 @@ const ShiftBadge = ({ shift }: { shift: any }) => {
   if (status === 'off') styles = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
   if (status === 'leave') styles = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
   if (status === 'vacation') styles = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+  if (status === 'hourly') styles = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
 
   return (
     <div className={`text-[10px] sm:text-xs font-semibold px-1.5 py-1 rounded-md border truncate text-center ${styles}`}>
-      {status === 'working' ? 'Working' : status.toUpperCase()}
+      {status === 'working' ? 'Working' : status === 'hourly' ? 'Hourly' : status.toUpperCase()}
     </div>
   );
 };
