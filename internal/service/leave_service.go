@@ -200,8 +200,8 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 
 	// Check department leave limits (if set) and not an Emergency leave
 	isEmergency := false
-	if leaveType != nil && leaveType.NameEn != nil {
-		if *leaveType.NameEn == "Emergency" || *leaveType.NameEn == "emergency" {
+	if leaveType != nil {
+		if leaveType.NameEn == "Emergency" || leaveType.NameEn == "emergency" {
 			isEmergency = true
 		}
 	}
