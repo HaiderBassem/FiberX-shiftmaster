@@ -485,57 +485,45 @@ export const ScheduleView = () => {
                               <div className="text-xs font-semibold uppercase tracking-wider">{d.status}</div>
                               <div className="text-[11px] opacity-80 mt-1">{d.shiftName || '-'}</div>
                               {canEdit && (
-                                <div className="flex flex-col gap-1 mt-2">
-                                  {/* Set Off */}
-                                  {d.status !== 'off' && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[11px] text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
-                                      onClick={() => setOffQuick.mutate({ employeeId: row.employee.id, date: d.date })}
-                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
-                                    >
-                                      Set Off
-                                    </Button>
-                                  )}
-
-                                  {/* Remove Off */}
-                                  {d.status === 'off' && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[11px] text-rose-500 border-rose-500/30 hover:bg-rose-500/10"
-                                      onClick={() => {
-                                        if (d.row?.id) {
-                                          deleteShift.mutate(d.row.id);
-                                        } else {
-                                          alert('Cannot remove off: record missing. Please refresh.');
-                                        }
-                                      }}
-                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
-                                    >
-                                      Remove Off
-                                    </Button>
-                                  )}
-
-                                  {/* Set Working — only when not already working */}
-                                  {d.status !== 'working' && row.employee.default_shift_id && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 text-[11px] text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
-                                      onClick={() =>
-                                        setWorkingQuick.mutate({
-                                          employeeId: row.employee.id,
-                                          date: d.date,
-                                          shiftId: row.employee.default_shift_id,
-                                        })
+                                <div className="mt-2">
+                                  <select
+                                    className={`w-full h-7 text-[10px] rounded border px-1 outline-none focus:ring-1 transition-colors ${
+                                      d.status === 'working' ? 'border-emerald-500/30 text-emerald-600 bg-emerald-500/10' :
+                                      d.status === 'off' ? 'border-amber-500/30 text-amber-600 bg-amber-500/10' :
+                                      'border-border text-foreground bg-background'
+                                    }`}
+                                    value={d.status === 'working' ? (d.row?.shift_id || row.employee.default_shift_id || 'working') : d.status}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (!val) return;
+                                      if (val === 'off') {
+                                        setOffQuick.mutate({ employeeId: row.employee.id, date: d.date });
+                                      } else if (val === 'remove') {
+                                        if (d.row?.id) deleteShift.mutate(d.row.id);
+                                        else alert('Cannot clear: record missing. Please refresh.');
+                                      } else {
+                                        setWorkingQuick.mutate({ employeeId: row.employee.id, date: d.date, shiftId: val });
                                       }
-                                      disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
-                                    >
-                                      Set Working
-                                    </Button>
-                                  )}
+                                    }}
+                                    disabled={setOffQuick.isPending || setWorkingQuick.isPending || deleteShift.isPending}
+                                  >
+                                    <option value="" disabled hidden>
+                                      {d.status === 'leave' || d.status === 'vacation' || d.status === 'hourly' 
+                                        ? d.status.toUpperCase() 
+                                        : 'Assign...'}
+                                    </option>
+                                    
+                                    <optgroup label="Assign Shift">
+                                      {shifts?.map((s: any) => (
+                                        <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>
+                                      ))}
+                                    </optgroup>
+                                    
+                                    <optgroup label="Other Actions">
+                                      <option value="off">Set Off Day</option>
+                                      {d.row && <option value="remove">Clear Assignment</option>}
+                                    </optgroup>
+                                  </select>
                                 </div>
                               )}
                             </div>

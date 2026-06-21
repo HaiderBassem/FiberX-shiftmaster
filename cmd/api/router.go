@@ -98,6 +98,7 @@ func SetupRouter(
 		schedules := protected.Group("/schedules")
 		{
 			schedules.GET("/daily", scheduleH.DailyShifts)
+			schedules.GET("/department", scheduleH.DepartmentShifts)
 			schedules.GET("/employee/:id", scheduleH.EmployeeShifts)
 			schedules.GET("/replacements", scheduleH.AvailableReplacements)
 

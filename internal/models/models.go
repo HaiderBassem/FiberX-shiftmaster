@@ -15,6 +15,7 @@ type Department struct {
 	FiberxEnabled  bool        `json:"fiberx_enabled"`
 	MaxLeavesPerDay *int       `json:"max_leaves_per_day"`
 	ManagerIDs     []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
+	ActiveModules  []string    `json:"active_modules"`
 	CreatedAt      time.Time   `json:"created_at"`
 	UpdatedAt      time.Time   `json:"updated_at"`
 }
@@ -108,6 +109,13 @@ type EmployeeShift struct {
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
 	CreatedBy             *uuid.UUID `json:"created_by"`
+}
+
+type EmployeeShiftExtended struct {
+	EmployeeShift
+	FirstName      string     `json:"first_name"`
+	LastName       string     `json:"last_name"`
+	DefaultShiftID *uuid.UUID `json:"default_shift_id"`
 }
 
 type TaskBoard struct {

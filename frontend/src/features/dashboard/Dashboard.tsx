@@ -147,6 +147,19 @@ const EmployeeDashboard = () => {
     },
   });
 
+  const { data: userDepartment } = useQuery({
+    queryKey: ['my-department', user?.department_id],
+    queryFn: async () => {
+      if (!user?.department_id) return null;
+      const res = await api.get(`/departments/${user?.department_id}`);
+      return res.data?.data;
+    },
+    enabled: !!user?.department_id,
+  });
+
+  const activeModules = userDepartment?.active_modules || [];
+  const tasksEnabled = !userDepartment || activeModules.includes('tasks');
+
   const startTask = useMutation({
     mutationFn: async (executionId: string) => { await api.post(`/tasks/executions/${executionId}/start`); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] }),
@@ -214,13 +227,18 @@ const EmployeeDashboard = () => {
 
       {/* Stats */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label="This Week" value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
-        <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label="Completed" value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
-        <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label="Progress" value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+        {tasksEnabled && (
+          <>
+            <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label="This Week" value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
+            <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label="Completed" value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
+            <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label="Progress" value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+          </>
+        )}
         <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label="Notifications" value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {tasksEnabled && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Weekly Progress Chart */}
         <motion.div variants={itemVariants}>
           <Card className="h-full border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
@@ -339,6 +357,7 @@ const EmployeeDashboard = () => {
           </Card>
         </motion.div>
       </div>
+      )}
 
       {/* Activity History */}
       <motion.div variants={itemVariants}>

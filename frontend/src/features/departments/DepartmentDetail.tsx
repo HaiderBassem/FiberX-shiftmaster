@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building2, Users, Crown, ArrowLeft, Database } from 'lucide-react';
+import { Building2, Users, Crown, ArrowLeft, Database, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type Department = {
@@ -13,6 +13,7 @@ type Department = {
   description: string | null;
   fiberx_enabled: boolean;
   manager_ids: string[]; // array from department_managers junction table
+  active_modules: string[];
   created_at: string;
 };
 
@@ -160,41 +161,60 @@ export const DepartmentDetail = () => {
         </CardContent>
       </Card>
 
-      {/* FiberX Data toggle */}
+      {/* Module Access Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-500" />
-            FiberX Data Access
+            <Shield className="w-5 h-5 text-indigo-500" />
+            Module Access
           </CardTitle>
-          <CardDescription>Control whether this department can access FiberX Data</CardDescription>
+          <CardDescription>Control which tabs and features are available for this department</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
-            <div>
-              <p className="font-semibold text-foreground">
-                {dept.fiberx_enabled ? 'FiberX Data is enabled' : 'FiberX Data is disabled'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {dept.fiberx_enabled
-                  ? 'Department members can access FiberX Data documents'
-                  : 'Enable to allow this department to access FiberX Data'
-                }
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={dept.fiberx_enabled}
-                onChange={(e) => {
-                  api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: e.target.checked }).then(() => {
-                    queryClient.invalidateQueries({ queryKey: ['department', id] });
-                  });
-                }}
-              />
-              <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-            </label>
+          <div className="space-y-3">
+            {[
+              { id: 'tasks', label: 'My Tasks', desc: 'Allow employees to see and complete their tasks' },
+              { id: 'handovers', label: 'Handovers', desc: 'Enable shift handover boards and logs' },
+              { id: 'calendar', label: 'Calendar', desc: 'Show the interactive shift and leave calendar' },
+              { id: 'task_center', label: 'Task Center', desc: 'Allow leaders to manage task boards' },
+              { id: 'references', label: 'References', desc: 'Allow access to informational data tables' },
+              { id: 'info_bank', label: 'Info Bank', desc: 'Provide access to help documents and guides' },
+              { id: 'fiberx_data', label: 'FiberX Data', desc: 'Access to FiberX specific documentation' },
+            ].map((module) => {
+              const isActive = (dept.active_modules || []).includes(module.id);
+              return (
+                <div key={module.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-border">
+                  <div>
+                    <p className="font-semibold text-foreground">{module.label}</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">{module.desc}</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={isActive}
+                      onChange={(e) => {
+                        const current = dept.active_modules || [];
+                        const next = e.target.checked 
+                          ? [...current, module.id] 
+                          : current.filter(m => m !== module.id);
+                        
+                        api.put(`/departments/${dept.id}`, {
+                          name: dept.name,
+                          description: dept.description,
+                          max_leaves_per_day: dept.max_leaves_per_day,
+                          manager_ids: dept.manager_ids,
+                          active_modules: next,
+                        }).then(() => {
+                          queryClient.invalidateQueries({ queryKey: ['department', id] });
+                        });
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

@@ -34,6 +34,7 @@ type ScheduleRepository interface {
 	GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsByEmployee(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsInRange(ctx context.Context, from, to time.Time) ([]models.EmployeeShift, error)
+	GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error)
 	GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error)
 	GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (*models.EmployeeShift, error)
 	CreateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
@@ -254,6 +255,41 @@ func (r *scheduleRepo) GetEmployeeShiftsInRange(ctx context.Context, from, to ti
 	}
 	defer rows.Close()
 	return r.scanEmployeeShifts(rows)
+}
+
+func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error) {
+	query := `SELECT es.id, es.schedule_id, es.employee_id, es.shift_id, es.shift_date, es.shift_status,
+		es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
+		es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
+		es.created_at, es.updated_at, es.created_by,
+		e.first_name, e.last_name, e.default_shift_id
+		FROM employee_shifts es
+		JOIN employees e ON e.id = es.employee_id
+		WHERE es.shift_date BETWEEN $1 AND $2
+		  AND e.department_id = $3
+		ORDER BY e.first_name, e.last_name, es.shift_date`
+		
+	rows, err := r.db.Query(ctx, query, from, to, departmentID)
+	if err != nil {
+		return nil, fmt.Errorf("get department shifts in range: %w", err)
+	}
+	defer rows.Close()
+
+	var shifts []models.EmployeeShiftExtended
+	for rows.Next() {
+		var es models.EmployeeShiftExtended
+		if err := rows.Scan(
+			&es.ID, &es.ScheduleID, &es.EmployeeID, &es.ShiftID, &es.ShiftDate,
+			&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
+			&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
+			&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+			&es.FirstName, &es.LastName, &es.DefaultShiftID,
+		); err != nil {
+			return nil, fmt.Errorf("scan department shift: %w", err)
+		}
+		shifts = append(shifts, es)
+	}
+	return shifts, rows.Err()
 }
 
 func (r *scheduleRepo) GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error) {

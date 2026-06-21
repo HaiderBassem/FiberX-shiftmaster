@@ -82,6 +82,7 @@ type createDepartmentRequest struct {
 	Description     *string     `json:"description"`
 	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
 	ManagerIDs      []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
+	ActiveModules   []string    `json:"active_modules"`
 }
 
 // Create creates a new department.
@@ -114,6 +115,7 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 		Description:     req.Description,
 		MaxLeavesPerDay: req.MaxLeavesPerDay,
 		ManagerIDs:      req.ManagerIDs,
+		ActiveModules:   req.ActiveModules,
 	}
 
 	if err := h.deptRepo.Create(c.Request.Context(), dept); err != nil {
@@ -129,6 +131,7 @@ type updateDepartmentRequest struct {
 	Description     *string     `json:"description"`
 	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
 	ManagerIDs      []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
+	ActiveModules   []string    `json:"active_modules"`
 }
 
 // Update updates a department.
@@ -167,6 +170,7 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 		Description:     req.Description,
 		MaxLeavesPerDay: req.MaxLeavesPerDay,
 		ManagerIDs:      req.ManagerIDs, // nil when key is absent → repo skips sync
+		ActiveModules:   req.ActiveModules,
 	}
 
 	if err := h.deptRepo.Update(c.Request.Context(), dept); err != nil {

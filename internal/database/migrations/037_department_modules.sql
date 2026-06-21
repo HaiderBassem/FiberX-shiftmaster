@@ -1,0 +1,1 @@
+ALTER TABLE departments ADD COLUMN active_modules JSONB DEFAULT '["tasks", "handovers", "calendar", "requests", "references", "help", "fiberx_data"]'::jsonb;

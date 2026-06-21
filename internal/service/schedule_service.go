@@ -416,6 +416,21 @@ func (s *ScheduleService) GetEmployeeShifts(ctx context.Context, employeeID uuid
 	return s.scheduleRepo.GetEmployeeShiftsByEmployee(ctx, employeeID, from, to)
 }
 
+// GetDepartmentShiftsInRange gets shifts for a whole department in a date range.
+func (s *ScheduleService) GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error) {
+	if err := s.EnsureWeekSchedule(ctx, from); err != nil {
+		return nil, fmt.Errorf("ensure week schedule: %w", err)
+	}
+	secondWeekStart := normalizeWeekStart(to)
+	firstWeekStart := normalizeWeekStart(from)
+	if !secondWeekStart.Equal(firstWeekStart) {
+		if err := s.EnsureWeekSchedule(ctx, to); err != nil {
+			return nil, fmt.Errorf("ensure week schedule: %w", err)
+		}
+	}
+	return s.scheduleRepo.GetDepartmentShiftsInRange(ctx, from, to, departmentID)
+}
+
 // SetEmployeeShift upserts a single employee shift for a day.
 // If the weekly schedule record for that week doesn't exist, it will be created as a draft.
 func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID, creatorRole string) (*models.EmployeeShift, error) {

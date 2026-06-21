@@ -656,6 +656,13 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 	}
 
 	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	
+	isHourly := false
+	if leave.LeaveTypeID != uuid.Nil {
+		if lt, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID); err == nil && lt != nil {
+			isHourly = lt.Unit == "hours"
+		}
+	}
 
 	start := leave.StartDate.UTC().Truncate(24 * time.Hour)
 	end := leave.EndDate.UTC().Truncate(24 * time.Hour)
@@ -688,13 +695,18 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			shiftID = emp.DefaultShiftID
 		}
 
+		var shiftStatus = "leave"
+		if isHourly {
+			shiftStatus = "hourly"
+		}
+
 		leaveReasonPtr := &leaveReason
 		es := &models.EmployeeShift{
 			ScheduleID:  ws.ID,
 			EmployeeID:  leave.EmployeeID,
 			ShiftID:     shiftID,
 			ShiftDate:   d,
-			ShiftStatus: "leave",
+			ShiftStatus: shiftStatus,
 			LeaveReason: leaveReasonPtr,
 			CreatedBy:   &approverID,
 		}

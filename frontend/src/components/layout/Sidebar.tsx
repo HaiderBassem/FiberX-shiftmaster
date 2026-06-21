@@ -54,23 +54,23 @@ function openExternalLink(link: ExternalLinkType, userRole?: string) {
 }
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/profile', label: 'My Profile', icon: User, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/handovers', label: 'Handovers', icon: ClipboardList, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/requests', label: 'My Requests', icon: Inbox, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'] },
-  { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'] },
-  { to: '/task-management', label: 'Task Center', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'] },
-  { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'] },
-  { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'] },
-  { to: '/leave-config', label: 'Leave Config', icon: CalendarDays, roles: ['admin'] },
-  { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'] },
-  { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true },
-  { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements' },
-  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'] },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+  { to: '/profile', label: 'My Profile', icon: User, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+  { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'tasks' },
+  { to: '/handovers', label: 'Handovers', icon: ClipboardList, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'handovers' },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'calendar' },
+  { to: '/requests', label: 'My Requests', icon: Inbox, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+  { to: '/approvals', label: 'Approvals', icon: ShieldCheck, roles: ['team_leader', 'manager', 'admin'], core: true },
+  { to: '/shifts', label: 'Schedules', icon: Calendar, roles: ['team_leader', 'manager', 'admin'], core: true },
+  { to: '/task-management', label: 'Task Center', icon: ClipboardList, roles: ['team_leader', 'manager', 'admin'], moduleId: 'task_center' },
+  { to: '/employees', label: 'Employees', icon: Users, roles: ['admin', 'manager', 'team_leader'], core: true },
+  { to: '/departments', label: 'Departments', icon: Building2, roles: ['admin'], core: true },
+  { to: '/leave-config', label: 'Leave Config', icon: CalendarDays, roles: ['admin'], core: true },
+  { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'references' },
+  { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'info_bank' },
+  { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true, moduleId: 'fiberx_data' },
+  { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements', core: true },
+  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'], core: true },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
@@ -102,12 +102,20 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
       }
     }
 
-    // FiberX Data: managers/TL/admin always see it; employees only if department has fiberx_enabled
+    // FiberX Data fallback logic (if active_modules is used, this may be redundant, but kept for safety)
     if ((item as any).requiresFiberx && hasAccess) {
       const isLeadership = user.role === 'admin' || user.role === 'manager' || user.role === 'team_leader';
       if (!isLeadership && !userDepartment?.fiberx_enabled) {
         hasAccess = false;
       }
+    }
+
+    // Module toggling logic based on active_modules in department
+    if (hasAccess && (item as any).moduleId && userDepartment) {
+       const activeModules = userDepartment.active_modules || [];
+       if (!activeModules.includes((item as any).moduleId)) {
+         hasAccess = false;
+       }
     }
     
     return hasAccess;

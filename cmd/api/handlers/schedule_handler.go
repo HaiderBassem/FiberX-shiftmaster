@@ -125,6 +125,41 @@ func (h *ScheduleHandler) EmployeeShifts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": shifts, "meta": gin.H{"count": len(shifts)}})
 }
 
+// DepartmentShifts returns the shifts for the user's department for a date range.
+func (h *ScheduleHandler) DepartmentShifts(c *gin.Context) {
+	fromStr := c.Query("from")
+	toStr := c.Query("to")
+	if fromStr == "" || toStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "'from' and 'to' query params required (YYYY-MM-DD)"})
+		return
+	}
+
+	from, err := parseTime(fromStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid 'from' date"})
+		return
+	}
+	to, err := parseTime(toStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid 'to' date"})
+		return
+	}
+
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "user has no department"})
+		return
+	}
+
+	shifts, err := h.scheduleSvc.GetDepartmentShiftsInRange(c.Request.Context(), from, to, *deptID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": shifts, "meta": gin.H{"count": len(shifts)}})
+}
+
 // CheckIn records an employee's check-in.
 func (h *ScheduleHandler) CheckIn(c *gin.Context) {
 	shiftID, err := uuid.Parse(c.Param("id"))

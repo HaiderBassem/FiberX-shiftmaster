@@ -28,11 +28,14 @@ export const InteractiveCalendar = () => {
   const startDateStr = format(calendarStart, 'yyyy-MM-dd');
   const endDateStr = format(calendarEnd, 'yyyy-MM-dd');
 
-  // Fetch employees for supervisor dropdown
-  const { data: employees } = useQuery({
-    queryKey: ['employees', 'all'],
+  const [selectedShiftId, setSelectedShiftId] = useState<string>('all');
+  const employeeIdToFetch = isSupervisor ? '' : user?.id;
+
+  // Fetch available shifts for supervisor dropdown
+  const { data: availableShifts } = useQuery({
+    queryKey: ['shifts'],
     queryFn: async () => {
-      const res = await api.get('/employees');
+      const res = await api.get('/shifts');
       return res.data?.data || [];
     },
     enabled: isSupervisor,
@@ -40,45 +43,40 @@ export const InteractiveCalendar = () => {
 
   // Fetch Employee Shifts
   const { data: shifts, isLoading: shiftsLoading } = useQuery({
-    queryKey: ['schedules', 'employee', selectedEmployeeId, startDateStr, endDateStr],
+    queryKey: ['schedules', isSupervisor ? 'department' : 'employee', employeeIdToFetch, startDateStr, endDateStr],
     queryFn: async () => {
-      if (!selectedEmployeeId) return [];
-      const res = await api.get(`/schedules/employee/${selectedEmployeeId}?from=${startDateStr}&to=${endDateStr}`);
-      return res.data?.data || [];
+      if (isSupervisor) {
+        const res = await api.get(`/schedules/department?from=${startDateStr}&to=${endDateStr}`);
+        return res.data?.data || [];
+      } else {
+        if (!employeeIdToFetch) return [];
+        const res = await api.get(`/schedules/employee/${employeeIdToFetch}?from=${startDateStr}&to=${endDateStr}`);
+        return res.data?.data || [];
+      }
     },
-    enabled: !!selectedEmployeeId,
+    enabled: isSupervisor ? true : !!employeeIdToFetch,
   });
 
   // Fetch Leaves
   const { data: leaves, isLoading: leavesLoading } = useQuery({
-    queryKey: ['leaves', selectedEmployeeId === user?.id ? 'me' : 'history', startDateStr, endDateStr],
+    queryKey: ['leaves', isSupervisor ? 'history' : 'me', startDateStr, endDateStr],
     queryFn: async () => {
-      const endpoint = selectedEmployeeId === user?.id ? '/leaves/me' : '/leaves/history';
+      const endpoint = isSupervisor ? '/leaves/history' : '/leaves/me';
       const res = await api.get(endpoint);
-      const allLeaves = res.data?.data || [];
-      // Filter for this employee if using history
-      if (selectedEmployeeId !== user?.id) {
-        return allLeaves.filter((l: any) => l.employee_id === selectedEmployeeId);
-      }
-      return allLeaves;
+      return res.data?.data || [];
     },
-    enabled: !!selectedEmployeeId,
+    enabled: true,
   });
 
   // Fetch Swaps
   const { data: swaps, isLoading: swapsLoading } = useQuery({
-    queryKey: ['swaps', selectedEmployeeId === user?.id ? 'me' : 'history', startDateStr, endDateStr],
+    queryKey: ['swaps', isSupervisor ? 'history' : 'me', startDateStr, endDateStr],
     queryFn: async () => {
-      const endpoint = selectedEmployeeId === user?.id ? '/swaps/me' : '/swaps/history';
+      const endpoint = isSupervisor ? '/swaps/history' : '/swaps/me';
       const res = await api.get(endpoint);
-      const allSwaps = res.data?.data || [];
-      // Filter for this employee if using history
-      if (selectedEmployeeId !== user?.id) {
-        return allSwaps.filter((s: any) => s.requester_id === selectedEmployeeId || s.target_employee_id === selectedEmployeeId);
-      }
-      return allSwaps;
+      return res.data?.data || [];
     },
-    enabled: !!selectedEmployeeId,
+    enabled: true,
   });
 
   const isLoading = shiftsLoading || leavesLoading || swapsLoading;
@@ -90,17 +88,21 @@ export const InteractiveCalendar = () => {
 
   // Group data by date
   const eventsByDate = useMemo(() => {
-    const map: Record<string, { shift?: any, leaves: any[], swaps: any[] }> = {};
+    const map: Record<string, { shifts: any[], leaves: any[], swaps: any[] }> = {};
     calendarDays.forEach(day => {
-      map[format(day, 'yyyy-MM-dd')] = { leaves: [], swaps: [] };
+      map[format(day, 'yyyy-MM-dd')] = { shifts: [], leaves: [], swaps: [] };
     });
 
     (shifts || []).forEach((s: any) => {
+      if (isSupervisor && selectedShiftId !== 'all') {
+        if (s.default_shift_id !== selectedShiftId && s.shift_id !== selectedShiftId) return;
+      }
       const dateKey = s.shift_date?.split('T')[0];
-      if (map[dateKey]) map[dateKey].shift = s;
+      if (map[dateKey]) map[dateKey].shifts.push(s);
     });
 
     (leaves || []).forEach((l: any) => {
+      if (isSupervisor) return; // For supervisors, leaves are shown via shifts (shift_status = leave)
       const start = parseISO(l.start_date);
       const end = parseISO(l.end_date);
       calendarDays.forEach(day => {
@@ -116,7 +118,7 @@ export const InteractiveCalendar = () => {
     });
 
     return map;
-  }, [shifts, leaves, swaps, calendarDays]);
+  }, [shifts, leaves, swaps, calendarDays, selectedShiftId, isSupervisor]);
 
   const selectClass = "h-10 px-3 py-2 rounded-xl bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors cursor-pointer shadow-sm";
 
@@ -136,15 +138,16 @@ export const InteractiveCalendar = () => {
 
         {isSupervisor && (
           <div className="flex items-center gap-2">
-            <User className="w-5 h-5 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Shift Filter:</span>
             <select 
               className={selectClass + " w-full sm:w-64"}
-              value={selectedEmployeeId}
-              onChange={(e) => setSelectedEmployeeId(e.target.value)}
+              value={selectedShiftId}
+              onChange={(e) => setSelectedShiftId(e.target.value)}
             >
-              {(employees || []).filter((e: any) => e.status === 'active').map((e: any) => (
-                <option key={e.id} value={e.id}>
-                  {e.id === user?.id ? "My Calendar (Me)" : `${e.first_name} ${e.last_name}`}
+              <option value="all">All Shifts</option>
+              {(availableShifts || []).map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.start_time.slice(11, 16)} - {s.end_time.slice(11, 16)})
                 </option>
               ))}
             </select>
@@ -220,27 +223,42 @@ export const InteractiveCalendar = () => {
                           </div>
                           
                           <div className="flex flex-col gap-1 overflow-y-auto max-h-[80px] sm:max-h-[100px] no-scrollbar">
-                            {/* Shift Badge */}
-                            {data?.shift && (
-                              <ShiftBadge shift={data.shift} />
+                            {isSupervisor ? (
+                              <>
+                                {/* Show all non-working shifts for the department */}
+                                {data?.shifts.filter((s: any) => s.shift_status !== 'working').map((s: any, i: number) => (
+                                  <SupervisorShiftBadge key={`shift-${i}`} shift={s} />
+                                ))}
+                                {/* Show swaps in the department */}
+                                {data?.swaps.map((s: any, i: number) => (
+                                  <SupervisorSwapBadge key={`swap-${i}`} swap={s} />
+                                ))}
+                              </>
+                            ) : (
+                              <>
+                                {/* Shift Badge */}
+                                {data?.shifts[0] && (
+                                  <ShiftBadge shift={data.shifts[0]} />
+                                )}
+
+                                {/* Default to OFF if no shift and is in past or today */}
+                                {!data?.shifts[0] && isCurrentMonth && (
+                                   <div className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-muted/30 text-muted-foreground border border-border/50 truncate text-center">
+                                     No Shift
+                                   </div>
+                                )}
+
+                                {/* Leaves */}
+                                {data?.leaves.map((l: any, i: number) => (
+                                  <LeaveBadge key={i} leave={l} />
+                                ))}
+
+                                {/* Swaps */}
+                                {data?.swaps.map((s: any, i: number) => (
+                                  <SwapBadge key={i} swap={s} currentUserId={user?.id || ''} />
+                                ))}
+                              </>
                             )}
-
-                            {/* Default to OFF if no shift and is in past or today (just a placeholder logic, usually we just show nothing if no shift) */}
-                            {!data?.shift && isCurrentMonth && (
-                               <div className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-muted/30 text-muted-foreground border border-border/50 truncate text-center">
-                                 No Shift
-                               </div>
-                            )}
-
-                            {/* Leaves */}
-                            {data?.leaves.map((l: any, i: number) => (
-                              <LeaveBadge key={i} leave={l} />
-                            ))}
-
-                            {/* Swaps */}
-                            {data?.swaps.map((s: any, i: number) => (
-                              <SwapBadge key={i} swap={s} currentUserId={selectedEmployeeId} />
-                            ))}
                           </div>
                         </div>
                       );
@@ -300,6 +318,38 @@ const SwapBadge = ({ swap, currentUserId }: { swap: any, currentUserId: string }
   return (
     <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`Swap ${isRequester ? 'Out' : 'In'}`}>
       <span>🔄 {isRequester ? 'Swap Out' : 'Swap In'}</span>
+      {!isApproved && swap.status !== 'rejected' && <span className="opacity-70 text-[9px]">(Pend)</span>}
+    </div>
+  );
+};
+
+const SupervisorShiftBadge = ({ shift }: { shift: any }) => {
+  const status = (shift.shift_status || '').toLowerCase();
+  
+  let styles = "bg-muted text-foreground border-border";
+  if (status === 'working') return null; // We only show exceptions
+  if (status === 'off') styles = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+  if (status === 'leave') styles = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+  if (status === 'vacation') styles = "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+  if (status === 'hourly') styles = "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20";
+
+  const label = status === 'hourly' ? 'Hourly' : status === 'off' ? 'Off' : 'Leave';
+  const name = `${shift.first_name || ''}`.trim() || 'Employee';
+
+  return (
+    <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate ${styles}`} title={`${name} - ${label}`}>
+      {name} - {label}
+    </div>
+  );
+};
+
+const SupervisorSwapBadge = ({ swap }: { swap: any }) => {
+  const isApproved = swap.status === 'approved';
+  let styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+  
+  return (
+    <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`${swap.requester_name} 🔄 ${swap.target_employee_name}`}>
+      <span className="truncate">{swap.requester_name?.split(' ')[0]} 🔄 {swap.target_employee_name?.split(' ')[0]}</span>
       {!isApproved && swap.status !== 'rejected' && <span className="opacity-70 text-[9px]">(Pend)</span>}
     </div>
   );
