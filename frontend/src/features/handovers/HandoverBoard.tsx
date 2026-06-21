@@ -5,6 +5,14 @@ import { Plus, CheckCircle, Hand } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import CreateHandoverModal from './CreateHandoverModal';
 
+export type HandoverComment = {
+  id: string;
+  employee_id: string;
+  author_name: string;
+  comment: string;
+  created_at: string;
+};
+
 export type Handover = {
   id: string;
   department_id: string;
@@ -17,7 +25,8 @@ export type Handover = {
   updated_at: string;
   creator_name?: string;
   claimer_name?: string;
-  claimer_notes?: string;
+  done_by_name?: string;
+  comments?: HandoverComment[];
 };
 
 export default function HandoverBoard() {
@@ -119,17 +128,26 @@ export default function HandoverBoard() {
                       />
                     </div>
                   )}
-                  {h.status === 'claimed' && (
+                  {h.status === 'claimed' && h.claimer_name && (
                     <div className="bg-muted/50 p-2 rounded-md text-sm mt-2 text-foreground border border-border">
                       <span className="font-semibold">Claimed by:</span> {h.claimer_name}
                     </div>
                   )}
-                  {h.claimer_notes && (
-                    <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                      <h4 className="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-1">Claimer Notes:</h4>
-                      <div className="text-sm text-blue-900 dark:text-blue-200 whitespace-pre-wrap">
-                        {h.claimer_notes}
-                      </div>
+
+                  {h.comments && h.comments.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <h4 className="text-sm font-semibold text-foreground mb-1">Comments:</h4>
+                      {h.comments.map((c) => (
+                        <div key={c.id} className="p-3 bg-muted/30 border border-border rounded-md">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-medium text-foreground">{c.author_name}</span>
+                            <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</span>
+                          </div>
+                          <div className="text-sm text-foreground whitespace-pre-wrap">
+                            {c.comment}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -174,15 +192,17 @@ export default function HandoverBoard() {
                       Claim Issues
                     </button>
                   )}
-                  {h.status === 'claimed' && h.claimed_by === user?.id && (
+                  {h.status === 'claimed' && (
                     <>
-                      <button
-                        onClick={() => unclaimMutation.mutate(h.id)}
-                        disabled={unclaimMutation.isPending}
-                        className="flex items-center px-3 py-1.5 border border-destructive/50 text-destructive hover:bg-destructive/10 rounded-lg transition-colors text-sm font-medium"
-                      >
-                        Unclaim
-                      </button>
+                      {h.claimed_by === user?.id && (
+                        <button
+                          onClick={() => unclaimMutation.mutate(h.id)}
+                          disabled={unclaimMutation.isPending}
+                          className="flex items-center px-3 py-1.5 border border-destructive/50 text-destructive hover:bg-destructive/10 rounded-lg transition-colors text-sm font-medium"
+                        >
+                          Unclaim
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setCommentingOnId(h.id);
@@ -219,17 +239,35 @@ export default function HandoverBoard() {
               <div className="p-4 flex justify-between items-start">
                 <div>
                   <h3 className="text-md font-semibold text-foreground">Handover from {h.creator_name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Completed by {h.claimer_name} on {new Date(h.updated_at).toLocaleString()}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {h.claimer_name && h.claimer_name !== h.done_by_name ? (
+                      <>Claimed by {h.claimer_name} and Done by {h.done_by_name}</>
+                    ) : (
+                      <>Done by {h.done_by_name || h.claimer_name || 'Unknown'}</>
+                    )} on {new Date(h.updated_at).toLocaleString()}
                   </p>
                 </div>
                 <CheckCircle className="w-5 h-5 text-emerald-500" />
               </div>
-              <div className="px-4 pb-4">
+              <div className="px-4 pb-4 space-y-3">
                 <div 
                   className="text-sm text-muted-foreground jodit-content max-w-none prose prose-sm dark:prose-invert line-clamp-3 overflow-hidden" 
                   dangerouslySetInnerHTML={{ __html: h.shift_summary }} 
                 />
+                
+                {h.comments && h.comments.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <h4 className="text-xs font-semibold text-foreground mb-2">Comments:</h4>
+                    <div className="space-y-2">
+                      {h.comments.map((c) => (
+                        <div key={c.id} className="text-sm">
+                          <span className="font-medium text-foreground">{c.author_name}: </span>
+                          <span className="text-muted-foreground">{c.comment}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

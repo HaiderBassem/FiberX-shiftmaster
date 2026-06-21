@@ -15,6 +15,7 @@ interface Department {
   name: string;
   description: string | null;
   fiberx_enabled: boolean;
+  max_leaves_per_day?: number | null;
   manager_ids: string[]; // now an array (multi-manager support)
   created_at: string;
 }
@@ -39,6 +40,7 @@ export const DepartmentList = () => {
   const [deptDesc, setDeptDesc] = useState('');
   // single dropdown; we wrap it in an array before sending
   const [deptManagerId, setDeptManagerId] = useState<string>('');
+  const [deptMaxLeaves, setDeptMaxLeaves] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -47,6 +49,7 @@ export const DepartmentList = () => {
   const [_editCode, setEditCode] = useState('');
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editMaxLeaves, setEditMaxLeaves] = useState('');
   const [editManagerId, setEditManagerId] = useState('');
 
   // ── queries ────────────────────────────────────────────────────────
@@ -81,13 +84,14 @@ export const DepartmentList = () => {
         department_code: deptCode,
         name: deptName,
         description: deptDesc || null,
+        max_leaves_per_day: deptMaxLeaves ? parseInt(deptMaxLeaves, 10) : null,
         // backend expects manager_ids array
         manager_ids: deptManagerId ? [deptManagerId] : [],
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
-      setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId('');
+      setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId(''); setDeptMaxLeaves('');
     },
     onError: (err: any) => {
       setError(err?.response?.data?.error || err?.message || 'Failed to create department');
@@ -101,6 +105,7 @@ export const DepartmentList = () => {
       await api.put(`/departments/${editId}`, {
         name: editName,
         description: editDesc || null,
+        max_leaves_per_day: editMaxLeaves ? parseInt(editMaxLeaves, 10) : null,
         // send the selected manager wrapped in array (replaces current list)
         manager_ids: editManagerId ? [editManagerId] : [],
       });
@@ -209,9 +214,13 @@ export const DepartmentList = () => {
                   ))}
                 </select>
               </div>
-              <div className="space-y-2 md:col-span-3">
+              <div className="space-y-2 md:col-span-2">
                 <Label>Description</Label>
                 <Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Max Leaves / Day</Label>
+                <Input type="number" min="1" value={deptMaxLeaves} onChange={(e) => setDeptMaxLeaves(e.target.value)} placeholder="No limit" />
               </div>
             </div>
           </CardContent>
@@ -283,13 +292,26 @@ export const DepartmentList = () => {
                           ))}
                         </select>
                       </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Description</Label>
-                        <Input
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          className="h-9"
-                        />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Description</Label>
+                          <Input
+                            value={editDesc}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Max Leaves / Day</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={editMaxLeaves}
+                            onChange={(e) => setEditMaxLeaves(e.target.value)}
+                            className="h-9"
+                            placeholder="No limit"
+                          />
+                        </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-1">
                         <Button
@@ -365,6 +387,7 @@ export const DepartmentList = () => {
                         setEditCode(dept.department_code);
                         setEditName(dept.name);
                         setEditDesc(dept.description || '');
+                        setEditMaxLeaves(dept.max_leaves_per_day ? dept.max_leaves_per_day.toString() : '');
                         // pre-fill with first assigned manager (if any)
                         setEditManagerId(dept.manager_ids?.[0] || '');
                       }}

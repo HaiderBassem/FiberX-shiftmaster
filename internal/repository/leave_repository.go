@@ -18,6 +18,7 @@ type LeaveRepository interface {
 	GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error)
 	GetByStatus(ctx context.Context, status string) ([]models.Leave, error)
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
+	GetOverlappingLeavesCount(ctx context.Context, departmentID uuid.UUID, startDate, endDate time.Time) (int, error)
 	GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
@@ -111,6 +112,25 @@ func (r *leaveRepo) GetByDateRange(ctx context.Context, from, to time.Time) ([]m
 	}
 	defer rows.Close()
 	return r.scanLeaves(rows)
+}
+
+func (r *leaveRepo) GetOverlappingLeavesCount(ctx context.Context, departmentID uuid.UUID, startDate, endDate time.Time) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(*) 
+		 FROM leaves l
+		 JOIN employees e ON l.employee_id = e.id
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE e.department_id = $1 
+		   AND l.status NOT IN ('rejected', 'cancelled')
+		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND l.start_date <= $3 
+		   AND l.end_date >= $2`, 
+		departmentID, startDate, endDate).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get overlapping leaves count: %w", err)
+	}
+	return count, nil
 }
 
 // GetApprovedForSchedule returns fully approved leaves overlapping a date range (for schedule overlay).

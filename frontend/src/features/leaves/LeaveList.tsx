@@ -68,6 +68,11 @@ export const LeaveList = () => {
     onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to submit leave'),
   });
 
+  const cancelLeaveMutation = useMutation({
+    mutationFn: async (id: string) => { await api.post(`/leaves/${id}/cancel`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); },
+  });
+
   const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
   const isHourly = selectedType?.unit === 'hours';
 
@@ -130,6 +135,7 @@ export const LeaveList = () => {
       case 'approved_by_manager': return <CheckCircle2 className="w-6 h-6 text-emerald-500" />;
       case 'approved_by_team_leader': return <CheckCircle2 className="w-6 h-6 text-blue-500" />;
       case 'rejected': return <XCircle className="w-6 h-6 text-destructive" />;
+      case 'cancelled': return <XCircle className="w-6 h-6 text-gray-500" />;
       default: return <Clock className="w-6 h-6 text-amber-500" />;
     }
   };
@@ -139,6 +145,7 @@ export const LeaveList = () => {
       case 'approved_by_manager': return 'Approved';
       case 'approved_by_team_leader': return 'TL Approved';
       case 'rejected': return 'Rejected';
+      case 'cancelled': return 'Cancelled';
       case 'pending': return 'Pending';
       default: return status || 'Pending';
     }
@@ -210,6 +217,7 @@ export const LeaveList = () => {
                           leave.status === 'approved_by_manager' ? 'bg-emerald-500/10' :
                           leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10' :
                           leave.status === 'rejected' ? 'bg-destructive/10' :
+                          leave.status === 'cancelled' ? 'bg-gray-500/10' :
                           'bg-amber-500/10'
                         }`}>
                           {getStatusIcon(leave.status)}
@@ -234,11 +242,27 @@ export const LeaveList = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center self-end sm:self-auto">
+                      <div className="flex items-center self-end sm:self-auto gap-3">
+                        {leave.status === 'pending' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
+                            onClick={() => {
+                              if (confirm("Are you sure you want to cancel this leave request?")) {
+                                cancelLeaveMutation.mutate(leave.id);
+                              }
+                            }}
+                            disabled={cancelLeaveMutation.isPending}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" /> Cancel Request
+                          </Button>
+                        )}
                         <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
                           leave.status === 'approved_by_manager' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30' :
                           leave.status === 'approved_by_team_leader' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' :
                           leave.status === 'rejected' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
+                          leave.status === 'cancelled' ? 'bg-gray-500/15 text-gray-500 border border-gray-500/30' :
                           'bg-amber-500/15 text-amber-600 border border-amber-500/30'
                         }`}>
                           {getStatusLabel(leave.status)}

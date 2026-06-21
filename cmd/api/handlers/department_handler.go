@@ -76,12 +76,12 @@ func (h *DepartmentHandler) MyManaged(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": departments, "meta": gin.H{"count": len(departments)}})
 }
 
-// createDepartmentRequest supports assigning multiple managers on creation.
 type createDepartmentRequest struct {
-	DepartmentCode string      `json:"department_code" binding:"required"`
-	Name           string      `json:"name"            binding:"required"`
-	Description    *string     `json:"description"`
-	ManagerIDs     []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
+	DepartmentCode  string      `json:"department_code" binding:"required"`
+	Name            string      `json:"name"            binding:"required"`
+	Description     *string     `json:"description"`
+	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
+	ManagerIDs      []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
 }
 
 // Create creates a new department.
@@ -109,10 +109,11 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	}
 
 	dept := &models.Department{
-		DepartmentCode: req.DepartmentCode,
-		Name:           req.Name,
-		Description:    req.Description,
-		ManagerIDs:     req.ManagerIDs,
+		DepartmentCode:  req.DepartmentCode,
+		Name:            req.Name,
+		Description:     req.Description,
+		MaxLeavesPerDay: req.MaxLeavesPerDay,
+		ManagerIDs:      req.ManagerIDs,
 	}
 
 	if err := h.deptRepo.Create(c.Request.Context(), dept); err != nil {
@@ -123,12 +124,11 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": dept})
 }
 
-// updateDepartmentRequest supports replacing the full list of managers.
-// If manager_ids is omitted from the JSON body the existing assignments are kept.
 type updateDepartmentRequest struct {
-	Name        string      `json:"name"`
-	Description *string     `json:"description"`
-	ManagerIDs  []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
+	Name            string      `json:"name"`
+	Description     *string     `json:"description"`
+	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
+	ManagerIDs      []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
 }
 
 // Update updates a department.
@@ -162,10 +162,11 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 	}
 
 	dept := &models.Department{
-		ID:          id,
-		Name:        req.Name,
-		Description: req.Description,
-		ManagerIDs:  req.ManagerIDs, // nil when key is absent → repo skips sync
+		ID:              id,
+		Name:            req.Name,
+		Description:     req.Description,
+		MaxLeavesPerDay: req.MaxLeavesPerDay,
+		ManagerIDs:      req.ManagerIDs, // nil when key is absent → repo skips sync
 	}
 
 	if err := h.deptRepo.Update(c.Request.Context(), dept); err != nil {

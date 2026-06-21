@@ -66,7 +66,7 @@ func main() {
 
 	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
 
-	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
+	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)

@@ -172,7 +172,10 @@ func (h *HandoverHandler) CompleteHandover(c *gin.Context) {
 		return
 	}
 
-	if err := h.handoverRepo.Complete(c.Request.Context(), handoverID); err != nil {
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	if err := h.handoverRepo.Complete(c.Request.Context(), handoverID, empID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete handover"})
 		return
 	}

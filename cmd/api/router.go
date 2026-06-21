@@ -114,6 +114,7 @@ func SetupRouter(
 			leaves.POST("", leaveH.Request)
 			leaves.GET("/me", leaveH.MyLeaves)
 			leaves.GET("/pending", leaveH.PendingForApproval)
+			leaves.POST("/:id/cancel", leaveH.CancelPending)
 		}
 
 		// FiberxData

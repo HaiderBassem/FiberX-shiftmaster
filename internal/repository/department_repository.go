@@ -69,10 +69,10 @@ func (r *departmentRepo) loadManagerIDs(ctx context.Context, departmentID uuid.U
 func (r *departmentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Department, error) {
 	var dept models.Department
 	err := r.db.QueryRow(ctx,
-		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), max_leaves_per_day, created_at, updated_at
 		 FROM departments WHERE id = $1`, id,
 	).Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-		&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt)
+		&dept.FiberxEnabled, &dept.MaxLeavesPerDay, &dept.CreatedAt, &dept.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("department not found: %w", err)
@@ -90,10 +90,10 @@ func (r *departmentRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Dep
 func (r *departmentRepo) GetByCode(ctx context.Context, code string) (*models.Department, error) {
 	var dept models.Department
 	err := r.db.QueryRow(ctx,
-		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), max_leaves_per_day, created_at, updated_at
 		 FROM departments WHERE department_code = $1`, code,
 	).Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-		&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt)
+		&dept.FiberxEnabled, &dept.MaxLeavesPerDay, &dept.CreatedAt, &dept.UpdatedAt)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, fmt.Errorf("department not found: %w", err)
@@ -110,7 +110,7 @@ func (r *departmentRepo) GetByCode(ctx context.Context, code string) (*models.De
 
 func (r *departmentRepo) GetAll(ctx context.Context) ([]models.Department, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), created_at, updated_at
+		`SELECT id, department_code, name, description, COALESCE(fiberx_enabled, false), max_leaves_per_day, created_at, updated_at
 		 FROM departments ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("get all departments: %w", err)
@@ -121,7 +121,7 @@ func (r *departmentRepo) GetAll(ctx context.Context) ([]models.Department, error
 	for rows.Next() {
 		var dept models.Department
 		if err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-			&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
+			&dept.FiberxEnabled, &dept.MaxLeavesPerDay, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan department: %w", err)
 		}
 		departments = append(departments, dept)
@@ -142,9 +142,9 @@ func (r *departmentRepo) GetAll(ctx context.Context) ([]models.Department, error
 
 func (r *departmentRepo) Create(ctx context.Context, dept *models.Department) error {
 	err := r.db.QueryRow(ctx,
-		`INSERT INTO departments (department_code, name, description)
-		 VALUES ($1,$2,$3) RETURNING id, created_at, updated_at`,
-		dept.DepartmentCode, dept.Name, dept.Description,
+		`INSERT INTO departments (department_code, name, description, max_leaves_per_day)
+		 VALUES ($1,$2,$3,$4) RETURNING id, created_at, updated_at`,
+		dept.DepartmentCode, dept.Name, dept.Description, dept.MaxLeavesPerDay,
 	).Scan(&dept.ID, &dept.CreatedAt, &dept.UpdatedAt)
 	if err != nil {
 		return err
@@ -161,9 +161,9 @@ func (r *departmentRepo) Create(ctx context.Context, dept *models.Department) er
 
 func (r *departmentRepo) Update(ctx context.Context, dept *models.Department) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE departments SET name=$1, description=$2, updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$3`,
-		dept.Name, dept.Description, dept.ID)
+		`UPDATE departments SET name=$1, description=$2, max_leaves_per_day=$3, updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$4`,
+		dept.Name, dept.Description, dept.MaxLeavesPerDay, dept.ID)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (r *departmentRepo) GetManagers(ctx context.Context, departmentID uuid.UUID
 // via the department_managers junction table.
 func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID) ([]models.Department, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT d.id, d.department_code, d.name, d.description, COALESCE(d.fiberx_enabled, false), d.created_at, d.updated_at
+		`SELECT d.id, d.department_code, d.name, d.description, COALESCE(d.fiberx_enabled, false), d.max_leaves_per_day, d.created_at, d.updated_at
 		 FROM departments d
 		 INNER JOIN department_managers dm ON dm.department_id = d.id
 		 WHERE dm.manager_id = $1
@@ -242,7 +242,7 @@ func (r *departmentRepo) GetByManagerID(ctx context.Context, managerID uuid.UUID
 	for rows.Next() {
 		var dept models.Department
 		if err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.Name, &dept.Description,
-			&dept.FiberxEnabled, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
+			&dept.FiberxEnabled, &dept.MaxLeavesPerDay, &dept.CreatedAt, &dept.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan department: %w", err)
 		}
 		departments = append(departments, dept)

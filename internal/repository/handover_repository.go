@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 
@@ -15,7 +16,7 @@ type HandoverRepository interface {
 	Claim(ctx context.Context, id, employeeID uuid.UUID) error
 	Unclaim(ctx context.Context, id, employeeID uuid.UUID) error
 	AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error
-	Complete(ctx context.Context, id uuid.UUID) error
+	Complete(ctx context.Context, id, employeeID uuid.UUID) error
 }
 
 type handoverRepo struct {
@@ -38,12 +39,28 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 
 	func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
 	query := `
-		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.claimer_notes, h.created_at, h.updated_at,
+		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.done_by, h.created_at, h.updated_at,
 		       c.first_name || ' ' || c.last_name as creator_name,
-		       cl.first_name || ' ' || cl.last_name as claimer_name
+		       cl.first_name || ' ' || cl.last_name as claimer_name,
+		       d.first_name || ' ' || d.last_name as done_by_name,
+		       COALESCE(
+		           (
+		               SELECT json_agg(json_build_object(
+		                   'id', hc.id,
+		                   'employee_id', hc.employee_id,
+		                   'author_name', e.first_name || ' ' || e.last_name,
+		                   'comment', hc.comment,
+		                   'created_at', hc.created_at
+		               ) ORDER BY hc.created_at ASC)
+		               FROM handover_comments hc
+		               JOIN employees e ON e.id = hc.employee_id
+		               WHERE hc.handover_id = h.id
+		           ), '[]'::json
+		       ) as comments
 		FROM shift_handovers h
 		JOIN employees c ON c.id = h.creator_id
 		LEFT JOIN employees cl ON cl.id = h.claimed_by
+		LEFT JOIN employees d ON d.id = h.done_by
 		WHERE h.department_id = $1
 		ORDER BY h.created_at DESC
 	`
@@ -56,12 +73,19 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 	var handovers []models.Handover
 	for rows.Next() {
 		var h models.Handover
+		var commentsJSON []byte
 		if err := rows.Scan(
-			&h.ID, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.ClaimerNotes, &h.CreatedAt, &h.UpdatedAt,
-			&h.CreatorName, &h.ClaimerName,
+			&h.ID, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.DoneBy, &h.CreatedAt, &h.UpdatedAt,
+			&h.CreatorName, &h.ClaimerName, &h.DoneByName, &commentsJSON,
 		); err != nil {
 			return nil, err
 		}
+		
+		if err := json.Unmarshal(commentsJSON, &h.Comments); err != nil {
+			// ignore unmarshal errors for empty/invalid json
+			h.Comments = []models.HandoverComment{}
+		}
+		
 		handovers = append(handovers, h)
 	}
 	return handovers, rows.Err()
@@ -89,24 +113,22 @@ func (r *handoverRepo) Unclaim(ctx context.Context, id, employeeID uuid.UUID) er
 
 func (r *handoverRepo) AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error {
 	query := `
-		UPDATE shift_handovers
-		SET claimer_notes = CASE 
-			WHEN claimer_notes IS NULL OR claimer_notes = '' THEN $1
-			ELSE claimer_notes || E'\n\n' || $1
-		END,
-		updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2 AND claimed_by = $3 AND status = 'claimed'
+		INSERT INTO handover_comments (handover_id, employee_id, comment)
+		VALUES ($1, $2, $3)
 	`
-	_, err := r.db.Exec(ctx, query, comment, id, employeeID)
+	_, err := r.db.Exec(ctx, query, id, employeeID, comment)
+	if err == nil {
+		_, _ = r.db.Exec(ctx, "UPDATE shift_handovers SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", id)
+	}
 	return err
 }
 
-func (r *handoverRepo) Complete(ctx context.Context, id uuid.UUID) error {
+func (r *handoverRepo) Complete(ctx context.Context, id, employeeID uuid.UUID) error {
 	query := `
 		UPDATE shift_handovers
-		SET status = 'completed', updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1
+		SET status = 'completed', done_by = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
 	`
-	_, err := r.db.Exec(ctx, query, id)
+	_, err := r.db.Exec(ctx, query, employeeID, id)
 	return err
 }

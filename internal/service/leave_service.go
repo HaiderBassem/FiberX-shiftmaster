@@ -16,6 +16,7 @@ import (
 type LeaveService struct {
 	leaveRepo        repository.LeaveRepository
 	employeeRepo     repository.EmployeeRepository
+	departmentRepo   repository.DepartmentRepository
 	scheduleRepo     repository.ScheduleRepository
 	leaveBalanceRepo repository.LeaveBalanceRepository
 	leaveTypeRepo    repository.LeaveTypeRepository
@@ -27,6 +28,7 @@ type LeaveService struct {
 func NewLeaveService(
 	leaveRepo repository.LeaveRepository,
 	employeeRepo repository.EmployeeRepository,
+	departmentRepo repository.DepartmentRepository,
 	scheduleRepo repository.ScheduleRepository,
 	leaveBalanceRepo repository.LeaveBalanceRepository,
 	leaveTypeRepo repository.LeaveTypeRepository,
@@ -37,6 +39,7 @@ func NewLeaveService(
 	return &LeaveService{
 		leaveRepo:        leaveRepo,
 		employeeRepo:     employeeRepo,
+		departmentRepo:   departmentRepo,
 		scheduleRepo:     scheduleRepo,
 		leaveBalanceRepo: leaveBalanceRepo,
 		leaveTypeRepo:    leaveTypeRepo,
@@ -193,6 +196,27 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	emp, err := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
 	if err != nil {
 		return fmt.Errorf("employee not found: %w", err)
+	}
+
+	// Check department leave limits (if set) and not an Emergency leave
+	isEmergency := false
+	if leaveType != nil && leaveType.NameEn != nil {
+		if *leaveType.NameEn == "Emergency" || *leaveType.NameEn == "emergency" {
+			isEmergency = true
+		}
+	}
+
+	if !isEmergency && emp.DepartmentID != nil {
+		dept, err := s.departmentRepo.GetByID(ctx, *emp.DepartmentID)
+		if err == nil && dept.MaxLeavesPerDay != nil {
+			overlappingCount, err := s.leaveRepo.GetOverlappingLeavesCount(ctx, *emp.DepartmentID, leave.StartDate, leave.EndDate)
+			if err == nil {
+				// Each hourly leave is counted as 1 leave for that day.
+				if overlappingCount >= *dept.MaxLeavesPerDay {
+					return fmt.Errorf("The maximum number of allowed leaves per day for your department has been reached.")
+				}
+			}
+		}
 	}
 
 	if err := s.leaveRepo.Create(ctx, leave); err != nil {
@@ -505,8 +529,8 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 	}
 
 	if leave.Status == "approved_by_manager" || leave.Status == "approved" {
-		if role != "manager" && role != "admin" {
-			return fmt.Errorf("only managers can cancel a fully approved leave")
+		if role != "manager" && role != "admin" && role != "team_leader" {
+			return fmt.Errorf("only managers and team leaders can cancel a fully approved leave")
 		}
 	}
 
@@ -596,6 +620,28 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 			"Leave Cancelled",
 			fmt.Sprintf("Hello %s,\n\nYour approved leave request (from %s to %s) has been cancelled by management. Please check your schedule for updates.", emp.FirstName, start.Format("2006-01-02"), end.Format("2006-01-02")),
 		)
+	}
+
+	return nil
+}
+
+// CancelPendingLeave cancels a leave request that has not yet been approved.
+func (s *LeaveService) CancelPendingLeave(ctx context.Context, leaveID uuid.UUID, employeeID uuid.UUID) error {
+	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
+	if err != nil {
+		return fmt.Errorf("leave not found: %w", err)
+	}
+
+	if leave.EmployeeID != employeeID {
+		return fmt.Errorf("unauthorized to cancel this leave")
+	}
+
+	if leave.Status != "pending" {
+		return fmt.Errorf("only pending leaves can be cancelled")
+	}
+
+	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "cancelled", employeeID, "employee"); err != nil {
+		return fmt.Errorf("failed to cancel leave: %w", err)
 	}
 
 	return nil
