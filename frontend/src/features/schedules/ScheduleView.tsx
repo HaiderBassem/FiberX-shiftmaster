@@ -9,6 +9,21 @@ import { Label } from '@/components/ui/label';
 import { Calendar as CalendarIcon, Loader2, Users, Briefcase, Wand2, Filter, AlertTriangle } from 'lucide-react';
 import { addDays, format, startOfWeek } from 'date-fns';
 
+/** Resolve display status for a day when DB row may be missing (matches daily view virtual rows). */
+function resolveDayStatus(emp: any, row: any, dateStr: string): string {
+  if (row?.shift_status) return String(row.shift_status).toLowerCase();
+  const dayOfWeek = new Date(`${dateStr}T12:00:00`).getDay();
+  if (emp.weekly_off_days >= 0 && emp.weekly_off_days === dayOfWeek) return 'off';
+  if (emp.default_shift_id) return 'working';
+  return 'none';
+}
+
+function resolveShiftName(row: any, emp: any, shiftLookup: Record<string, any>): string | null {
+  const shiftId = row?.shift_id || emp?.default_shift_id;
+  if (!shiftId) return null;
+  return shiftLookup[shiftId]?.name || 'Shift';
+}
+
 export const ScheduleView = () => {
   const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filterShiftId, setFilterShiftId] = useState<string>('');
@@ -72,8 +87,11 @@ export const ScheduleView = () => {
   );
 
   const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({
-    queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd'), deptId],
+    queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd'), deptId, shifts?.length ?? 0],
     queryFn: async () => {
+      const shiftLookup: Record<string, any> = {};
+      (shifts || []).forEach((s: any) => { shiftLookup[s.id] = s; });
+
       const dates = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
       const dayResponses = await Promise.all(
         dates.map((d) => api.get(`/schedules/daily?date=${d}`)),
@@ -86,18 +104,19 @@ export const ScheduleView = () => {
       const emps = (employees || []).filter((e: any) => !e.status || e.status.toLowerCase() === 'active');
       return emps.map((emp: any) => {
         const days = dates.map((d) => {
-          const row = (dayMap[d] || []).find((r: any) => r.employee_id === emp.id);
+          const row = (dayMap[d] || []).find((r: any) => String(r.employee_id) === String(emp.id));
+          const status = resolveDayStatus(emp, row, d);
           return {
             date: d,
-            row,
-            status: row?.shift_status || 'none',
-            shiftName: row?.shift_id ? (shiftMap[row.shift_id]?.name || 'Shift') : null,
+            row: row || null,
+            status,
+            shiftName: resolveShiftName(row, emp, shiftLookup),
           };
         });
         return { employee: emp, days };
       });
     },
-    enabled: (employees || []).length > 0 && (shifts || []).length >= 0,
+    enabled: (employees || []).length > 0,
   });
 
   const filteredWeeklyRows = useMemo(() => {
@@ -381,7 +400,7 @@ export const ScheduleView = () => {
                         const emp = employeeMap[es.employee_id];
                         const name = emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown Employee';
                         const code = emp?.employee_code || '';
-                        const status = (es.shift_status || '—') as string;
+                        const status = (es.shift_status || '—').toLowerCase();
 
                         const statusTone =
                           status === 'working' ? 'text-emerald-500' :

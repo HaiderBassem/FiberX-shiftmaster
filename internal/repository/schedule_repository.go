@@ -144,7 +144,8 @@ func (r *scheduleRepo) GetWeeklySchedule(ctx context.Context, weekStart time.Tim
 	var ws models.WeeklySchedule
 	err := r.db.QueryRow(ctx,
 		`SELECT id, week_start_date, week_end_date, template_id, status, published_by, published_at, notes, created_at
-		 FROM weekly_schedule WHERE week_start_date = $1`, weekStart,
+		 FROM weekly_schedule WHERE week_start_date = $1::date
+		 ORDER BY created_at DESC LIMIT 1`, weekStart,
 	).Scan(&ws.ID, &ws.WeekStartDate, &ws.WeekEndDate, &ws.TemplateID, &ws.Status,
 		&ws.PublishedBy, &ws.PublishedAt, &ws.Notes, &ws.CreatedAt)
 	if err != nil {

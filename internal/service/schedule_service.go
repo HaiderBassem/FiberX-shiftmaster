@@ -60,16 +60,9 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 	weekStart := normalizeWeekStart(refDate)
 	weekEnd := weekStart.AddDate(0, 0, 6)
 
-	ws, err := s.scheduleRepo.GetWeeklySchedule(ctx, weekStart)
+	ws, err := s.getOrCreateWeeklySchedule(ctx, weekStart, weekEnd)
 	if err != nil {
-		ws = &models.WeeklySchedule{
-			WeekStartDate: weekStart,
-			WeekEndDate:   weekEnd,
-			Status:        "draft",
-		}
-		if createErr := s.scheduleRepo.CreateWeeklySchedule(ctx, ws); createErr != nil {
-			return fmt.Errorf("create weekly schedule: %w", createErr)
-		}
+		return err
 	}
 
 	prevWeekStart := weekStart.AddDate(0, 0, -7)
@@ -77,7 +70,8 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 	prevShifts, _ := s.scheduleRepo.GetEmployeeShiftsInRange(ctx, prevWeekStart, prevWeekEnd)
 	prevByEmployeeDay := map[uuid.UUID]map[int]models.EmployeeShift{}
 	for _, ps := range prevShifts {
-		if ps.ShiftStatus != "working" && ps.ShiftStatus != "off" {
+		st := strings.ToLower(ps.ShiftStatus)
+		if st != "working" && st != "off" {
 			continue
 		}
 		dow := int(ps.ShiftDate.UTC().Weekday())
@@ -111,7 +105,7 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 			var shiftID *uuid.UUID
 
 			if prevDay, ok := prevByEmployeeDay[emp.ID][day]; ok {
-				status = prevDay.ShiftStatus
+				status = strings.ToLower(prevDay.ShiftStatus)
 				shiftID = prevDay.ShiftID
 			} else if tmpl, ok := tmplByDay[day]; ok {
 				if tmpl.IsOff {
@@ -146,6 +140,25 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 	}
 
 	return s.applyApprovedLeavesForRange(ctx, ws, weekStart, weekEnd)
+}
+
+func (s *ScheduleService) getOrCreateWeeklySchedule(ctx context.Context, weekStart, weekEnd time.Time) (*models.WeeklySchedule, error) {
+	ws, err := s.scheduleRepo.GetWeeklySchedule(ctx, weekStart)
+	if err == nil {
+		return ws, nil
+	}
+	ws = &models.WeeklySchedule{
+		WeekStartDate: weekStart,
+		WeekEndDate:   weekEnd,
+		Status:        "draft",
+	}
+	if createErr := s.scheduleRepo.CreateWeeklySchedule(ctx, ws); createErr != nil {
+		if existing, getErr := s.scheduleRepo.GetWeeklySchedule(ctx, weekStart); getErr == nil {
+			return existing, nil
+		}
+		return nil, fmt.Errorf("create weekly schedule: %w", createErr)
+	}
+	return ws, nil
 }
 
 func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *models.WeeklySchedule, from, to time.Time) error {
@@ -472,12 +485,9 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 	weekEnd := weekStart.AddDate(0, 0, 6)
 
 	// Ensure weekly schedule exists (draft by default)
-	ws, wsErr := s.scheduleRepo.GetWeeklySchedule(ctx, weekStart)
-	if wsErr != nil {
-		ws = &models.WeeklySchedule{WeekStartDate: weekStart, WeekEndDate: weekEnd, Status: "draft"}
-		if err := s.scheduleRepo.CreateWeeklySchedule(ctx, ws); err != nil {
-			return nil, fmt.Errorf("create weekly schedule: %w", err)
-		}
+	ws, err := s.getOrCreateWeeklySchedule(ctx, weekStart, weekEnd)
+	if err != nil {
+		return nil, err
 	}
 
 	es := &models.EmployeeShift{
