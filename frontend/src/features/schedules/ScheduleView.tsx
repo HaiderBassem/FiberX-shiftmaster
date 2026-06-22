@@ -83,7 +83,7 @@ export const ScheduleView = () => {
         dayMap[d] = dayResponses[idx]?.data?.data || [];
       });
 
-      const emps = (employees || []).filter((e: any) => e.status === 'active');
+      const emps = (employees || []).filter((e: any) => !e.status || e.status.toLowerCase() === 'active');
       return emps.map((emp: any) => {
         const days = dates.map((d) => {
           const row = (dayMap[d] || []).find((r: any) => r.employee_id === emp.id);
