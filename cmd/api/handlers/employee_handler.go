@@ -71,7 +71,7 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 			for _, e := range deptEmployees {
 				if role == "manager" && (e.Role == "employee" || e.Role == "team_leader") {
 					filtered = append(filtered, e)
-				} else if role == "team_leader" && e.Role == "employee" {
+				} else if role == "team_leader" && (e.Role == "employee" || e.Role == "team_leader") {
 					filtered = append(filtered, e)
 				} else if role == "employee" {
 					// Employees can see other employees/TLs in their department (e.g., for swaps)
@@ -167,7 +167,7 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
 				return
 			}
-			if role == "team_leader" && emp.Role != "employee" {
+			if role == "team_leader" && emp.Role != "employee" && emp.Role != "team_leader" {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
 				return
 			}

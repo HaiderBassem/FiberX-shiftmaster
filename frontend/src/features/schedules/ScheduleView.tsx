@@ -13,10 +13,12 @@ export const ScheduleView = () => {
   const [viewDate, setViewDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [filterShiftId, setFilterShiftId] = useState<string>('');
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
+  const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const isSupervisor = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'team_leader';
-  const canEdit = user?.role === 'team_leader' || user?.role === 'admin'; // Manager is VIEW ONLY
+  const canEdit = user?.role === 'team_leader' || user?.role === 'admin' || user?.role === 'manager';
+  
+  const deptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : 'self');
 
   // Manual set form
   const [setEmployeeId, setSetEmployeeId] = useState('');
@@ -28,7 +30,7 @@ export const ScheduleView = () => {
 
   // Query for fetching daily schedule
   const { data: activeSchedule, isLoading: isLoadingSchedule } = useQuery({
-    queryKey: ['schedules', viewDate],
+    queryKey: ['schedules', viewDate, deptId],
     queryFn: async () => {
       const response = await api.get(`/schedules/daily?date=${viewDate}`);
       return response.data?.data || [];
@@ -36,7 +38,7 @@ export const ScheduleView = () => {
   });
 
   const { data: rawEmployees } = useQuery({
-    queryKey: ['employees', 'all'],
+    queryKey: ['employees', 'all', deptId],
     queryFn: async () => {
       const res = await api.get('/employees');
       return res.data?.data || [];
@@ -52,7 +54,7 @@ export const ScheduleView = () => {
   }, [rawEmployees, user]);
 
   const { data: shifts } = useQuery({
-    queryKey: ['shifts'],
+    queryKey: ['shifts', deptId],
     queryFn: async () => {
       const res = await api.get('/shifts');
       return res.data?.data || [];
@@ -70,7 +72,7 @@ export const ScheduleView = () => {
   );
 
   const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({
-    queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd')],
+    queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd'), deptId],
     queryFn: async () => {
       const dates = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
       const dayResponses = await Promise.all(
@@ -105,7 +107,7 @@ export const ScheduleView = () => {
   }, [weeklyRows, filterShiftId]);
 
   const { data: pendingLeaves } = useQuery({
-    queryKey: ['leaves', 'pending', 'schedule-panel'],
+    queryKey: ['leaves', 'pending', 'schedule-panel', deptId],
     queryFn: async () => {
       const res = await api.get('/leaves/pending');
       return res.data?.data || [];
