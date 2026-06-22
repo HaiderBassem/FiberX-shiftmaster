@@ -145,7 +145,7 @@ export const ScheduleView = () => {
 
     // Add virtual rows for active employees with no record today
     (employees || []).forEach((emp: any) => {
-      if (emp.status !== 'active') return;
+      if (emp.status && emp.status.toLowerCase() !== 'active') return;
       if (coveredEmployeeIds.has(String(emp.id))) return; // already has a real row
       const key = emp.default_shift_id || 'off_no_shift';
       if (filterShiftId && key !== filterShiftId) return;
@@ -181,7 +181,7 @@ export const ScheduleView = () => {
     });
     // Count virtual rows (employees with no record = assumed working)
     (employees || []).forEach((emp: any) => {
-      if (emp.status === 'active' && !coveredIds.has(String(emp.id))) {
+      if ((!emp.status || emp.status.toLowerCase() === 'active') && !coveredIds.has(String(emp.id))) {
         base.total++;
         base.working++;
       }
@@ -307,7 +307,7 @@ export const ScheduleView = () => {
                 <Label>Employee</Label>
                 <select className={selectClass} value={setEmployeeId} onChange={(e) => setSetEmployeeId(e.target.value)}>
                   <option value="">Select employee…</option>
-                  {(employees || []).filter((e: any) => e.status === 'active').map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
+                  {(employees || []).filter((e: any) => !e.status || e.status.toLowerCase() === 'active').map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
                 </select>
               </div>
               <div className="space-y-2">

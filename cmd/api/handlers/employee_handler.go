@@ -49,32 +49,29 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 	roleAny, _ := c.Get("role")
 	role, _ := roleAny.(string)
 
-
-
 	// Scope: strictly isolate non-admins to their own department.
 	if role != "admin" {
-
-
-		// The middleware guarantees that getDepartmentID(c) returns a valid, authorized department context.
 		targetDeptID := getDepartmentID(c)
+		var deptEmployees []models.Employee
+
 		if targetDeptID == nil {
-			employees = []models.Employee{}
-			c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": 0}})
-			return
+			// If no target department is specified, just fetch all active employees (or all employees)
+			// Team Leaders might not have a department set in the UI context
+			deptEmployees, err = h.employeeService.GetActive(ctx)
+		} else {
+			deptEmployees, err = h.employeeService.GetByDepartment(ctx, *targetDeptID)
 		}
 
-		// Employees can only ever see people in their own department.
-		deptEmployees, err := h.employeeService.GetByDepartment(ctx, *targetDeptID)
 		if err == nil {
-			// Role-based visibility filtering within the department:
+			// Role-based visibility filtering:
 			filtered := make([]models.Employee, 0, len(deptEmployees))
 			for _, e := range deptEmployees {
-				if role == "manager" && (e.Role == "employee" || e.Role == "team_leader") {
+				if role == "manager" && (e.Role == "employee" || e.Role == "team_leader" || e.Role == "manager") {
 					filtered = append(filtered, e)
 				} else if role == "team_leader" && (e.Role == "employee" || e.Role == "team_leader") {
 					filtered = append(filtered, e)
 				} else if role == "employee" {
-					// Employees can see other employees/TLs in their department (e.g., for swaps)
+					// Employees can see other employees/TLs (e.g., for swaps)
 					filtered = append(filtered, e)
 				}
 			}
@@ -104,6 +101,21 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 		default:
 			employees, err = h.employeeService.GetAll(ctx)
 		}
+
+		// Filter by contextual department if one is selected by an Admin explicitly from header.
+		// We only filter if the header is present, to avoid filtering out employees with no department if Admin has a default department.
+		if c.GetHeader("X-Department-ID") != "" {
+			targetDeptID := getDepartmentID(c)
+			if targetDeptID != nil {
+				filtered := make([]models.Employee, 0)
+				for _, e := range employees {
+					if e.DepartmentID != nil && *e.DepartmentID == *targetDeptID {
+						filtered = append(filtered, e)
+					}
+				}
+				employees = filtered
+			}
+		}
 	}
 
 	if err != nil {
@@ -112,20 +124,6 @@ func (h *EmployeeHandler) List(c *gin.Context) {
 	}
 	if employees == nil {
 		employees = []models.Employee{}
-	}
-
-	// Filter by contextual department if one is selected (e.g., by an Admin from the Topbar)
-	if role == "admin" {
-		targetDeptID := getDepartmentID(c)
-		if targetDeptID != nil {
-			filtered := make([]models.Employee, 0)
-			for _, e := range employees {
-				if e.DepartmentID != nil && *e.DepartmentID == *targetDeptID {
-					filtered = append(filtered, e)
-				}
-			}
-			employees = filtered
-		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": employees, "meta": gin.H{"count": len(employees)}})
