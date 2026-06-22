@@ -354,6 +354,16 @@ export const ScheduleView = () => {
         </Card>
       )}
 
+      {/* DEBUG HEADER - TEMPORARY */}
+      <div className="p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-500 font-mono text-sm">
+        DEBUG INFO: 
+        Role: {user?.role} | 
+        DeptId: {deptId} | 
+        rawEmployees: {rawEmployees ? rawEmployees.length : 'loading/null'} | 
+        filteredEmployees: {employees ? employees.length : 'null'} |
+        isError: {String(rawEmployees === undefined)}
+      </div>
+
       {/* Daily schedule */}
       <Card>
         <CardHeader className="pb-3 border-b border-border">
