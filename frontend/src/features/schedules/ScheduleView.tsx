@@ -183,7 +183,7 @@ export const ScheduleView = () => {
   }, [activeSchedule, employees, filterShiftId]);
 
   const stats = useMemo(() => {
-    const base = { working: 0, off: 0, leave: 0, vacation: 0, other: 0, total: 0 };
+    const base = { working: 0, off: 0, leave: 0, vacation: 0, hourly: 0, other: 0, total: 0 };
     // Count real DB rows
     const coveredIds = new Set<string>();
     (activeSchedule || []).forEach((es: any) => {
@@ -194,7 +194,7 @@ export const ScheduleView = () => {
       if (st === 'working') base.working++;
       else if (st === 'off') base.off++;
       else if (st === 'leave') base.leave++;
-      else if (st === 'hourly') base.other++; // we could track hourly separately, but for now we put it under other, or we can just count it in working.
+      else if (st === 'hourly') base.hourly++;
       else if (st === 'vacation') base.vacation++;
       else base.other++;
     });
@@ -297,11 +297,12 @@ export const ScheduleView = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 w-full">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 w-full">
             <Stat label="Total" value={stats.total} tone="default" />
             <Stat label="Working" value={stats.working} tone="emerald" />
             <Stat label="Off" value={stats.off} tone="amber" />
             <Stat label="Leave" value={stats.leave} tone="rose" />
+            <Stat label="Hourly" value={stats.hourly} tone="cyan" />
             <Stat label="Vacation" value={stats.vacation} tone="blue" />
           </div>
         </CardContent>
@@ -380,6 +381,7 @@ export const ScheduleView = () => {
                 const working = rows.filter((r: any) => r.shift_status === 'working').length;
                 const off = rows.filter((r: any) => r.shift_status === 'off').length;
                 const leave = rows.filter((r: any) => r.shift_status === 'leave').length;
+                const hourly = rows.filter((r: any) => r.shift_status === 'hourly').length;
                 const vacation = rows.filter((r: any) => r.shift_status === 'vacation').length;
 
                 return (
@@ -393,6 +395,7 @@ export const ScheduleView = () => {
                         <span className="text-emerald-500">Working: {working}</span>
                         <span className="text-amber-500">Off: {off}</span>
                         <span className="text-rose-500">Leave: {leave}</span>
+                        <span className="text-cyan-500">Hourly: {hourly}</span>
                         <span className="text-blue-500">Vacation: {vacation}</span>
                       </div>
                     </div>
@@ -408,8 +411,8 @@ export const ScheduleView = () => {
                           status === 'working' ? 'text-emerald-500' :
                           status === 'off' ? 'text-amber-500' :
                           status === 'leave' ? 'text-rose-500' :
+                          status === 'hourly' ? 'text-cyan-500' :
                           status === 'vacation' ? 'text-blue-500' :
-                          status === 'hourly' ? 'text-blue-500' :
                           'text-muted-foreground';
 
                         return (
@@ -498,8 +501,8 @@ export const ScheduleView = () => {
                           d.status === 'working' ? 'text-emerald-500 border-emerald-500/30 bg-emerald-500/5'
                             : d.status === 'off' ? 'text-amber-500 border-amber-500/30 bg-amber-500/5'
                               : d.status === 'leave' ? 'text-rose-500 border-rose-500/30 bg-rose-500/5'
-                                : d.status === 'vacation' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
-                                  : d.status === 'hourly' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
+                                : d.status === 'hourly' ? 'text-cyan-500 border-cyan-500/30 bg-cyan-500/5'
+                                  : d.status === 'vacation' ? 'text-blue-500 border-blue-500/30 bg-blue-500/5'
                                     : 'text-muted-foreground border-border bg-muted/20';
 
                         return (
@@ -605,12 +608,13 @@ export const ScheduleView = () => {
   );
 };
 
-const Stat = ({ label, value, tone }: { label: string; value: number; tone: 'default' | 'emerald' | 'amber' | 'rose' | 'blue' }) => {
+const Stat = ({ label, value, tone }: { label: string; value: number; tone: 'default' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'blue' }) => {
   const toneMap: Record<string, string> = {
     default: 'text-foreground bg-muted/40 border-border',
     emerald: 'text-emerald-500 bg-emerald-500/5 border-emerald-500/20',
     amber: 'text-amber-500 bg-amber-500/5 border-amber-500/20',
     rose: 'text-rose-500 bg-rose-500/5 border-rose-500/20',
+    cyan: 'text-cyan-500 bg-cyan-500/5 border-cyan-500/20',
     blue: 'text-blue-500 bg-blue-500/5 border-blue-500/20',
   };
   return (

@@ -195,9 +195,7 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 
 			shiftStatus := "leave"
 			if leave.LeaveTypeNameEn != nil && (strings.ToLower(*leave.LeaveTypeNameEn) == "hourly" || strings.ToLower(*leave.LeaveTypeNameEn) == "زمنية") {
-				// Hourly leaves are still "leave" in the DB enum, but we tag the reason
-				// so the frontend can distinguish them.
-				leaveReason = "[hourly] " + leaveReason
+				shiftStatus = "hourly"
 			}
 
 			es := &models.EmployeeShift{
