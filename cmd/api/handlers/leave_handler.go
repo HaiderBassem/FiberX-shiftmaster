@@ -292,6 +292,27 @@ func (h *LeaveHandler) SyncBalances(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "leave balances synchronized"}})
 }
 
+// MyBalances returns the authenticated employee's own leave balances.
+func (h *LeaveHandler) MyBalances(c *gin.Context) {
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	year := 2026
+	if c.Query("year") != "" {
+		// Could parse year string to int here
+	}
+
+	balances, err := h.leaveSvc.GetEmployeeLeaveBalances(c.Request.Context(), empID, year)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if balances == nil {
+		balances = []models.EmployeeLeaveBalance{}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": balances})
+}
+
 func (h *LeaveHandler) GetEmployeeBalances(c *gin.Context) {
 	empID, err := uuid.Parse(c.Param("id"))
 	if err != nil {

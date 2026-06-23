@@ -44,7 +44,7 @@ export const LeaveList = () => {
     queryKey: ['leave-balances', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const res = await api.get(`/leave-balances/employee/${user.id}?year=${new Date(startDate).getFullYear()}`);
+      const res = await api.get(`/leaves/my-balances?year=${new Date(startDate).getFullYear()}`);
       return res.data?.data || [];
     },
     enabled: !!user?.id && !!startDate,
