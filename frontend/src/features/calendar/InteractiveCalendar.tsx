@@ -276,8 +276,18 @@ export const InteractiveCalendar = () => {
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
+/** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
+function resolveCalendarStatus(row: any): string {
+  const raw = String(row?.shift_status || 'working').toLowerCase();
+  if (raw === 'leave' && row?.leave_reason && String(row.leave_reason).startsWith('[hourly]')) {
+    return 'hourly';
+  }
+  if (raw === 'hourly') return 'hourly';
+  return raw;
+}
+
 const ShiftBadge = ({ shift }: { shift: any }) => {
-  const status = (shift.shift_status || 'working').toLowerCase();
+  const status = resolveCalendarStatus(shift);
   
   let styles = "bg-muted text-foreground border-border";
   if (status === 'working') styles = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
@@ -324,7 +334,7 @@ const SwapBadge = ({ swap, currentUserId }: { swap: any, currentUserId: string }
 };
 
 const SupervisorShiftBadge = ({ shift }: { shift: any }) => {
-  const status = (shift.shift_status || '').toLowerCase();
+  const status = resolveCalendarStatus(shift);
   
   let styles = "bg-muted text-foreground border-border";
   if (status === 'working') return null; // We only show exceptions

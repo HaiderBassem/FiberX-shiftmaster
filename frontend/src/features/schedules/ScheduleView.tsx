@@ -9,9 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Calendar as CalendarIcon, Loader2, Users, Briefcase, Wand2, Filter, AlertTriangle } from 'lucide-react';
 import { addDays, format, startOfWeek } from 'date-fns';
 
+/** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
+function resolveDisplayStatus(row: any): string {
+  const raw = String(row?.shift_status || '').toLowerCase();
+  if (raw === 'leave' && row?.leave_reason && String(row.leave_reason).startsWith('[hourly]')) {
+    return 'hourly';
+  }
+  if (raw === 'hourly') return 'hourly'; // direct DB enum (after restart)
+  return raw;
+}
+
 /** Resolve display status for a day when DB row may be missing (matches daily view virtual rows). */
 function resolveDayStatus(emp: any, row: any, dateStr: string): string {
-  if (row?.shift_status) return String(row.shift_status).toLowerCase();
+  if (row?.shift_status) return resolveDisplayStatus(row);
   const dayOfWeek = new Date(`${dateStr}T12:00:00`).getDay();
   if (emp.weekly_off_days >= 0 && emp.weekly_off_days === dayOfWeek) return 'off';
   if (emp.default_shift_id) return 'working';
@@ -190,11 +200,11 @@ export const ScheduleView = () => {
       if (!employeeMap[es.employee_id]) return; // Skip out-of-scope employees
       coveredIds.add(String(es.employee_id));
       base.total++;
-      const st = (es.shift_status || '').toLowerCase();
+      const st = resolveDisplayStatus(es);
       if (st === 'working') base.working++;
       else if (st === 'off') base.off++;
-      else if (st === 'leave') base.leave++;
       else if (st === 'hourly') base.hourly++;
+      else if (st === 'leave') base.leave++;
       else if (st === 'vacation') base.vacation++;
       else base.other++;
     });
@@ -405,7 +415,7 @@ export const ScheduleView = () => {
                         const emp = employeeMap[es.employee_id];
                         const name = emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown Employee';
                         const code = emp?.employee_code || '';
-                        const status = (es.shift_status || '—').toLowerCase();
+                        const status = resolveDisplayStatus(es) || '—';
 
                         const statusTone =
                           status === 'working' ? 'text-emerald-500' :

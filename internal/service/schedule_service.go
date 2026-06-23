@@ -195,7 +195,7 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 
 			shiftStatus := "leave"
 			if leave.LeaveTypeNameEn != nil && (strings.ToLower(*leave.LeaveTypeNameEn) == "hourly" || strings.ToLower(*leave.LeaveTypeNameEn) == "زمنية") {
-				shiftStatus = "hourly"
+				leaveReason = "[hourly] " + leaveReason
 			}
 
 			es := &models.EmployeeShift{
