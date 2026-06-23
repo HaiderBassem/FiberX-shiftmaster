@@ -625,7 +625,7 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 	return nil
 }
 
-// CancelPendingLeave cancels a leave request that has not yet been approved.
+// CancelPendingLeave cancels a leave request that has not yet been fully approved.
 func (s *LeaveService) CancelPendingLeave(ctx context.Context, leaveID uuid.UUID, employeeID uuid.UUID) error {
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
@@ -636,8 +636,8 @@ func (s *LeaveService) CancelPendingLeave(ctx context.Context, leaveID uuid.UUID
 		return fmt.Errorf("unauthorized to cancel this leave")
 	}
 
-	if leave.Status != "pending" {
-		return fmt.Errorf("only pending leaves can be cancelled")
+	if leave.Status != "pending" && leave.Status != "approved_by_team_leader" {
+		return fmt.Errorf("only pending or team-leader-approved leaves can be cancelled by the employee")
 	}
 
 	if err := s.leaveRepo.UpdateStatus(ctx, leaveID, "cancelled", employeeID, "employee"); err != nil {

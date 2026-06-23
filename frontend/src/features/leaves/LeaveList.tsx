@@ -243,7 +243,7 @@ export const LeaveList = () => {
                       </div>
                       
                       <div className="flex items-center self-end sm:self-auto gap-3">
-                        {leave.status === 'pending' && (
+                        {(leave.status === 'pending' || leave.status === 'approved_by_team_leader') && (
                           <Button 
                             variant="outline" 
                             size="sm" 

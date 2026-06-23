@@ -271,6 +271,9 @@ func (r *leaveRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status strin
 		query = `UPDATE leaves SET status=$1, approved_by_team_leader=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
 	case "manager":
 		query = `UPDATE leaves SET status=$1, approved_by_manager=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
+	case "employee":
+		// Employee cancelling their own leave — no approver column to set
+		query = `UPDATE leaves SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
 	default:
 		return fmt.Errorf("invalid approver role: %s", approverRole)
 	}
