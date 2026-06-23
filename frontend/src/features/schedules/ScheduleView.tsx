@@ -44,7 +44,7 @@ export const ScheduleView = () => {
   const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
 
   // Query for fetching daily schedule
-  const { data: activeSchedule, isLoading: isLoadingSchedule } = useQuery({
+  const { data: activeSchedule, isLoading: isLoadingSchedule, error: dailyError } = useQuery({
     queryKey: ['schedules', viewDate, deptId],
     queryFn: async () => {
       const response = await api.get(`/schedules/daily?date=${viewDate}`);
@@ -86,7 +86,7 @@ export const ScheduleView = () => {
     [weekStartKey, weekStart],
   );
 
-  const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({
+  const { data: weeklyRows, isLoading: weeklyLoading, error: weeklyError } = useQuery({
     queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd'), deptId, shifts?.length ?? 0],
     queryFn: async () => {
       const shiftLookup: Record<string, any> = {};
@@ -361,7 +361,12 @@ export const ScheduleView = () => {
         DeptId: {deptId} | 
         rawEmployees: {rawEmployees ? rawEmployees.length : 'loading/null'} | 
         filteredEmployees: {employees ? employees.length : 'null'} |
-        isError: {String(rawEmployees === undefined)}
+        isError: {String(rawEmployees === undefined)} |
+        emp0_status: {employees && employees.length > 0 ? String(employees[0].status) : 'none'}
+        <br />
+        Weekly Rows: {weeklyRows ? weeklyRows.length : 'null/undefined'} |
+        Daily Err: {dailyError ? (dailyError as any).message || String(dailyError) : 'none'} |
+        Weekly Err: {weeklyError ? (weeklyError as any).message || String(weeklyError) : 'none'}
       </div>
 
       {/* Daily schedule */}
