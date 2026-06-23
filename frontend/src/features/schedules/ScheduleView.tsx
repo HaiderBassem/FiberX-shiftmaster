@@ -365,8 +365,8 @@ export const ScheduleView = () => {
         emp0_status: {employees && employees.length > 0 ? String(employees[0].status) : 'none'}
         <br />
         Weekly Rows: {weeklyRows ? weeklyRows.length : 'null/undefined'} |
-        Daily Err: {dailyError ? (dailyError as any).message || String(dailyError) : 'none'} |
-        Weekly Err: {weeklyError ? (weeklyError as any).message || String(weeklyError) : 'none'}
+        Daily Err: {dailyError ? (dailyError as any).response?.data?.error || (dailyError as any).message || String(dailyError) : 'none'} |
+        Weekly Err: {weeklyError ? (weeklyError as any).response?.data?.error || (weeklyError as any).message || String(weeklyError) : 'none'}
       </div>
 
       {/* Daily schedule */}
