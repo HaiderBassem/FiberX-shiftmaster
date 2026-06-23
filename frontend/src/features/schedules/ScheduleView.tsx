@@ -57,8 +57,12 @@ export const ScheduleView = () => {
   const { data: activeSchedule, isLoading: isLoadingSchedule, error: dailyError } = useQuery({
     queryKey: ['schedules', viewDate, deptId],
     queryFn: async () => {
-      const response = await api.get(`/schedules/daily?date=${viewDate}`);
-      return response.data?.data || [];
+      try {
+        const response = await api.get(`/schedules/daily?date=${viewDate}`);
+        return response.data?.data || [];
+      } catch {
+        return []; // Gracefully degrade — show defaults from employee list
+      }
     },
   });
 
@@ -104,7 +108,7 @@ export const ScheduleView = () => {
 
       const dates = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
       const dayResponses = await Promise.all(
-        dates.map((d) => api.get(`/schedules/daily?date=${d}`)),
+        dates.map((d) => api.get(`/schedules/daily?date=${d}`).catch(() => ({ data: { data: [] } }))),
       );
       const dayMap: Record<string, any[]> = {};
       dates.forEach((d, idx) => {
