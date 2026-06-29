@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -60,13 +58,6 @@ type createShiftRequest struct {
 	ColorCode       *string `json:"color_code"`
 	RequiresVehicle bool    `json:"requires_vehicle"`
 	MinRestHours    int     `json:"min_rest_hours"`
-}
-
-func parseTimeStr(t string) (time.Time, error) {
-	if len(t) > 5 {
-		t = t[:5]
-	}
-	return time.Parse("15:04", t)
 }
 
 // Create creates a new shift.
