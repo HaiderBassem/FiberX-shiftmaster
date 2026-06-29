@@ -43,6 +43,7 @@ sudo chmod +x "$APP_DIR/shiftmaster-api"
 # ── 3. Build Frontend ──
 echo "[INFO] Building frontend..."
 cd "$PROJECT_DIR/frontend"
+sudo rm -rf dist
 npm install --include=dev --legacy-peer-deps
 npm run build
 sudo rm -rf "$APP_DIR/frontend/dist"
