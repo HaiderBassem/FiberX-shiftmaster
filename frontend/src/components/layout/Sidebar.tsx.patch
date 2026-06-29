@@ -1,0 +1,31 @@
+--- frontend/src/components/layout/Sidebar.tsx
++++ frontend/src/components/layout/Sidebar.tsx
+@@ -1,15 +1,13 @@
+-import { useState } from 'react';
+ import { Link, useLocation } from 'react-router-dom';
+ import { useAuthStore } from '@/store/authStore';
+-import { useAuthStore } from '@/store/authStore';
+ import { useQuery } from '@tanstack/react-query';
+ import api from '@/lib/api';
+-	LayoutDashboard, Users, Calendar, CheckSquare,
+-	ShieldCheck, ClipboardList, Building2, Database,
+-	Clock, X, MapPin, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, Link as LinkIcon
+-} from 'lucide-react';
++import {
++  LayoutDashboard, Users, Calendar, CheckSquare,
++  ShieldCheck, ClipboardList, Building2, Database,
++  Clock, X, MapPin, Ticket, Table, BookOpen, Inbox, Megaphone, CalendarDays, Link as LinkIcon
++} from 'lucide-react';
+ 
+-
+ 
+ const navItems = [
+   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+@@ -34,8 +32,6 @@
+ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
+   const { user } = useAuthStore();
+   const location = useLocation();
+-  const location = useLocation();
+ 
+   // Fetch the user's department to check fiberx_enabled
+   const { data: userDepartment } = useQuery({

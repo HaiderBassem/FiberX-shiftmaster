@@ -1,9 +1,48 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
-import { useMyLinks } from '@/hooks/useModuleAccess';
-import { Search, Link as LinkIcon, ExternalLink } from 'lucide-react';
-import { getLinkIcon, getLinkTheme } from '@/components/icons';
-import { openExternalLink } from '@/lib/utils';
+import { useMyLinks, type ExternalLink as ExternalLinkType } from '@/hooks/useModuleAccess';
+import { Search, Link as LinkIcon, ExternalLink, MapPin, Ticket, Calendar, Users, BookOpen } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+type LinkTheme = { c1: string; c2: string };
+
+function getLinkTheme(iconName: string): LinkTheme {
+  switch (iconName) {
+    case 'map-pin': return { c1: '#0CCCCC', c2: '#01A3A3' };
+    case 'ticket': return { c1: '#F59E0B', c2: '#D97706' };
+    case 'calendar': return { c1: '#8B5CF6', c2: '#7C3AED' };
+    case 'users': return { c1: '#3B82F6', c2: '#2563EB' };
+    case 'book-open': return { c1: '#10B981', c2: '#059669' };
+    case 'external-link': return { c1: '#EC4899', c2: '#DB2777' };
+    default: return { c1: '#A78BFA', c2: '#7C3AED' };
+  }
+}
+
+function getLinkIcon(iconName: string): LucideIcon {
+  switch (iconName) {
+    case 'map-pin': return MapPin;
+    case 'ticket': return Ticket;
+    case 'external-link': return ExternalLink;
+    case 'calendar': return Calendar;
+    case 'users': return Users;
+    case 'book-open': return BookOpen;
+    default: return LinkIcon;
+  }
+}
+
+function openExternalLink(link: ExternalLinkType, userRole?: string) {
+  const isLiveMap = link.title === 'Live Map' || link.url.includes('maps.shift-master.org');
+  if (isLiveMap) {
+    const sysRoles = ['admin', 'manager', 'team_leader'];
+    const isSys = userRole && sysRoles.includes(userRole);
+    const u = isSys ? 'sys@fiberx.iq' : 'emp@fiberx.iq';
+    const p = isSys ? 'fibersysX' : 'empfiberX';
+    const url = `https://maps.shift-master.org/autologin?u=${encodeURIComponent(u)}&p=${encodeURIComponent(p)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } else {
+    window.open(link.url, '_blank', 'noopener,noreferrer');
+  }
+}
 
 export function ExternalToolsList() {
   const { user } = useAuthStore();
@@ -85,11 +124,6 @@ export function ExternalToolsList() {
                 >
                   {link.title}
                 </h3>
-                {link.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-3">
-                    {link.description}
-                  </p>
-                )}
               </div>
             );
           })}
