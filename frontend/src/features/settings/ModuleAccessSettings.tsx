@@ -126,19 +126,22 @@ const ModuleAccessSettingsInner = () => {
   };
 
   const isAdmin = user?.role === 'admin';
+  const isManagement = isAdmin || user?.role === 'manager' || user?.role === 'team_leader';
   
-  if (!isAdmin) {
+  if (!isManagement) {
     return (
       <div className="p-6 text-center">
         <ShieldCheck className="w-12 h-12 text-red-500 mx-auto mb-4" />
         <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
-        <p className="text-gray-400">Only administrators can manage external tools and permissions.</p>
+        <p className="text-gray-400">Only management can manage external tools and permissions.</p>
       </div>
     );
   }
 
-  // Admin sees all departments
-  const manageableDepartments = departments;
+  // Admin sees all departments, others see only their own
+  const manageableDepartments = isAdmin 
+    ? departments 
+    : departments.filter(d => d.id === user?.department_id);
 
   return (
     <div className="flex flex-col h-full bg-[#0B0F19] text-white">
@@ -155,22 +158,20 @@ const ModuleAccessSettingsInner = () => {
         </div>
 
         {/* Tabs */}
-        {isAdmin && (
-          <div className="flex gap-4 mt-6 border-b border-white/10">
-            <button
-              onClick={() => setActiveTab('access')}
-              className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'access' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              Access Control
-            </button>
-            <button
-              onClick={() => setActiveTab('links')}
-              className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'links' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              Manage Links
-            </button>
-          </div>
-        )}
+        <div className="flex gap-4 mt-6 border-b border-white/10">
+          <button
+            onClick={() => setActiveTab('access')}
+            className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'access' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            Access Control
+          </button>
+          <button
+            onClick={() => setActiveTab('links')}
+            className={`pb-2 px-1 text-sm font-medium transition-colors ${activeTab === 'links' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            Manage Links
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -187,7 +188,7 @@ const ModuleAccessSettingsInner = () => {
         )}
         
         {/* --- LINKS MANAGEMENT TAB --- */}
-        {isAdmin && activeTab === 'links' && (
+        {activeTab === 'links' && (
           <div className="space-y-6 max-w-4xl">
             {/* Create form */}
             <form onSubmit={handleCreateLink} className="p-5 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row gap-4 items-end">

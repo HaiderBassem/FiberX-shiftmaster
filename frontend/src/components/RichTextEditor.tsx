@@ -29,18 +29,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     defaultActionOnPaste: 'insert_as_html' as const,
     askBeforePasteFromWord: false,
     direction: '' as const, // allows both RTL and LTR
-    toolbarAdaptive: false,
+    toolbarAdaptive: true,
     buttons: [
-      'source', '|',
-      'bold', 'strikethrough', 'underline', 'italic', '|',
-      'superscript', 'subscript', '|',
+      'bold', 'italic', 'underline', '|',
       'ul', 'ol', '|',
-      'outdent', 'indent', '|',
-      'font', 'fontsize', 'brush', 'paragraph', '|',
-      'image', 'file', 'video', 'table', 'link', '|',
+      'font', 'fontsize', 'brush', '|',
+      'image', 'table', 'link', '|',
       'align', 'undo', 'redo', '|',
-      'hr', 'eraser', 'copyformat', '|',
-      'symbol', 'fullsize', 'print', 'about'
+      'copyformat', 'fullsize'
     ],
     uploader: {
       insertImageAsBase64URI: false,

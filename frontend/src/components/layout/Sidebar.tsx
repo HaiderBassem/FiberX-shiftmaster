@@ -25,7 +25,7 @@ const navItems = [
   { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true, moduleId: 'fiberx_data' },
   { to: '/external-tools', label: 'External Tools', icon: LinkIcon, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
   { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements', core: true },
-  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'], core: true },
+  { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin', 'manager', 'team_leader'], core: true },
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
