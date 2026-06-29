@@ -19,6 +19,7 @@ type LeaveRepository interface {
 	GetByStatus(ctx context.Context, status string) ([]models.Leave, error)
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetOverlappingLeavesCount(ctx context.Context, departmentID uuid.UUID, startDate, endDate time.Time) (int, error)
+	GetOverlappingLeavesCountByShift(ctx context.Context, departmentID uuid.UUID, shiftID uuid.UUID, date time.Time, isHourly bool) (int, error)
 	GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
@@ -32,6 +33,8 @@ type LeaveRepository interface {
 	HasApproved(ctx context.Context, leaveID, approverID uuid.UUID) (bool, error)
 	GetLeaveHistory(ctx context.Context, departmentID *uuid.UUID) ([]models.LeaveHistoryRow, error)
 	GetPendingLeavesRich(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.PendingLeaveRich, error)
+	GetLeavesForReminders(ctx context.Context) ([]models.Leave, error)
+	MarkReminderSent(ctx context.Context, leaveID uuid.UUID) error
 }
 
 type leaveRepo struct {
@@ -84,6 +87,26 @@ func (r *leaveRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Leave, e
 	return l, nil
 }
 
+func (r *leaveRepo) GetLeavesForReminders(ctx context.Context) ([]models.Leave, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+leaveColumns+` FROM leaves l
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE l.status IN ('approved_by_team_leader', 'approved_by_manager', 'approved')
+		   AND l.reminder_sent_at IS NULL
+		   AND l.start_date = CURRENT_DATE + INTERVAL '2 days'
+		   AND l.applied_date <= l.start_date - INTERVAL '3 days'`)
+	if err != nil {
+		return nil, fmt.Errorf("get leaves for reminders: %w", err)
+	}
+	defer rows.Close()
+	return r.scanLeaves(rows)
+}
+
+func (r *leaveRepo) MarkReminderSent(ctx context.Context, leaveID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, `UPDATE leaves SET reminder_sent_at = CURRENT_TIMESTAMP WHERE id = $1`, leaveID)
+	return err
+}
+
 func (r *leaveRepo) GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT `+leaveColumns+` FROM leaves l LEFT JOIN leave_types lt ON lt.id = l.leave_type_id WHERE l.employee_id = $1 ORDER BY l.start_date DESC`, employeeID)
@@ -129,6 +152,29 @@ func (r *leaveRepo) GetOverlappingLeavesCount(ctx context.Context, departmentID 
 		departmentID, startDate, endDate).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count: %w", err)
+	}
+	return count, nil
+}
+
+func (r *leaveRepo) GetOverlappingLeavesCountByShift(ctx context.Context, departmentID uuid.UUID, shiftID uuid.UUID, date time.Time, isHourly bool) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT l.id) 
+		 FROM leaves l
+		 JOIN employees e ON l.employee_id = e.id
+		 LEFT JOIN employee_shifts es ON es.employee_id = e.id AND es.shift_date = $3
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE e.department_id = $1 
+		   AND COALESCE(es.shift_id, e.default_shift_id) = $2
+		   AND l.status NOT IN ('rejected', 'cancelled')
+		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND l.start_date <= $3 
+		   AND l.end_date >= $3
+		   AND ($4::boolean = false OR lt.unit = 'hours')
+		   AND ($4::boolean = true OR lt.unit = 'days')`, 
+		departmentID, shiftID, date, isHourly).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("get overlapping leaves count by shift: %w", err)
 	}
 	return count, nil
 }

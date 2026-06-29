@@ -6,7 +6,7 @@ import {
   eachDayOfInterval, format, isSameMonth, isToday, 
   addMonths, subMonths, isWithinInterval, parseISO 
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, User, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -15,8 +15,6 @@ import { Button } from '@/components/ui/button';
 export const InteractiveCalendar = () => {
   const { user } = useAuthStore();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(user?.id || '');
-
   const isSupervisor = user?.role === 'admin' || user?.role === 'manager' || user?.role === 'team_leader';
 
   const monthStart = startOfMonth(currentDate);

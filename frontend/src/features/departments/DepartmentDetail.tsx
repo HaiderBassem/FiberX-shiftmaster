@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building2, Users, Crown, ArrowLeft, Database, Shield } from 'lucide-react';
+import { Building2, Users, Crown, ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type Department = {
@@ -12,6 +12,8 @@ type Department = {
   name: string;
   description: string | null;
   fiberx_enabled: boolean;
+  max_leaves_per_day?: number | null;
+  max_hourly_leaves_per_day?: number | null;
   manager_ids: string[]; // array from department_managers junction table
   active_modules: string[];
   created_at: string;
@@ -203,6 +205,7 @@ export const DepartmentDetail = () => {
                           name: dept.name,
                           description: dept.description,
                           max_leaves_per_day: dept.max_leaves_per_day,
+                          max_hourly_leaves_per_day: dept.max_hourly_leaves_per_day,
                           manager_ids: dept.manager_ids,
                           active_modules: next,
                         }).then(() => {

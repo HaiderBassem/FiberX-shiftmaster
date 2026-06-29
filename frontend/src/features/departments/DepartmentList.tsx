@@ -16,6 +16,7 @@ interface Department {
   description: string | null;
   fiberx_enabled: boolean;
   max_leaves_per_day?: number | null;
+  max_hourly_leaves_per_day?: number | null;
   manager_ids: string[]; // now an array (multi-manager support)
   created_at: string;
 }
@@ -41,6 +42,7 @@ export const DepartmentList = () => {
   // single dropdown; we wrap it in an array before sending
   const [deptManagerId, setDeptManagerId] = useState<string>('');
   const [deptMaxLeaves, setDeptMaxLeaves] = useState<string>('');
+  const [deptMaxHourlyLeaves, setDeptMaxHourlyLeaves] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -50,6 +52,7 @@ export const DepartmentList = () => {
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
   const [editMaxLeaves, setEditMaxLeaves] = useState('');
+  const [editMaxHourlyLeaves, setEditMaxHourlyLeaves] = useState('');
   const [editManagerId, setEditManagerId] = useState('');
 
   // ── queries ────────────────────────────────────────────────────────
@@ -85,13 +88,14 @@ export const DepartmentList = () => {
         name: deptName,
         description: deptDesc || null,
         max_leaves_per_day: deptMaxLeaves ? parseInt(deptMaxLeaves, 10) : null,
+        max_hourly_leaves_per_day: deptMaxHourlyLeaves ? parseInt(deptMaxHourlyLeaves, 10) : null,
         // backend expects manager_ids array
         manager_ids: deptManagerId ? [deptManagerId] : [],
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
-      setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId(''); setDeptMaxLeaves('');
+      setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId(''); setDeptMaxLeaves(''); setDeptMaxHourlyLeaves('');
     },
     onError: (err: any) => {
       setError(err?.response?.data?.error || err?.message || 'Failed to create department');
@@ -106,6 +110,7 @@ export const DepartmentList = () => {
         name: editName,
         description: editDesc || null,
         max_leaves_per_day: editMaxLeaves ? parseInt(editMaxLeaves, 10) : null,
+        max_hourly_leaves_per_day: editMaxHourlyLeaves ? parseInt(editMaxHourlyLeaves, 10) : null,
         // send the selected manager wrapped in array (replaces current list)
         manager_ids: editManagerId ? [editManagerId] : [],
       });
@@ -222,6 +227,10 @@ export const DepartmentList = () => {
                 <Label>Max Leaves / Day</Label>
                 <Input type="number" min="1" value={deptMaxLeaves} onChange={(e) => setDeptMaxLeaves(e.target.value)} placeholder="No limit" />
               </div>
+              <div className="space-y-2">
+                <Label>Max Hourly Leaves / Shift</Label>
+                <Input type="number" min="1" value={deptMaxHourlyLeaves} onChange={(e) => setDeptMaxHourlyLeaves(e.target.value)} placeholder="No limit" />
+              </div>
             </div>
           </CardContent>
           <CardFooter>
@@ -312,6 +321,17 @@ export const DepartmentList = () => {
                             placeholder="No limit"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Max Hourly Leaves / Shift</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={editMaxHourlyLeaves}
+                            onChange={(e) => setEditMaxHourlyLeaves(e.target.value)}
+                            className="h-9"
+                            placeholder="No limit"
+                          />
+                        </div>
                       </div>
                       <div className="flex justify-end gap-2 pt-1">
                         <Button
@@ -388,6 +408,7 @@ export const DepartmentList = () => {
                         setEditName(dept.name);
                         setEditDesc(dept.description || '');
                         setEditMaxLeaves(dept.max_leaves_per_day ? dept.max_leaves_per_day.toString() : '');
+                        setEditMaxHourlyLeaves(dept.max_hourly_leaves_per_day ? dept.max_hourly_leaves_per_day.toString() : '');
                         // pre-fill with first assigned manager (if any)
                         setEditManagerId(dept.manager_ids?.[0] || '');
                       }}

@@ -74,4 +74,37 @@ export const infoTableService = {
   removeEmployeeAccess: async (tableId: string, employeeId: string): Promise<void> => {
     await api.delete(`/info-tables/${tableId}/access/employee/${employeeId}`);
   },
+
+  exportToExcel: async (tableId: string): Promise<void> => {
+    const response = await api.get(`/info-tables/${tableId}/export`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    // Extract filename from header if present, otherwise default
+    const contentDisposition = response.headers['content-disposition'];
+    let fileName = `table-${tableId}.xlsx`;
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+      if (fileNameMatch && fileNameMatch.length === 2) {
+        fileName = fileNameMatch[1];
+      }
+    }
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  importFromExcel: async (tableId: string, file: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    await api.post(`/info-tables/${tableId}/import`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };

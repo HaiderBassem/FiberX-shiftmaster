@@ -391,3 +391,101 @@ func (h *InfoTableHandler) GetAccessLists(c *gin.Context) {
 		"employees":   empAcc,
 	})
 }
+
+func (h *InfoTableHandler) ExportToExcel(c *gin.Context) {
+	idStr := c.Param("id")
+	tableID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table ID"})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+	roleStr, _ := c.Get("role")
+	role := roleStr.(string)
+
+	var depID *uuid.UUID
+	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
+		id, err := uuid.Parse(depStr.(string))
+		if err == nil {
+			depID = &id
+		}
+	}
+
+	// Verify access (must have at least read access)
+	table, err := h.svc.GetTableByID(c.Request.Context(), tableID, empID, role, depID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Table not found or no access"})
+		return
+	}
+
+	if table.MyAccessLevel == "none" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "No access to this table"})
+		return
+	}
+
+	buf, err := h.svc.ExportToExcel(c.Request.Context(), tableID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to export table: " + err.Error()})
+		return
+	}
+
+	c.Header("Content-Disposition", "attachment; filename="+table.Name+".xlsx")
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+}
+
+func (h *InfoTableHandler) ImportFromExcel(c *gin.Context) {
+	idStr := c.Param("id")
+	tableID, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid table ID"})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+	roleStr, _ := c.Get("role")
+	role := roleStr.(string)
+
+	var depID *uuid.UUID
+	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
+		id, err := uuid.Parse(depStr.(string))
+		if err == nil {
+			depID = &id
+		}
+	}
+
+	// Verify access (must have write or manage access)
+	table, err := h.svc.GetTableByID(c.Request.Context(), tableID, empID, role, depID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Table not found or no access"})
+		return
+	}
+
+	if table.MyAccessLevel != "write" && table.MyAccessLevel != "manage" && role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to import data"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File is required"})
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer file.Close()
+
+	if err := h.svc.ImportFromExcel(c.Request.Context(), tableID, file, &empID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to import data: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Data imported successfully"})
+}

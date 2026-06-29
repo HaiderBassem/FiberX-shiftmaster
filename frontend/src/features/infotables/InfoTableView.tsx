@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Edit2, Trash2, Shield, Search } from 'lucide-react';
+import { ArrowLeft, Plus, Edit2, Trash2, Shield, Search, Download, Upload, Loader2 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import type { InfoTable, InfoTableRow } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
@@ -22,6 +22,7 @@ const InfoTableView: React.FC = () => {
   const [editingRow, setEditingRow] = useState<InfoTableRow | null>(null);
   const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [isEditTableModalOpen, setIsEditTableModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -70,6 +71,36 @@ const InfoTableView: React.FC = () => {
     } catch (error) {
       console.error('Failed to delete table:', error);
       alert('Failed to delete table. You might not have permission.');
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      await infoTableService.exportToExcel(id!);
+    } catch (error) {
+      console.error('Failed to export:', error);
+      alert('Failed to export data.');
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      await infoTableService.importFromExcel(id!, file);
+      // Refresh data
+      await fetchData();
+      alert('Data imported successfully!');
+    } catch (error) {
+      console.error('Failed to import:', error);
+      alert('Failed to import data. Check file format and permissions.');
+    } finally {
+      setIsImporting(false);
+      if (e.target) {
+        e.target.value = '';
+      }
     }
   };
 
@@ -143,6 +174,23 @@ const InfoTableView: React.FC = () => {
               </button>
             </>
           )}
+          
+          <button
+            onClick={handleExport}
+            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+
+          {canWrite && (
+            <label className="cursor-pointer px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm flex items-center gap-2">
+              {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              <span className="hidden sm:inline">{isImporting ? 'Importing...' : 'Import'}</span>
+              <input type="file" accept=".xlsx" className="hidden" onChange={handleImport} disabled={isImporting} />
+            </label>
+          )}
+
           {canWrite && (
             <button
               onClick={() => {

@@ -14,6 +14,7 @@ type Department struct {
 	Description    *string     `json:"description"`
 	FiberxEnabled  bool        `json:"fiberx_enabled"`
 	MaxLeavesPerDay *int       `json:"max_leaves_per_day"`
+	MaxHourlyLeavesPerDay *int `json:"max_hourly_leaves_per_day"`
 	ManagerIDs     []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
 	ActiveModules  []string    `json:"active_modules"`
 	CreatedAt      time.Time   `json:"created_at"`
@@ -214,6 +215,7 @@ type Leave struct {
 	Attachments          *string    `json:"attachments"` // JSONB
 	StartTime            *string    `json:"start_time"`  // For hourly leaves (HH:MM)
 	EndTime              *string    `json:"end_time"`    // For hourly leaves (HH:MM)
+	ReminderSentAt       *time.Time `json:"reminder_sent_at"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 }

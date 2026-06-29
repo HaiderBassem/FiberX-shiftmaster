@@ -208,12 +208,34 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 
 	if !isEmergency && emp.DepartmentID != nil {
 		dept, err := s.departmentRepo.GetByID(ctx, *emp.DepartmentID)
-		if err == nil && dept.MaxLeavesPerDay != nil {
-			overlappingCount, err := s.leaveRepo.GetOverlappingLeavesCount(ctx, *emp.DepartmentID, leave.StartDate, leave.EndDate)
-			if err == nil {
-				// Each hourly leave is counted as 1 leave for that day.
-				if overlappingCount >= *dept.MaxLeavesPerDay {
-					return fmt.Errorf("The maximum number of allowed leaves per day for your department has been reached.")
+		if err == nil {
+			isHourly := false
+			if leaveType != nil && leaveType.Unit == "hours" {
+				isHourly = true
+			}
+			limit := dept.MaxLeavesPerDay
+			if isHourly {
+				limit = dept.MaxHourlyLeavesPerDay
+			}
+
+			if limit != nil {
+				for d := leave.StartDate; !d.After(leave.EndDate); d = d.AddDate(0, 0, 1) {
+					shiftID := emp.DefaultShiftID
+					es, err := s.scheduleRepo.GetEmployeeShift(ctx, emp.ID, d)
+					if err == nil && es != nil && es.ShiftID != nil {
+						shiftID = es.ShiftID
+					}
+
+					if shiftID != nil {
+						overlappingCount, err := s.leaveRepo.GetOverlappingLeavesCountByShift(ctx, *emp.DepartmentID, *shiftID, d, isHourly)
+						if err == nil && overlappingCount >= *limit {
+							leaveTypeStr := "leaves"
+							if isHourly {
+								leaveTypeStr = "hourly leaves"
+							}
+							return fmt.Errorf("the maximum number of allowed %s per shift for your department has been reached on %s", leaveTypeStr, d.Format("2006-01-02"))
+						}
+					}
 				}
 			}
 		}
@@ -880,3 +902,58 @@ func (s *LeaveService) GetLeaveHistory(ctx context.Context, departmentID *uuid.U
 	return s.leaveRepo.GetLeaveHistory(ctx, departmentID)
 }
 
+// SendUpcomingLeaveReminders sends reminders to team leaders for upcoming leaves that were requested >= 3 days in advance.
+func (s *LeaveService) SendUpcomingLeaveReminders(ctx context.Context) error {
+	leaves, err := s.leaveRepo.GetLeavesForReminders(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get leaves for reminders: %w", err)
+	}
+
+	for _, leave := range leaves {
+		emp, err := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+		if err != nil {
+			continue // Skip if employee not found
+		}
+
+		if emp.DepartmentID == nil {
+			continue
+		}
+
+		// Find team leaders for this department
+		teamLeaders, err := s.employeeRepo.GetByRole(ctx, "team_leader")
+		if err != nil {
+			continue
+		}
+
+		// Send notification to team leaders in the same department
+		title := "Upcoming Leave Reminder"
+		msg := fmt.Sprintf("Reminder: Employee %s %s has a leave starting in 2 days (%s).", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"))
+		entityType := "leave"
+		
+		for _, tl := range teamLeaders {
+			if tl.DepartmentID != nil && *tl.DepartmentID == *emp.DepartmentID {
+				// Send In-App notification
+				_ = s.notifService.SendNotification(ctx, &models.Notification{
+					RecipientID:       tl.ID,
+					Type:              "reminder",
+					Title:             title,
+					Message:           &msg,
+					RelatedEntityType: &entityType,
+					RelatedEntityID:   &leave.ID,
+					Priority:          "medium",
+				})
+
+				// Send Email
+				s.emailService.SendEmailAsync([]string{tl.Email}, title, msg)
+				
+				// Send Push Notification
+				_ = s.pushService.SendToEmployee(ctx, tl.ID, title, msg, "/approvals")
+			}
+		}
+
+		// Mark reminder as sent
+		_ = s.leaveRepo.MarkReminderSent(ctx, leave.ID)
+	}
+
+	return nil
+}

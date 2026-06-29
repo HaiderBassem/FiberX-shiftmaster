@@ -1,12 +1,18 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
 
 	"github.com/google/uuid"
+	"github.com/xuri/excelize/v2"
 )
 
 type InfoTableService struct {
@@ -360,4 +366,170 @@ func (s *InfoTableService) RemoveEmployeeAccess(ctx context.Context, reqEmployee
 	}
 
 	return s.repo.RemoveEmployeeAccess(ctx, tableID, targetEmployeeID)
+}
+
+// ExportToExcel exports the table data to an Excel file
+func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID) (*bytes.Buffer, error) {
+	// 1. Get the table
+	table, err := s.repo.GetTableByID(ctx, tableID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort columns by order
+	sort.SliceStable(table.Columns, func(i, j int) bool {
+		return table.Columns[i].Order < table.Columns[j].Order
+	})
+
+	// 2. Get all rows
+	rows, err := s.repo.GetTableRows(ctx, tableID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Create Excel file
+	f := excelize.NewFile()
+	defer f.Close()
+	sheetName := "Sheet1"
+
+	// Write Headers
+	for i, col := range table.Columns {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheetName, cell, col.Name)
+	}
+
+	// Create bold style for headers
+	style, err := f.NewStyle(&excelize.Style{
+		Font: &excelize.Font{Bold: true},
+	})
+	if err == nil {
+		lastCell, _ := excelize.CoordinatesToCellName(len(table.Columns), 1)
+		f.SetCellStyle(sheetName, "A1", lastCell, style)
+	}
+
+	// Write Rows
+	for rIdx, row := range rows {
+		for cIdx, col := range table.Columns {
+			val, ok := row.Data[col.ID]
+			if ok {
+				cell, _ := excelize.CoordinatesToCellName(cIdx+1, rIdx+2)
+				f.SetCellValue(sheetName, cell, val)
+			}
+		}
+	}
+
+	return f.WriteToBuffer()
+}
+
+// ImportFromExcel imports rows from an Excel file into the table, creating missing columns dynamically.
+func (s *InfoTableService) ImportFromExcel(ctx context.Context, tableID uuid.UUID, r io.Reader, uploaderID *uuid.UUID) error {
+	// 1. Get the table
+	table, err := s.repo.GetTableByID(ctx, tableID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Open Excel file
+	f, err := excelize.OpenReader(r)
+	if err != nil {
+		return fmt.Errorf("failed to parse Excel file: %w", err)
+	}
+	defer f.Close()
+
+	sheetName := f.GetSheetName(f.GetActiveSheetIndex())
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		return fmt.Errorf("failed to read rows: %w", err)
+	}
+
+	if len(rows) < 2 {
+		return errors.New("the excel file has no data rows")
+	}
+
+	headers := rows[0]
+
+	// Find highest order to append new columns
+	highestOrder := 0
+	for _, col := range table.Columns {
+		if col.Order > highestOrder {
+			highestOrder = col.Order
+		}
+	}
+
+	// Build a map of lowercase column names to column ID
+	colNameToID := make(map[string]string)
+	for _, col := range table.Columns {
+		colNameToID[strings.ToLower(col.Name)] = col.ID
+	}
+
+	schemaChanged := false
+
+	// Map excel columns (index) to table Column ID
+	excelColIndexToColID := make(map[int]string)
+
+	for i, header := range headers {
+		header = strings.TrimSpace(header)
+		if header == "" {
+			continue
+		}
+
+		lowerHeader := strings.ToLower(header)
+		if colID, exists := colNameToID[lowerHeader]; exists {
+			excelColIndexToColID[i] = colID
+		} else {
+			// Column does not exist, create it dynamically
+			newColID := uuid.New().String()
+			highestOrder++
+			newCol := models.InfoTableColumn{
+				ID:    newColID,
+				Name:  header,
+				Type:  "text", // default
+				Order: highestOrder,
+			}
+			table.Columns = append(table.Columns, newCol)
+			excelColIndexToColID[i] = newColID
+			schemaChanged = true
+		}
+	}
+
+	if schemaChanged {
+		if _, err := s.repo.UpdateTable(ctx, table); err != nil {
+			return fmt.Errorf("failed to update table schema with new columns: %w", err)
+		}
+	}
+
+	// Parse and insert rows
+	// We'll collect all new rows and insert them one by one (or batch if possible, but one by one is fine for now)
+	for rIdx := 1; rIdx < len(rows); rIdx++ {
+		row := rows[rIdx]
+		data := make(map[string]interface{})
+		isEmpty := true
+
+		for cIdx, cellValue := range row {
+			if colID, ok := excelColIndexToColID[cIdx]; ok {
+				if cellValue != "" {
+					data[colID] = cellValue
+					isEmpty = false
+				}
+			}
+		}
+
+		if !isEmpty {
+			newRow := &models.InfoTableRow{
+				ID:        uuid.New(),
+				TableID:   tableID,
+				Data:      data,
+				CreatedBy: uploaderID,
+			}
+			// Insert the row
+			_, err := s.repo.CreateTableRow(ctx, newRow)
+			if err != nil {
+				// log or return error
+				// Since we are inserting many, we can fail fast
+				return fmt.Errorf("failed to insert row %d: %w", rIdx+1, err)
+			}
+		}
+	}
+
+	return nil
 }

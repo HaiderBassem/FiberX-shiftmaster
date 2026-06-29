@@ -205,6 +205,10 @@ func SetupRouter(
 			infoTables.PUT("/:id/rows/:rowId", infoTableH.UpdateTableRow)
 			infoTables.DELETE("/:id/rows/:rowId", infoTableH.DeleteTableRow)
 			
+			// Export / Import
+			infoTables.GET("/:id/export", infoTableH.ExportToExcel)
+			infoTables.POST("/:id/import", infoTableH.ImportFromExcel)
+			
 			// Access Management
 			infoTables.GET("/:id/access", infoTableH.GetAccessLists)
 			infoTables.POST("/:id/access", infoTableH.AddEmployeeAccess)

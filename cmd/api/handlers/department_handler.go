@@ -80,9 +80,10 @@ type createDepartmentRequest struct {
 	DepartmentCode  string      `json:"department_code" binding:"required"`
 	Name            string      `json:"name"            binding:"required"`
 	Description     *string     `json:"description"`
-	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
-	ManagerIDs      []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
-	ActiveModules   []string    `json:"active_modules"`
+	MaxLeavesPerDay       *int        `json:"max_leaves_per_day"`
+	MaxHourlyLeavesPerDay *int        `json:"max_hourly_leaves_per_day"`
+	ManagerIDs            []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
+	ActiveModules         []string    `json:"active_modules"`
 }
 
 // Create creates a new department.
@@ -110,12 +111,20 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 	}
 
 	dept := &models.Department{
-		DepartmentCode:  req.DepartmentCode,
-		Name:            req.Name,
-		Description:     req.Description,
-		MaxLeavesPerDay: req.MaxLeavesPerDay,
-		ManagerIDs:      req.ManagerIDs,
-		ActiveModules:   req.ActiveModules,
+		DepartmentCode: req.DepartmentCode,
+		Name:           req.Name,
+		Description:    req.Description,
+		ManagerIDs:     req.ManagerIDs,
+	}
+
+	if req.MaxLeavesPerDay != nil {
+		dept.MaxLeavesPerDay = req.MaxLeavesPerDay
+	}
+	if req.MaxHourlyLeavesPerDay != nil {
+		dept.MaxHourlyLeavesPerDay = req.MaxHourlyLeavesPerDay
+	}
+	if req.ActiveModules != nil {
+		dept.ActiveModules = req.ActiveModules
 	}
 
 	if err := h.deptRepo.Create(c.Request.Context(), dept); err != nil {
@@ -129,9 +138,10 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 type updateDepartmentRequest struct {
 	Name            string      `json:"name"`
 	Description     *string     `json:"description"`
-	MaxLeavesPerDay *int        `json:"max_leaves_per_day"`
-	ManagerIDs      []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
-	ActiveModules   []string    `json:"active_modules"`
+	MaxLeavesPerDay       *int        `json:"max_leaves_per_day"`
+	MaxHourlyLeavesPerDay *int        `json:"max_hourly_leaves_per_day"`
+	ManagerIDs            []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers
+	ActiveModules         []string    `json:"active_modules"`
 }
 
 // Update updates a department.
@@ -165,12 +175,13 @@ func (h *DepartmentHandler) Update(c *gin.Context) {
 	}
 
 	dept := &models.Department{
-		ID:              id,
-		Name:            req.Name,
-		Description:     req.Description,
-		MaxLeavesPerDay: req.MaxLeavesPerDay,
-		ManagerIDs:      req.ManagerIDs, // nil when key is absent → repo skips sync
-		ActiveModules:   req.ActiveModules,
+		ID:                    id,
+		Name:                  req.Name,
+		Description:           req.Description,
+		MaxLeavesPerDay:       req.MaxLeavesPerDay,
+		MaxHourlyLeavesPerDay: req.MaxHourlyLeavesPerDay,
+		ManagerIDs:            req.ManagerIDs, // nil when key is absent → repo skips sync
+		ActiveModules:         req.ActiveModules,
 	}
 
 	if err := h.deptRepo.Update(c.Request.Context(), dept); err != nil {

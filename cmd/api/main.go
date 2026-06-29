@@ -154,6 +154,19 @@ func main() {
 	// Start pool monitor in background
 	go db.Monitor(context.Background(), time.Minute)
 
+	// Start upcoming leave reminders background worker (runs every hour)
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			if err := leaveService.SendUpcomingLeaveReminders(ctx); err != nil {
+				log.Printf("Failed to send upcoming leave reminders: %v", err)
+			}
+			cancel()
+		}
+	}()
+
 	// Wait for interrupt signal to gracefully shutdown the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
