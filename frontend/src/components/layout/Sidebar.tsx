@@ -69,6 +69,7 @@ const navItems = [
   { to: '/info-tables', label: 'References', icon: Table, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'references' },
   { to: '/help', label: 'Info Bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'info_bank' },
   { to: '/fiberx-data', label: 'FiberX Data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true, moduleId: 'fiberx_data' },
+  { to: '/external-tools', label: 'External Tools', icon: LinkIcon, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
   { to: '/announcements/manage', label: 'Announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements', core: true },
   { to: '/module-settings', label: 'External Modules', icon: ShieldCheck, roles: ['admin'], core: true },
 ];
@@ -182,55 +183,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
         })}
       </nav>
 
-      {/* ── External Tools (collapsible dropdown) ── */}
-      {myModules && myModules.length > 0 && (
-        <div className="px-3 pb-3 border-t border-white/5 pt-3">
-          <button
-            type="button"
-            onClick={() => setExternalToolsOpen((open) => !open)}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all duration-200"
-            aria-expanded={externalToolsOpen}
-          >
-            <LinkIcon className="w-[18px] h-[18px] flex-shrink-0" />
-            <span className="flex-1 text-left">External Tools</span>
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-white/10 text-muted-foreground tabular-nums">
-              {myModules.length}
-            </span>
-            {externalToolsOpen
-              ? <ChevronUp className="w-4 h-4 flex-shrink-0 opacity-60" />
-              : <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-60" />}
-          </button>
 
-          {externalToolsOpen && (
-            <div className="mt-1 ml-2 pl-3 border-l border-white/10 space-y-0.5 max-h-52 overflow-y-auto">
-              {myModules.map((link) => {
-                const theme = getLinkTheme(link.icon_name);
-                const Icon = getLinkIcon(link.icon_name);
-
-                return (
-                  <button
-                    key={link.id}
-                    type="button"
-                    onClick={() => openExternalLink(link, user?.role)}
-                    className="group flex items-center gap-2.5 w-full rounded-lg px-2 py-2 text-left hover:bg-white/5 transition-colors"
-                  >
-                    <div
-                      className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
-                      style={{ background: `linear-gradient(135deg, ${theme.c1} 0%, ${theme.c2} 100%)` }}
-                    >
-                      <Icon className="w-3 h-3 text-white" />
-                    </div>
-                    <span className="flex-1 min-w-0 text-xs font-medium truncate" style={{ color: theme.c1 }}>
-                      {link.title}
-                    </span>
-                    <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-40 group-hover:opacity-80 transition-opacity" style={{ color: theme.c1 }} />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
       {/* ── Footer ── */}
       <div className="px-5 py-4 border-t border-white/5">
         <p className="text-[10px] text-muted-foreground/50 text-center">

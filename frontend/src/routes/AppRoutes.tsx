@@ -28,6 +28,7 @@ import { ModuleAccessSettings } from '../features/settings/ModuleAccessSettings'
 import { FiberxDataHub } from '../features/fiberx-data/FiberxDataHub';
 import { FiberxDataView } from '../features/fiberx-data/FiberxDataView';
 import { FiberxDataEditor } from '../features/fiberx-data/FiberxDataEditor';
+import { ExternalToolsList } from '../features/external-tools/ExternalToolsList';
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -94,6 +95,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
                 <InfoTableHub />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="external-tools" 
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'team_leader', 'manager', 'admin']}>
+                <ExternalToolsList />
               </ProtectedRoute>
             } 
           />
