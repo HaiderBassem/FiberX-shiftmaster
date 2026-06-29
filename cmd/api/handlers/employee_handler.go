@@ -885,6 +885,13 @@ func (h *EmployeeHandler) UpdatePreferences(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+func parseTimeStr(t string) (time.Time, error) {
+	if len(t) > 5 {
+		t = t[:5]
+	}
+	return time.Parse("15:04", t)
+}
+
 // GetProfileStats returns statistics and leave balances for the authenticated employee
 func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 	ctx := c.Request.Context()
@@ -941,8 +948,8 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 						}
 						if y == b.Year && m == b.Month {
 							if b.Unit == "hours" && l.StartTime != nil && l.EndTime != nil {
-								st, _ := time.Parse("15:04", *l.StartTime)
-								en, _ := time.Parse("15:04", *l.EndTime)
+								st, _ := parseTimeStr(*l.StartTime)
+								en, _ := parseTimeStr(*l.EndTime)
 								balances[i].PendingAmount += en.Sub(st).Hours()
 							} else if b.Unit != "hours" {
 								for d := l.StartDate.UTC().Truncate(24 * time.Hour); !d.After(l.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {

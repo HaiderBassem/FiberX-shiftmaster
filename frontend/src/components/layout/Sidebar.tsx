@@ -55,7 +55,7 @@ function openExternalLink(link: ExternalLinkType, userRole?: string) {
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
-  { to: '/profile', label: 'My Profile', icon: User, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+
   { to: '/tasks', label: 'My Tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'tasks' },
   { to: '/handovers', label: 'Handovers', icon: ClipboardList, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'handovers' },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'calendar' },

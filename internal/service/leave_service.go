@@ -49,6 +49,13 @@ func NewLeaveService(
 	}
 }
 
+func parseTimeStr(t string) (time.Time, error) {
+	if len(t) > 5 {
+		t = t[:5]
+	}
+	return time.Parse("15:04", t)
+}
+
 func (s *LeaveService) GetEmployeeLeaveBalances(ctx context.Context, empID uuid.UUID, year int) ([]models.EmployeeLeaveBalance, error) {
 	return s.leaveBalanceRepo.GetByEmployeeAndYear(ctx, empID, year)
 }
@@ -123,8 +130,8 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	isHourly := leaveType != nil && leaveType.Unit == "hours"
 	
 	if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-		startTime, err1 := time.Parse("15:04", *leave.StartTime)
-		endTime, err2 := time.Parse("15:04", *leave.EndTime)
+		startTime, err1 := parseTimeStr(*leave.StartTime)
+		endTime, err2 := parseTimeStr(*leave.EndTime)
 		if err1 == nil && err2 == nil {
 			requestedAmount = endTime.Sub(startTime).Hours()
 			if requestedAmount <= 0 {
@@ -167,8 +174,8 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 						}
 						if y == year && m == month {
 							if isHourly && l.StartTime != nil && l.EndTime != nil {
-								st, err1 := time.Parse("15:04", *l.StartTime)
-								en, err2 := time.Parse("15:04", *l.EndTime)
+								st, err1 := parseTimeStr(*l.StartTime)
+								en, err2 := parseTimeStr(*l.EndTime)
 								if err1 == nil && err2 == nil {
 									pendingAmount += en.Sub(st).Hours()
 								}
@@ -601,8 +608,8 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 			amountToRevert := 0.0
 			isHourly := leaveType.Unit == "hours"
 			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-				st, err1 := time.Parse("15:04", *leave.StartTime)
-				en, err2 := time.Parse("15:04", *leave.EndTime)
+				st, err1 := parseTimeStr(*leave.StartTime)
+				en, err2 := parseTimeStr(*leave.EndTime)
 				if err1 == nil && err2 == nil {
 					amountToRevert = en.Sub(st).Hours()
 				}
@@ -744,8 +751,8 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			amountTaken := 0.0
 			isHourly := leaveType.Unit == "hours"
 			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-				st, err1 := time.Parse("15:04", *leave.StartTime)
-				en, err2 := time.Parse("15:04", *leave.EndTime)
+				st, err1 := parseTimeStr(*leave.StartTime)
+				en, err2 := parseTimeStr(*leave.EndTime)
 				if err1 == nil && err2 == nil {
 					amountTaken = en.Sub(st).Hours()
 				}

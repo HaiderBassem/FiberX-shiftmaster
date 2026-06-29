@@ -62,6 +62,13 @@ type createShiftRequest struct {
 	MinRestHours    int     `json:"min_rest_hours"`
 }
 
+func parseTimeStr(t string) (time.Time, error) {
+	if len(t) > 5 {
+		t = t[:5]
+	}
+	return time.Parse("15:04", t)
+}
+
 // Create creates a new shift.
 func (h *ShiftHandler) Create(c *gin.Context) {
 	var req createShiftRequest
@@ -70,12 +77,12 @@ func (h *ShiftHandler) Create(c *gin.Context) {
 		return
 	}
 
-	startTime, err := time.Parse("15:04", req.StartTime)
+	startTime, err := parseTimeStr(req.StartTime)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid start_time format, expected HH:MM"})
 		return
 	}
-	endTime, err := time.Parse("15:04", req.EndTime)
+	endTime, err := parseTimeStr(req.EndTime)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid end_time format, expected HH:MM"})
 		return
@@ -117,12 +124,12 @@ func (h *ShiftHandler) Update(c *gin.Context) {
 		return
 	}
 
-	startTime, err := time.Parse("15:04", req.StartTime)
+	startTime, err := parseTimeStr(req.StartTime)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid start_time format"})
 		return
 	}
-	endTime, err := time.Parse("15:04", req.EndTime)
+	endTime, err := parseTimeStr(req.EndTime)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid end_time format"})
 		return
