@@ -22,18 +22,18 @@ LOG_DIR="/var/log/shiftmaster"
 CADDY_LOG_DIR="/var/log/caddy"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "╔═══════════════════════════════════════════╗"
-echo "║     ShiftMaster Production Deployment     ║"
-echo "╚═══════════════════════════════════════════╝"
+echo "============================================="
+echo "      ShiftMaster Production Deployment      "
+echo "============================================="
 echo ""
 
 # ── 1. Create directories ──
-echo "→ Creating directories..."
+echo "[INFO] Creating directories..."
 sudo mkdir -p "$APP_DIR/frontend" "$APP_DIR/uploads" "$LOG_DIR" "$CADDY_LOG_DIR"
-sudo chown -R usernameofyourserver:usernameofyourserver "$APP_DIR" "$LOG_DIR" || true
+sudo chown -R techsupport:techsupport "$APP_DIR" "$LOG_DIR" || true
 
 # ── 2. Build Go binary ──
-echo "→ Building Go backend..."
+echo "[INFO] Building Go backend..."
 cd "$PROJECT_DIR"
 CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o build-api ./cmd/api/
 sudo mv build-api "$APP_DIR/shiftmaster-api"
@@ -41,34 +41,33 @@ sudo chown cpper:cpper "$APP_DIR/shiftmaster-api"
 sudo chmod +x "$APP_DIR/shiftmaster-api"
 
 # ── 3. Build Frontend ──
-echo "→ Building frontend..."
+echo "[INFO] Building frontend..."
 cd "$PROJECT_DIR/frontend"
-npm install --production=false --legacy-peer-deps
-npx vite build
+npm install --include=dev --legacy-peer-deps
+npm run build
 sudo rm -rf "$APP_DIR/frontend/dist"
 sudo cp -r dist "$APP_DIR/frontend/"
-sudo chown -R usernameofyourserver:usernameofyourserver "$APP_DIR/frontend"
+sudo chown -R techsupport:techsupport "$APP_DIR/frontend"
 
 # ── 4. Copy config files ──
-echo "→ Copying configuration..."
+echo "[INFO] Verifying configuration..."
 if [ ! -f "$APP_DIR/.env" ]; then
-    cp "$PROJECT_DIR/.env.production" "$APP_DIR/.env"
-    echo "  ⚠  Created .env from template — EDIT DB credentials & JWT_SECRET!"
+    echo "  [WARNING] .env not found in $APP_DIR. Ensure you create it with correct DB credentials!"
 else
-    echo "  ✓  .env already exists, skipping (won't overwrite)"
+    echo "  [OK] .env exists, skipping (won't overwrite)"
 fi
 
 # ── 5. Run database migration ──
-echo "→ Running database migrations..."
+echo "[INFO] Running database migrations..."
 source "$APP_DIR/.env"
 for migration in "$PROJECT_DIR"/internal/database/migrations/*.sql; do
     echo "  Running: $(basename "$migration")"
     PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$migration" 2>/dev/null || true
 done
-echo "  ✓  Migrations complete"
+echo "  [OK] Migrations complete"
 
 # ── 5b. Fix table ownership (in case tables were created by a different user) ──
-echo "→ Fixing table ownership..."
+echo "[INFO] Fixing table ownership..."
 sudo -u postgres psql -d "$DB_NAME" -c "
 DO \$\$
 BEGIN
@@ -85,53 +84,53 @@ BEGIN
 END
 \$\$;
 " 2>/dev/null || true
-echo "  ✓  Ownership fixed"
+echo "  [OK] Ownership fixed"
 
 # ── 6. Install systemd service ──
-echo "→ Setting up systemd service..."
+echo "[INFO] Setting up systemd service..."
 sudo cp "$PROJECT_DIR/deploy/shiftmaster.service" /etc/systemd/system/shiftmaster.service
 sudo systemctl daemon-reload
 sudo systemctl enable shiftmaster
 sudo systemctl restart shiftmaster
-echo "  ✓  shiftmaster.service started"
+echo "  [OK] shiftmaster.service started"
 
 # ── 7. Configure Caddy ──
-echo "→ Configuring Caddy..."
+echo "[INFO] Configuring Caddy..."
 #sudo cp "$PROJECT_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile
 sudo systemctl restart caddy
-echo "  ✓  Caddy configured and restarted"
+echo "  [OK] Caddy configured and restarted"
 
 # ── 8. Verify ──
 echo ""
-echo "→ Waiting for services to start..."
+echo "[INFO] Waiting for services to start..."
 sleep 3
 
 API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/health 2>/dev/null || echo "000")
 WEB_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://shift-master.org/ 2>/dev/null || echo "000")
 
 echo ""
-echo "╔═══════════════════════════════════════════╗"
-echo "║          Deployment Results               ║"
-echo "╠═══════════════════════════════════════════╣"
+echo "============================================="
+echo "             Deployment Results              "
+echo "============================================="
 if [ "$API_STATUS" = "200" ]; then
-    echo "║  ✅  API Backend:  http://127.0.0.1:8080  ║"
+    echo "  [OK]     API Backend:  http://127.0.0.1:8080"
 else
-    echo "║  ❌  API Backend:  FAILED (HTTP $API_STATUS)     ║"
+    echo "  [FAILED] API Backend:  FAILED (HTTP $API_STATUS)"
 fi
 if [ "$WEB_STATUS" = "200" ]; then
-    echo "║  ✅  Web Frontend: http://192.168.16.138  ║"
+    echo "  [OK]     Web Frontend: http://192.168.16.138"
 else
-    echo "║  ❌  Web Frontend: FAILED (HTTP $WEB_STATUS)     ║"
+    echo "  [FAILED] Web Frontend: FAILED (HTTP $WEB_STATUS)"
 fi
-echo "╠═══════════════════════════════════════════╣"
-echo "║  Logs:                                    ║"
-echo "║    API:   journalctl -u shiftmaster -f    ║"
-echo "║    Caddy: /var/log/caddy/shiftmaster.log  ║"
-echo "╚═══════════════════════════════════════════╝"
+echo "---------------------------------------------"
+echo "  Logs:                                      "
+echo "    API:   journalctl -u shiftmaster -f      "
+echo "    Caddy: /var/log/caddy/shiftmaster.log    "
+echo "============================================="
 
 if [ "$API_STATUS" != "200" ]; then
     echo ""
-    echo "⚠  API failed — check:"
+    echo "[WARNING] API failed — check:"
     echo "   1. Database credentials in $APP_DIR/.env"
     echo "   2. sudo journalctl -u shiftmaster --no-pager -n 20"
 fi
