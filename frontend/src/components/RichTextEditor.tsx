@@ -24,6 +24,24 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     readonly: false,
     placeholder: placeholder || 'Start typing...',
     height: height,
+    width: '100%',
+    askBeforePasteHTML: false,
+    defaultActionOnPaste: 'insert_as_html' as const,
+    askBeforePasteFromWord: false,
+    direction: '' as const, // allows both RTL and LTR
+    toolbarAdaptive: false,
+    buttons: [
+      'source', '|',
+      'bold', 'strikethrough', 'underline', 'italic', '|',
+      'superscript', 'subscript', '|',
+      'ul', 'ol', '|',
+      'outdent', 'indent', '|',
+      'font', 'fontsize', 'brush', 'paragraph', '|',
+      'image', 'file', 'video', 'table', 'link', '|',
+      'align', 'undo', 'redo', '|',
+      'hr', 'eraser', 'copyformat', '|',
+      'symbol', 'fullsize', 'print', 'about'
+    ],
     uploader: {
       insertImageAsBase64URI: false,
       url: `${api.defaults.baseURL || '/api'}/upload/image`, // Correctly resolve API base URL
@@ -80,7 +98,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   }), [placeholder, height, token]);
 
   return (
-    <div className="rich-text-editor-container" style={{ borderRadius: '0.5rem', overflow: 'hidden' }}>
+    <div className="rich-text-editor-container w-full h-full" style={{ borderRadius: '0.5rem', overflow: 'hidden' }}>
       <JoditEditor
         ref={editor}
         value={value}

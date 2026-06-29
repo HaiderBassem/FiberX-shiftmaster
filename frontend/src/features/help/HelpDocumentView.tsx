@@ -25,7 +25,7 @@ export function HelpDocumentView() {
   const canManageAccess = user?.role === 'manager' || user?.role === 'admin';
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="w-full px-4 md:px-8 mx-auto space-y-6 pb-12">
       {/* Header Section */}
       <div className="bg-card rounded-2xl shadow-sm border border-border p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div className="flex items-start sm:items-center gap-4">
