@@ -302,7 +302,6 @@ export const MyTasksWeekly = () => {
             });
 
             const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && ['off', 'vacation', 'leave'].includes(s.shift_status));
-            const dayHourlySchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && s.shift_status === 'hourly');
             
             const isHourlyLeave = dayLeave?.leave_type_name_en?.toLowerCase() === 'hourly';
             const isOff = (!!dayLeave && !isHourlyLeave) || !!dayOffSchedule;
