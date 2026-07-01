@@ -170,9 +170,6 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           <span className="text-xs sm:text-sm font-medium text-foreground hidden xs:inline">
             {user?.first_name}
           </span>
-          <span className="text-xs sm:text-sm font-medium text-foreground hidden sm:inline">
-            {user?.last_name}
-          </span>
         </div>
 
         {/* Notifications */}

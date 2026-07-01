@@ -312,18 +312,22 @@ func (r *leaveRepo) Create(ctx context.Context, leave *models.Leave) error {
 
 func (r *leaveRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status string, approverID uuid.UUID, approverRole string) error {
 	var query string
+	var args []interface{}
 	switch approverRole {
 	case "team_leader":
 		query = `UPDATE leaves SET status=$1, approved_by_team_leader=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
+		args = []interface{}{status, approverID, id}
 	case "manager":
 		query = `UPDATE leaves SET status=$1, approved_by_manager=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
+		args = []interface{}{status, approverID, id}
 	case "employee":
 		// Employee cancelling their own leave — no approver column to set
-		query = `UPDATE leaves SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$3`
+		query = `UPDATE leaves SET status=$1, updated_at=CURRENT_TIMESTAMP WHERE id=$2`
+		args = []interface{}{status, id}
 	default:
 		return fmt.Errorf("invalid approver role: %s", approverRole)
 	}
-	_, err := r.db.Exec(ctx, query, status, approverID, id)
+	_, err := r.db.Exec(ctx, query, args...)
 	return err
 }
 

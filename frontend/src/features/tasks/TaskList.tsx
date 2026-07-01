@@ -302,7 +302,10 @@ export const MyTasksWeekly = () => {
             });
 
             const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && ['off', 'vacation', 'leave'].includes(s.shift_status));
-            const isOff = !!dayLeave || !!dayOffSchedule;
+            const dayHourlySchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && s.shift_status === 'hourly');
+            
+            const isHourlyLeave = dayLeave?.leave_type_name_en?.toLowerCase() === 'hourly';
+            const isOff = (!!dayLeave && !isHourlyLeave) || !!dayOffSchedule;
 
             return (
               <Card key={dayIdx} className={`transition-all duration-300 overflow-hidden ${today ? 'border-primary/30 shadow-[0_0_30px_rgba(12,204,204,0.06)]' : ''}`}>
@@ -328,6 +331,11 @@ export const MyTasksWeekly = () => {
                   <div className="flex items-center gap-2 sm:gap-3">
                     {dayTotal > 0 ? (
                       <div className="flex items-center gap-2">
+                        {dayLeave && isHourlyLeave && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 mr-1">
+                            ⏳ {dayLeave.leave_type_name_ar || dayLeave.leave_type_name_en || 'زمنية'}
+                          </span>
+                        )}
                         <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
                           <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
                             style={{ width: `${dayTotal > 0 ? (dayCompleted / dayTotal) * 100 : 0}%` }} />
@@ -335,7 +343,9 @@ export const MyTasksWeekly = () => {
                         <span className="text-xs text-muted-foreground min-w-[40px]">{dayCompleted}/{dayTotal}</span>
                       </div>
                     ) : isOff ? (
-                      <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">🌴 Off</span>
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">🌴 {dayLeave?.leave_type_name_ar || dayLeave?.leave_type_name_en || 'Off'}</span>
+                    ) : dayLeave && isHourlyLeave ? (
+                      <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">⏳ {dayLeave.leave_type_name_ar || dayLeave.leave_type_name_en || 'زمنية'}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">No tasks</span>
                     )}
@@ -363,8 +373,14 @@ export const MyTasksWeekly = () => {
                       {isOff ? (
                         <div className="animate-in fade-in zoom-in duration-300">
                           <div className="text-4xl mb-3">🌴</div>
-                          <p className="text-base font-bold text-emerald-600">Off / Happy Holiday!</p>
+                          <p className="text-base font-bold text-emerald-600">{dayLeave?.leave_type_name_ar || dayLeave?.leave_type_name_en || 'Off / Happy Holiday!'}</p>
                           <p className="text-sm text-muted-foreground mt-1">Enjoy your time off.</p>
+                        </div>
+                      ) : dayLeave && isHourlyLeave ? (
+                        <div className="animate-in fade-in zoom-in duration-300">
+                          <div className="text-4xl mb-3">⏳</div>
+                          <p className="text-base font-bold text-amber-600">{dayLeave.leave_type_name_ar || dayLeave.leave_type_name_en || 'زمنية'}</p>
+                          <p className="text-sm text-muted-foreground mt-1">Short leave approved for this day.</p>
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground/60">No tasks assigned for this day</p>

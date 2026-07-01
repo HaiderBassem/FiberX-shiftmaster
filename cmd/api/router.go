@@ -33,6 +33,7 @@ func SetupRouter(
 	moduleAccessH *handlers.ModuleAccessHandler,
 	fiberxDataH *handlers.FiberxDataHandler,
 	securityH *handlers.SecurityHandler,
+	itemReqH *handlers.ItemRequestHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -190,6 +191,14 @@ func SetupRouter(
 			notifs.GET("/ws", notifH.ServeWS)
 		}
 
+		// Item Requests
+		itemReqs := protected.Group("/item-requests")
+		{
+			itemReqs.GET("/categories", itemReqH.GetCategories)
+			itemReqs.GET("/me", itemReqH.GetMyRequests)
+			itemReqs.POST("", itemReqH.SubmitRequest)
+		}
+
 		// Activity history (audit logs)
 		protected.GET("/activity", auditH.ListActivity)
 
@@ -311,6 +320,11 @@ func SetupRouter(
 			tlWrite.POST("/shifts", shiftH.Create)
 			tlWrite.PUT("/shifts/:id", shiftH.Update)
 			tlWrite.DELETE("/shifts/:id", shiftH.Delete)
+
+			// Item Request Categories
+			tlWrite.POST("/item-requests/categories", itemReqH.CreateCategory)
+			tlWrite.PUT("/item-requests/categories/:id", itemReqH.UpdateCategory)
+			tlWrite.DELETE("/item-requests/categories/:id", itemReqH.DeleteCategory)
 		}
 
 

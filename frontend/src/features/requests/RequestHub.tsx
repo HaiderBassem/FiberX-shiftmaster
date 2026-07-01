@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { CalendarOff, ArrowLeftRight, Inbox } from 'lucide-react';
+import { CalendarOff, ArrowLeftRight, Inbox, Package } from 'lucide-react';
 import { LeaveList } from '../leaves/LeaveList';
 import { SwapList } from '../swaps/SwapList';
+import { ItemList } from './ItemList';
 
-type Tab = 'leaves' | 'swaps';
+type Tab = 'leaves' | 'swaps' | 'items';
 
 export const RequestHub = () => {
   const [activeTab, setActiveTab] = useState<Tab>('leaves');
@@ -18,7 +19,7 @@ export const RequestHub = () => {
             Requests Center
           </h2>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Manage your time off requests and shift swaps with teammates.
+            Manage your time off requests, shift swaps, and company item requests.
           </p>
         </div>
 
@@ -45,6 +46,17 @@ export const RequestHub = () => {
             <ArrowLeftRight className="w-4 h-4" />
             Swaps
           </button>
+          <button
+            onClick={() => setActiveTab('items')}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all snap-center whitespace-nowrap ${
+              activeTab === 'items'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Items
+          </button>
         </div>
       </div>
 
@@ -52,6 +64,7 @@ export const RequestHub = () => {
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         {activeTab === 'leaves' && <LeaveList />}
         {activeTab === 'swaps' && <SwapList />}
+        {activeTab === 'items' && <ItemList />}
       </div>
     </div>
   );

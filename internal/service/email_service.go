@@ -81,6 +81,27 @@ func (s *EmailService) getAccessToken() (string, error) {
 
 // sendEmailGraph sends an email using the Microsoft Graph API /sendMail endpoint.
 func (s *EmailService) sendEmailGraph(to []string, subject, body string) error {
+	return s.sendEmailGraphWithCC(to, nil, subject, body)
+}
+
+// SendEmailWithCCAsync sends an email in a background goroutine including CC recipients.
+func (s *EmailService) SendEmailWithCCAsync(to, cc []string, subject, body string) {
+	if s.cfg.ClientID == "" || s.cfg.TenantID == "" || s.cfg.ClientSecret == "" {
+		fmt.Println("[EMAIL] Graph API credentials not fully configured. Skipping email to:", to)
+		return
+	}
+
+	go func() {
+		err := s.sendEmailGraphWithCC(to, cc, subject, body)
+		if err != nil {
+			fmt.Printf("[EMAIL] Failed to send email to %v via Graph API: %v\n", to, err)
+		} else {
+			fmt.Printf("[EMAIL] Successfully sent email to %v via Graph API\n", to)
+		}
+	}()
+}
+
+func (s *EmailService) sendEmailGraphWithCC(to, cc []string, subject, body string) error {
 	token, err := s.getAccessToken()
 	if err != nil {
 		return fmt.Errorf("auth error: %w", err)
@@ -93,20 +114,35 @@ func (s *EmailService) sendEmailGraph(to []string, subject, body string) error {
 	for _, recipient := range to {
 		toRecipients = append(toRecipients, map[string]interface{}{
 			"emailAddress": map[string]string{
-				"address": recipient,
+				"address": strings.TrimSpace(recipient),
 			},
 		})
 	}
 
-	message := map[string]interface{}{
-		"message": map[string]interface{}{
-			"subject": subject,
-			"body": map[string]string{
-				"contentType": "Text",
-				"content":     body,
+	ccRecipients := make([]map[string]interface{}, 0, len(cc))
+	for _, recipient := range cc {
+		ccRecipients = append(ccRecipients, map[string]interface{}{
+			"emailAddress": map[string]string{
+				"address": strings.TrimSpace(recipient),
 			},
-			"toRecipients": toRecipients,
+		})
+	}
+
+	messageBody := map[string]interface{}{
+		"subject": subject,
+		"body": map[string]string{
+			"contentType": "Text",
+			"content":     body,
 		},
+		"toRecipients": toRecipients,
+	}
+
+	if len(ccRecipients) > 0 {
+		messageBody["ccRecipients"] = ccRecipients
+	}
+
+	message := map[string]interface{}{
+		"message": messageBody,
 		"saveToSentItems": "false",
 	}
 

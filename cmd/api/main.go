@@ -55,6 +55,7 @@ func main() {
 	moduleAccessRepo := repository.NewModuleAccessRepository(db)
 	fiberxDataRepo := repository.NewFiberxDataRepository(db)
 	securityRepo := repository.NewSecurityRepository(db)
+	itemReqRepo := repository.NewItemRequestRepository(db)
 
 	// --- Initialize Services ---
 	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
@@ -76,6 +77,7 @@ func main() {
 	announcementService := service.NewAnnouncementService(announcementRepo, employeeRepo, emailService, pushService)
 	moduleAccessService := service.NewModuleAccessService(moduleAccessRepo, employeeRepo)
 	fiberxDataService := service.NewFiberxDataService(fiberxDataRepo, employeeRepo)
+	itemReqService := service.NewItemRequestService(itemReqRepo, employeeRepo, departmentRepo, emailService)
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
@@ -98,6 +100,7 @@ func main() {
 	moduleAccessHandler := handlers.NewModuleAccessHandler(moduleAccessService)
 	fiberxDataHandler := handlers.NewFiberxDataHandler(fiberxDataService)
 	securityHandler := handlers.NewSecurityHandler(securityService)
+	itemReqHandler := handlers.NewItemRequestHandler(itemReqService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -132,7 +135,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler,
 	)
 
 	// --- Start HTTP Server ---
