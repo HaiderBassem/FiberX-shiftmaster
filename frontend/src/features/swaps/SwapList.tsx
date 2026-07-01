@@ -24,7 +24,7 @@ export const SwapList = () => {
   const [shiftDate, setShiftDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [respondError, setRespondError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // My outgoing swap requests
   const { data: mySwaps, isLoading: mySwapsLoading } = useQuery({
@@ -68,11 +68,22 @@ export const SwapList = () => {
 
   const respondSwap = useMutation({
     mutationFn: async ({ swapId, accept }: { swapId: string; accept: boolean }) => {
-      setRespondError(null);
       await api.post(`/swaps/${swapId}/respond`, { accept });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['swaps'] }),
-    onError: (err: any) => setRespondError(err?.response?.data?.error || err?.message || 'Failed to respond to swap'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['swaps'] });
+      setSuccess("Successfully responded to swap request");
+      setTimeout(() => setSuccess(null), 3000);
+    },
+    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to respond'),
+  });
+
+  const cancelSwapMutation = useMutation({
+    mutationFn: async (id: string) => { await api.post(`/swaps/${id}/cancel`); },
+    onSuccess: () => { 
+      queryClient.invalidateQueries({ queryKey: ['swaps'] }); 
+    },
+    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel swap request'),
   });
 
   const getStatusBadge = (status: string) => {
@@ -138,10 +149,13 @@ export const SwapList = () => {
                   </span>
                 </h3>
               </div>
-
-              {respondError && (
-                <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">{respondError}</div>
-              )}
+  
+                {error && (
+                  <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm font-medium">{error}</div>
+                )}
+                {success && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-sm font-medium">{success}</div>
+                )}
 
               {pendingLoading ? (
                 <div className="space-y-3">
@@ -246,9 +260,24 @@ export const SwapList = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center self-end sm:self-auto">
-                      {getStatusBadge(swap.status)}
-                    </div>
+                    <div className="flex items-center self-end sm:self-auto gap-3">
+                        {swap.status === 'pending' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
+                            onClick={() => {
+                              if (confirm("Are you sure you want to cancel this swap request?")) {
+                                cancelSwapMutation.mutate(swap.id);
+                              }
+                            }}
+                            disabled={cancelSwapMutation.isPending}
+                          >
+                            <XCircle className="w-3 h-3 mr-1" /> Cancel Request
+                          </Button>
+                        )}
+                        {getStatusBadge(swap.status)}
+                      </div>
                   </CardContent>
                 </Card>
               </motion.div>

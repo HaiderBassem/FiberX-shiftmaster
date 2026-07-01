@@ -168,7 +168,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             )}
           </div>
           <span className="text-xs sm:text-sm font-medium text-foreground hidden xs:inline">
-            {user?.first_name}
+            {user?.first_name?.split(' ')[0]}
           </span>
         </div>
 

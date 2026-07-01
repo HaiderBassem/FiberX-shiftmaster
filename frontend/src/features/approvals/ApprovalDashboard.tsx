@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShieldCheck, CalendarOff, ArrowLeftRight, Users, AlertTriangle, CheckCircle2, XCircle,
-  UserPlus, History, Clock, ChevronDown, ChevronUp, Moon, Info } from 'lucide-react';
+  UserPlus, History, Clock, ChevronDown, ChevronUp, Moon, Info, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate, fmtDateTime, parseDate } from '@/lib/dateUtils';
 
@@ -384,8 +384,18 @@ export const ApprovalDashboard = () => {
   });
 
   const { data: pendingSwaps, isLoading: swapsLoading } = useQuery({
-    queryKey: ['swaps', 'pending', 'manager', selectedDeptId],
-    queryFn: async () => { const res = await api.get('/swaps/pending/manager'); return res.data?.data || []; },
+    queryKey: ['swaps', 'pending', selectedDeptId],
+    queryFn: async () => { const res = await api.get(user?.role === 'manager' ? '/swaps/pending/manager' : '/swaps/pending'); return res.data?.data || []; },
+  });
+
+  const { data: pendingItemRequests, isLoading: itemRequestsLoading } = useQuery({
+    queryKey: ['itemRequests', 'pending', selectedDeptId],
+    queryFn: async () => { const res = await api.get('/item-requests/pending'); return res.data?.data || []; },
+  });
+
+  const updateItemRequestStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string, status: string }) => { await api.post(`/item-requests/${id}/status`, { status }); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['itemRequests', 'pending'] }); },
   });
 
   const approveLeave = useMutation({
@@ -469,8 +479,8 @@ export const ApprovalDashboard = () => {
       )}
 
       {activeTab === 'pending' && (
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* ── Leave Requests ── */}
+        <div className="grid xl:grid-cols-3 lg:grid-cols-2 gap-6">
+          {/* ─── Leave Requests ─── */}
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <CalendarOff className="w-5 h-5 text-destructive" />
@@ -640,6 +650,56 @@ export const ApprovalDashboard = () => {
                 <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
                   <ArrowLeftRight className="w-10 h-10 mb-3 opacity-20" />
                   <p>No pending swap requests.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* ─── Item Requests ─── */}
+          <div className="space-y-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
+              <Package className="w-5 h-5 text-indigo-500" />
+              Item Requests
+              {pendingItemRequests?.length > 0 && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-600 border border-indigo-500/30">
+                  {pendingItemRequests.length}
+                </span>
+              )}
+            </h3>
+
+            {itemRequestsLoading ? (
+              <div className="space-y-3">{[1,2].map(i => <Card key={i} className="animate-pulse h-24" />)}</div>
+            ) : pendingItemRequests?.length > 0 ? (
+              pendingItemRequests.map((req: any) => (
+                <Card key={req.id}>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">{req.category_name || 'Request'}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 flex-wrap mt-1">
+                      <span className="flex items-center gap-1">
+                        {req.employee_name}
+                      </span>
+                      • {fmtDate(req.created_at)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm">{req.description}</p>
+                  </CardContent>
+                  <CardFooter className="flex justify-end gap-2 sm:gap-3 pt-0">
+                    <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
+                      onClick={() => updateItemRequestStatus.mutate({ id: req.id, status: 'rejected' })} disabled={updateItemRequestStatus.isPending}>
+                      <XCircle className="w-4 h-4" /> Reject
+                    </Button>
+                    <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 gap-1" onClick={() => updateItemRequestStatus.mutate({ id: req.id, status: 'processed' })} disabled={updateItemRequestStatus.isPending}>
+                      <CheckCircle2 className="w-4 h-4" /> Processed
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))
+            ) : (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
+                  <Package className="w-10 h-10 mb-3 opacity-20" />
+                  <p>No pending item requests.</p>
                 </CardContent>
               </Card>
             )}

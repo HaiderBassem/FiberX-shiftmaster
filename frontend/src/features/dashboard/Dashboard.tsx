@@ -216,7 +216,7 @@ const EmployeeDashboard = () => {
       {/* Header */}
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
-          Welcome back, {user?.first_name} 👋
+          Welcome back, {user?.first_name?.split(' ')[0]} 👋
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </motion.div>
@@ -499,7 +499,7 @@ const LeaderDashboard = () => {
           Analytics Dashboard
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')} · Welcome, {user?.first_name}
+          {format(new Date(), 'EEEE, MMMM d, yyyy')} • Welcome, {user?.first_name?.split(' ')[0]}
         </p>
       </motion.div>
 

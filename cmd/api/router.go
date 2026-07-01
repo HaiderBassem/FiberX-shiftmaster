@@ -197,6 +197,7 @@ func SetupRouter(
 			itemReqs.GET("/categories", itemReqH.GetCategories)
 			itemReqs.GET("/me", itemReqH.GetMyRequests)
 			itemReqs.POST("", itemReqH.SubmitRequest)
+			itemReqs.POST("/:id/cancel", itemReqH.CancelRequest)
 		}
 
 		// Activity history (audit logs)
@@ -281,6 +282,10 @@ func SetupRouter(
 
 			// Pending leaves with employee details for approval dashboard
 			supervisor.GET("/leaves/pending/rich", leaveH.PendingRich)
+
+			// Item request approvals
+			supervisor.GET("/item-requests/pending", itemReqH.GetPendingRequests)
+			supervisor.POST("/item-requests/:id/status", itemReqH.UpdateStatus)
 		}
 
 		// --- Team Leader + Manager + Admin WRITE routes ---
@@ -405,6 +410,7 @@ func SetupRouter(
 			announcements.POST("", announcementH.Create)
 			announcements.DELETE("/:id", announcementH.Delete)
 			announcements.PUT("/:id/activate", announcementH.SetActive)
+			announcements.PUT("/:id/deactivate", announcementH.Deactivate)
 		}
 
 	}

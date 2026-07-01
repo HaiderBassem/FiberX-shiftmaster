@@ -20,6 +20,9 @@ type ItemRequestRepository interface {
 	// Requests
 	CreateRequest(ctx context.Context, req *models.ItemRequest) error
 	GetRequestsByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.ItemRequest, error)
+	GetPendingRequests(ctx context.Context, departmentID uuid.UUID) ([]models.ItemRequest, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
+	Cancel(ctx context.Context, id uuid.UUID, employeeID uuid.UUID) error
 }
 
 type itemRequestRepo struct {
@@ -120,3 +123,34 @@ func (r *itemRequestRepo) GetRequestsByEmployee(ctx context.Context, employeeID 
 	}
 	return reqs, rows.Err()
 }
+
+func (r *itemRequestRepo) GetPendingRequests(ctx context.Context, departmentID uuid.UUID) ([]models.ItemRequest, error) {
+	rows, err := r.db.Query(ctx, 
+		"SELECT r.id, r.employee_id, r.category_id, r.description, r.status, r.created_at, r.updated_at, c.name as category_name, e.first_name || ' ' || e.last_name as employee_name " +
+		"FROM item_requests r " +
+		"JOIN item_request_categories c ON c.id = r.category_id " +
+		"JOIN employees e ON e.id = r.employee_id " +
+		"WHERE r.status = 'pending' AND e.department_id = $1 ORDER BY r.created_at ASC",
+		departmentID,
+	)
+	if err != nil { return nil, err }
+	defer rows.Close()
+	var reqs []models.ItemRequest
+	for rows.Next() {
+		var r models.ItemRequest
+		if err := rows.Scan(&r.ID, &r.EmployeeID, &r.CategoryID, &r.Description, &r.Status, &r.CreatedAt, &r.UpdatedAt, &r.CategoryName, &r.EmployeeName); err != nil { return nil, err }
+		reqs = append(reqs, r)
+	}
+	return reqs, rows.Err()
+}
+
+func (r *itemRequestRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
+	_, err := r.db.Exec(ctx, "UPDATE item_requests SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", status, id)
+	return err
+}
+
+func (r *itemRequestRepo) Cancel(ctx context.Context, id uuid.UUID, employeeID uuid.UUID) error {
+	_, err := r.db.Exec(ctx, "UPDATE item_requests SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND employee_id = $2 AND status = 'pending'", id, employeeID)
+	return err
+}
+

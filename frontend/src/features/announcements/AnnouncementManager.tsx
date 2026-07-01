@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Trash2, Power, AlertCircle, Loader, Shield, ImagePlus, X } from 'lucide-react';
+import { Plus, Trash2, Power, PowerOff, AlertCircle, Loader, Shield, ImagePlus, X } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
 import { AnnouncementPermissionsModal } from './AnnouncementPermissionsModal';
@@ -125,6 +125,16 @@ export const AnnouncementManager: React.FC = () => {
     }
   };
 
+  const handleToggleInactive = async (id: string) => {
+    try {
+      await announcementService.setInactive(id);
+      fetchAnnouncements();
+    } catch (err) {
+      console.error('Failed to deactivate announcement:', err);
+      alert('Failed to deactivate announcement.');
+    }
+  };
+
   const resetForm = () => {
     setTitle('');
     setMessage('');
@@ -230,17 +240,25 @@ export const AnnouncementManager: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                    {!a.is_active && (
+                  <div className="flex items-center space-x-2">
+                      {!a.is_active ? (
+                        <button
+                          onClick={() => handleToggleActive(a.id)}
+                          className="p-2 text-muted-foreground hover:text-primary transition-colors"
+                          title="Set Active"
+                        >
+                          <Power className="h-5 w-5" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleInactive(a.id)}
+                          className="p-2 text-muted-foreground hover:text-amber-500 transition-colors"
+                          title="Deactivate"
+                        >
+                          <PowerOff className="h-5 w-5" />
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleToggleActive(a.id)}
-                        className="p-2 text-muted-foreground hover:text-primary transition-colors"
-                        title="Set Active"
-                      >
-                        <Power className="h-5 w-5" />
-                      </button>
-                    )}
-                    <button
                       onClick={() => handleDelete(a.id)}
                       className="p-2 text-muted-foreground hover:text-destructive transition-colors"
                       title="Delete"

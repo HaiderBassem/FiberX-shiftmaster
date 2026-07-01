@@ -222,3 +222,24 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
+
+func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
+		return
+	}
+	depID := getDepartmentID(c)
+	if depID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
+		return
+	}
+	err = h.announcementRepo.SetInactiveByDepartment(c.Request.Context(), *depID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+

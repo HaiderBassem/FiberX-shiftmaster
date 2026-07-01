@@ -154,3 +154,49 @@ func (h *ItemRequestHandler) SubmitRequest(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": itemReq})
 }
+
+func (h *ItemRequestHandler) GetPendingRequests(c *gin.Context) {
+	depID := getDepartmentID(c)
+	if depID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID required"})
+		return
+	}
+	reqs, err := h.svc.GetPendingRequests(c.Request.Context(), *depID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": reqs})
+}
+
+func (h *ItemRequestHandler) UpdateStatus(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"}); return }
+
+	var req struct { Status string `json:"status" binding:"required"` }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	if err := h.svc.UpdateStatus(c.Request.Context(), id, req.Status); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (h *ItemRequestHandler) CancelRequest(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"}); return }
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	if err := h.svc.CancelRequest(c.Request.Context(), id, empID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+

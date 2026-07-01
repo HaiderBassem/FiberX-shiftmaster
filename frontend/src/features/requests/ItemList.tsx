@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Plus, Package, Clock, Settings, PackageOpen } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Plus, Package, Clock, Settings, PackageOpen, XCircle } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { useAuthStore } from '../../store/authStore';
@@ -18,6 +18,7 @@ interface ItemRequest {
 
 export const ItemList = () => {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const isSupervisor = ['admin', 'manager', 'team_leader'].includes(user?.role || '');
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
@@ -29,6 +30,12 @@ export const ItemList = () => {
       const { data } = await api.get('/item-requests/me');
       return data.data as ItemRequest[];
     },
+  });
+
+  const cancelItemMutation = useMutation({
+    mutationFn: async (id: string) => { await api.post(`/item-requests/${id}/cancel`); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['item-requests'] }); },
+    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel request'),
   });
 
   return (
@@ -76,12 +83,29 @@ export const ItemList = () => {
                     </span>
                   </div>
                 </div>
-                <div>
+                <div className="flex items-center gap-3">
+                  {req.status === 'pending' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to cancel this item request?")) {
+                          cancelItemMutation.mutate(req.id);
+                        }
+                      }}
+                      disabled={cancelItemMutation.isPending}
+                    >
+                      <XCircle className="w-3 h-3 mr-1" /> Cancel Request
+                    </Button>
+                  )}
                   <span className={`px-2.5 py-1 text-xs font-semibold rounded-full capitalize border ${
                     req.status === 'pending' 
                       ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
                       : req.status === 'processed'
                       ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                      : req.status === 'cancelled'
+                      ? 'bg-gray-500/10 text-gray-500 border-gray-500/20'
                       : 'bg-muted text-muted-foreground border-border'
                   }`}>
                     {req.status}

@@ -65,4 +65,9 @@ export const announcementService = {
     const { data } = await api.put(`/announcements/${id}/activate`);
     return data;
   },
+
+  setInactive: async (id: string) => {
+    const { data } = await api.put(`/announcements/${id}/deactivate`);
+    return data;
+  },
 };

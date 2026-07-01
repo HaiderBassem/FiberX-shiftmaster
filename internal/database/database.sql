@@ -986,3 +986,6 @@ CREATE TABLE item_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add 'cancelled' to leave_status
+ALTER TYPE leave_status ADD VALUE IF NOT EXISTS 'cancelled';

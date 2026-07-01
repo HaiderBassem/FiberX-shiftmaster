@@ -119,3 +119,17 @@ func parseEmails(input string) []string {
 	}
 	return result
 }
+
+func (s *ItemRequestService) GetPendingRequests(ctx context.Context, departmentID uuid.UUID) ([]models.ItemRequest, error) {
+	return s.repo.GetPendingRequests(ctx, departmentID)
+}
+
+func (s *ItemRequestService) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
+	if status != "processed" && status != "rejected" { return fmt.Errorf("invalid status") }
+	return s.repo.UpdateStatus(ctx, id, status)
+}
+
+func (s *ItemRequestService) CancelRequest(ctx context.Context, id uuid.UUID, employeeID uuid.UUID) error {
+	return s.repo.Cancel(ctx, id, employeeID)
+}
+

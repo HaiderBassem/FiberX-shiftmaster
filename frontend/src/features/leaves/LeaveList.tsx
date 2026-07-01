@@ -71,6 +71,7 @@ export const LeaveList = () => {
   const cancelLeaveMutation = useMutation({
     mutationFn: async (id: string) => { await api.post(`/leaves/${id}/cancel`); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); },
+    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel leave request'),
   });
 
   const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
