@@ -225,7 +225,7 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 
 func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
+	_, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
 		return
