@@ -15,6 +15,7 @@ type AnnouncementRepository interface {
 	GetActiveByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error)
 	GetActiveTickerByDepartment(ctx context.Context, departmentID uuid.UUID) (*models.Announcement, error)
 	GetAllByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Announcement, error)
+	SetInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error
 	SetInactive(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) error
 	SetTickerInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error
 	SetActive(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) error
@@ -157,6 +158,12 @@ func (r *announcementRepository) GetAllByDepartment(ctx context.Context, departm
 		list = append(list, a)
 	}
 	return list, nil
+}
+
+func (r *announcementRepository) SetInactiveByDepartment(ctx context.Context, departmentID uuid.UUID) error {
+	query := `UPDATE announcements SET is_active = false WHERE department_id = $1`
+	_, err := r.db.Exec(ctx, query, departmentID)
+	return err
 }
 
 func (r *announcementRepository) SetInactive(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) error {
