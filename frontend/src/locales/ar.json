@@ -1,0 +1,39 @@
+{
+  "navigation": {
+    "dashboard": "لوحة القيادة",
+    "my_tasks": "مهامي",
+    "handovers": "التسليمات",
+    "calendar": "التقويم",
+    "my_requests": "طلباتي",
+    "approvals": "الموافقات",
+    "shifts": "إدارة المناوبات",
+    "task_center": "مركز المهام",
+    "manage_employees": "الموظفين",
+    "departments": "الأقسام",
+    "leave_config": "إعدادات الإجازات",
+    "references": "المراجع",
+    "info_bank": "بنك المعلومات",
+    "fiber_data": "بيانات فايبرإكس",
+    "external_tools": "الأدوات الخارجية",
+    "announcements": "التبليغات",
+    "external_modules": "الوحدات الإضافية",
+    "logout": "تسجيل الخروج"
+  },
+  "topbar": {
+    "welcome": "مرحباً",
+    "language": "اللغة",
+    "search": "بحث..."
+  },
+  "dashboard": {
+    "welcome_back": "أهلاً بك مجدداً",
+    "analytics": "لوحة التحليلات"
+  },
+  "common": {
+    "pending": "قيد الانتظار",
+    "processed": "مكتمل",
+    "cancelled": "ملغى",
+    "cancel_request": "إلغاء الطلب",
+    "history": "السجل",
+    "request": "طلب جديد"
+  }
+}

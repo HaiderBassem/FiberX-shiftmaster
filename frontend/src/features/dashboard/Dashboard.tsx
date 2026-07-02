@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -117,6 +118,7 @@ export const Dashboard = () => {
 
 const EmployeeDashboard = () => {
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
@@ -216,7 +218,7 @@ const EmployeeDashboard = () => {
       {/* Header */}
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
-          Welcome back, {user?.first_name?.split(' ')[0]} 👋
+          {t('dashboard.welcome_back')}, {user?.first_name?.split(' ')[0]} 👋
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </motion.div>
@@ -405,6 +407,7 @@ const EmployeeDashboard = () => {
 
 const LeaderDashboard = () => {
   const user = useAuthStore(s => s.user);
+  const { t } = useTranslation();
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('all');
 
   const { data: employees } = useQuery({
@@ -493,15 +496,15 @@ const LeaderDashboard = () => {
       animate="show"
     >
       {/* Header */}
-      <motion.div variants={itemVariants}>
-        <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
-          <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Analytics Dashboard
-        </h2>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')} • Welcome, {user?.first_name?.split(' ')[0]}
-        </p>
-      </motion.div>
+        <motion.div variants={itemVariants}>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
+            <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+            {t('dashboard.analytics')}
+          </h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
+          {format(new Date(), 'EEEE, MMMM d, yyyy')} • {t('topbar.welcome')}, {user?.first_name?.split(' ')[0]}
+          </p>
+        </motion.div>
 
       <motion.div variants={itemVariants}>
         <AnnouncementBanner />

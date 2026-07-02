@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
-import { LogOut, Sun, Moon, User, Menu, Key, Bell } from 'lucide-react';
+import { Sun, Moon, User, Menu, Key, Bell } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { useNotification } from '@/providers/NotificationProvider';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
+  const { i18n } = useTranslation();
   const { requestPermission, permission } = useNotification();
   const {
     user,
-    logout,
     adminSelectedDepartmentId,
     setAdminSelectedDepartmentId,
     managerSelectedDepartmentId,
@@ -67,10 +68,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     }
   }, [managedDepartments, managerSelectedDepartmentId, user?.role, setManagerSelectedDepartmentId]);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+
 
   return (
     <header className="h-14 sm:h-16 border-b border-border bg-card/80 backdrop-blur-sm px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30">
@@ -210,15 +208,15 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           <Key className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </Button>
 
-        {/* Logout */}
+        {/* Language Switcher */}
         <Button
           variant="ghost"
-          size="icon"
-          onClick={handleLogout}
-          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
-          title="Logout"
+          size="sm"
+          onClick={() => i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
+          className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg font-medium w-8 h-8 sm:w-9 sm:h-9"
+          title="Switch Language"
         >
-          <LogOut className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+          {i18n.language === 'ar' ? 'EN' : 'عربي'}
         </Button>
       </div>
 

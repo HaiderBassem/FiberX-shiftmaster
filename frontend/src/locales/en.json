@@ -1,0 +1,39 @@
+{
+  "navigation": {
+    "dashboard": "Dashboard",
+    "my_tasks": "My Tasks",
+    "handovers": "Handovers",
+    "calendar": "Calendar",
+    "my_requests": "My Requests",
+    "approvals": "Approvals",
+    "shifts": "Schedules",
+    "task_center": "Task Center",
+    "manage_employees": "Employees",
+    "departments": "Departments",
+    "leave_config": "Leave Config",
+    "references": "References",
+    "info_bank": "Info Bank",
+    "fiber_data": "FiberX Data",
+    "external_tools": "External Tools",
+    "announcements": "Announcements",
+    "external_modules": "External Modules",
+    "logout": "Logout"
+  },
+  "topbar": {
+    "welcome": "Welcome",
+    "language": "Language",
+    "search": "Search..."
+  },
+  "dashboard": {
+    "welcome_back": "Welcome back",
+    "analytics": "Analytics Dashboard"
+  },
+  "common": {
+    "pending": "Pending",
+    "processed": "Processed",
+    "cancelled": "Cancelled",
+    "cancel_request": "Cancel Request",
+    "history": "History",
+    "request": "Request"
+  }
+}
