@@ -10,9 +10,11 @@ import { ShieldCheck, CalendarOff, ArrowLeftRight, Users, AlertTriangle, CheckCi
   UserPlus, History, Clock, ChevronDown, ChevronUp, Moon, Info, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate, fmtDateTime, parseDate } from '@/lib/dateUtils';
+import { useTranslation } from 'react-i18next';
 
 // ─── Coverage Preview Widget ───────────────────────────────────────────────────
 const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) => {
+  const { t } = useTranslation();
   const { data: coverage, isLoading } = useQuery({
     queryKey: ['coverage', shiftId, date],
     queryFn: async () => { const res = await api.get(`/leaves/coverage-preview?shift_id=${shiftId}&date=${date}`); return res.data?.data; },
@@ -29,18 +31,18 @@ const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) =
       <div className="flex items-center gap-2 mb-2">
         {isLow ? <AlertTriangle className="w-4 h-4 text-destructive" /> : <Users className="w-4 h-4 text-emerald-500" />}
         <span className={`text-xs font-semibold uppercase tracking-wider ${isLow ? 'text-destructive' : 'text-emerald-500'}`}>
-          Shift Coverage — {date}
+          {t('approvals.shift_coverage')} — {date}
         </span>
       </div>
       <div className="grid grid-cols-4 gap-2 text-center">
-        <div><div className="text-lg font-bold text-foreground">{coverage.total_assigned}</div><div className="text-[10px] text-muted-foreground uppercase">Total</div></div>
-        <div><div className="text-lg font-bold text-emerald-500">{coverage.total_working}</div><div className="text-[10px] text-muted-foreground uppercase">Working</div></div>
-        <div><div className="text-lg font-bold text-amber-500">{coverage.total_off}</div><div className="text-[10px] text-muted-foreground uppercase">Off</div></div>
-        <div><div className="text-lg font-bold text-destructive">{coverage.total_on_leave}</div><div className="text-[10px] text-muted-foreground uppercase">On Leave</div></div>
+        <div><div className="text-lg font-bold text-foreground">{coverage.total_assigned}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.total')}</div></div>
+        <div><div className="text-lg font-bold text-emerald-500">{coverage.total_working}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.working')}</div></div>
+        <div><div className="text-lg font-bold text-amber-500">{coverage.total_off}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.off')}</div></div>
+        <div><div className="text-lg font-bold text-destructive">{coverage.total_on_leave}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.on_leave')}</div></div>
       </div>
       {isLow && (
         <p className="text-xs text-destructive mt-2 flex items-center gap-1">
-          <AlertTriangle className="w-3 h-3" /> Warning: Low staffing! Approving may cause shortages.
+          <AlertTriangle className="w-3 h-3" /> {t('approvals.warning_low_staffing')}
         </p>
       )}
     </div>
@@ -49,6 +51,7 @@ const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) =
 
 // ─── Night Shift Previous Day Info ─────────────────────────────────────────────
 const NightShiftPrevDayInfo = ({ shiftId, date }: { shiftId: string; date: string }) => {
+  const { t } = useTranslation();
   // Check coverage for the day BEFORE the leave
   const prevDate = (() => {
     const d = parseDate(date);
@@ -70,17 +73,17 @@ const NightShiftPrevDayInfo = ({ shiftId, date }: { shiftId: string; date: strin
       <div className="flex items-center gap-2 mb-2">
         <Moon className="w-4 h-4 text-indigo-400" />
         <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
-          Night Shift — Previous Day ({prevDate})
+          {t('approvals.night_shift_prev_day')} ({prevDate})
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-center">
-        <div><div className="text-lg font-bold text-amber-500">{coverage.total_off}</div><div className="text-[10px] text-muted-foreground uppercase">Off</div></div>
-        <div><div className="text-lg font-bold text-destructive">{coverage.total_on_leave}</div><div className="text-[10px] text-muted-foreground uppercase">On Leave</div></div>
-        <div><div className="text-lg font-bold text-emerald-500">{coverage.total_working}</div><div className="text-[10px] text-muted-foreground uppercase">Working</div></div>
+        <div><div className="text-lg font-bold text-amber-500">{coverage.total_off}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.off')}</div></div>
+        <div><div className="text-lg font-bold text-destructive">{coverage.total_on_leave}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.on_leave')}</div></div>
+        <div><div className="text-lg font-bold text-emerald-500">{coverage.total_working}</div><div className="text-[10px] text-muted-foreground uppercase">{t('approvals.working')}</div></div>
       </div>
       {(coverage.total_off + coverage.total_on_leave) > 0 && (
         <p className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
-          <Info className="w-3 h-3" /> {coverage.total_off + coverage.total_on_leave} employees were off/on leave the day before.
+          <Info className="w-3 h-3" /> {coverage.total_off + coverage.total_on_leave} {t('approvals.employees_were_off')}
         </p>
       )}
     </div>
@@ -89,6 +92,7 @@ const NightShiftPrevDayInfo = ({ shiftId, date }: { shiftId: string; date: strin
 
 // ─── Quick Replacement Select ──────────────────────────────────────────────────
 const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (empId: string) => void }) => {
+  const { t } = useTranslation();
   const { data: replacements, isLoading } = useQuery({
     queryKey: ['replacements', date],
     queryFn: async () => { const res = await api.get(`/schedules/replacements?date=${date}`); return res.data?.data || []; },
@@ -99,20 +103,21 @@ const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (e
 
   return (
     <div className="space-y-2">
-      <Label className="flex items-center gap-1"><UserPlus className="w-4 h-4" /> Quick Replacement</Label>
+      <Label className="flex items-center gap-1"><UserPlus className="w-4 h-4" /> {t('approvals.quick_replacement')}</Label>
       <select className={selectClass} onChange={(e) => onSelect(e.target.value)} disabled={isLoading}>
-        <option value="">Select a replacement (optional)</option>
+        <option value="">{t('approvals.select_replacement')}</option>
         {replacements?.map((emp: any) => (
           <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} — {emp.employee_code}</option>
         ))}
       </select>
-      {replacements?.length === 0 && !isLoading && <p className="text-xs text-muted-foreground">No available replacements.</p>}
+      {replacements?.length === 0 && !isLoading && <p className="text-xs text-muted-foreground">{t('approvals.no_replacements')}</p>}
     </div>
   );
 };
 
 // ─── Leave History Tab ─────────────────────────────────────────────────────────
 const LeaveHistory = () => {
+  const { t } = useTranslation();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
   const queryClient = useQueryClient();
@@ -132,11 +137,11 @@ const LeaveHistory = () => {
       cancelled: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
     };
     const labels: Record<string, string> = {
-      pending: 'Pending',
-      approved_by_team_leader: 'TL Approved',
-      approved_by_manager: 'Fully Approved',
-      rejected: 'Rejected',
-      cancelled: 'Cancelled',
+      pending: t('approvals.pending'),
+      approved_by_team_leader: t('approvals.tl_approved'),
+      approved_by_manager: t('approvals.fully_approved'),
+      rejected: t('approvals.rejected'),
+      cancelled: t('approvals.cancelled'),
     };
     return (
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${map[status] || 'bg-muted text-muted-foreground'}`}>
@@ -158,7 +163,7 @@ const LeaveHistory = () => {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
             <History className="w-10 h-10 mb-3 opacity-20" />
-            <p>No leave history yet.</p>
+            <p>{t('approvals.no_leave_history')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -190,22 +195,22 @@ const LeaveHistory = () => {
               <CardContent className="pt-0 space-y-3">
                 {item.reason && (
                   <div className="p-3 rounded-lg bg-muted/30 border border-border">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Reason</p>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">{t('approvals.reason')}</p>
                     <p className="text-sm text-foreground">{item.reason}</p>
                   </div>
                 )}
                 {item.rejection_reason && (
                   <div className="p-3 rounded-lg bg-destructive/5 border border-destructive/20">
-                    <p className="text-xs text-destructive uppercase tracking-wider mb-1">Rejection Reason</p>
+                    <p className="text-xs text-destructive uppercase tracking-wider mb-1">{t('approvals.rejection_reason')}</p>
                     <p className="text-sm text-destructive">{item.rejection_reason}</p>
                   </div>
                 )}
                 {item.applied_date && (
-                  <p className="text-xs text-muted-foreground">Applied: {fmtDate(item.applied_date)}</p>
+                  <p className="text-xs text-muted-foreground">{t('approvals.applied')}: {fmtDate(item.applied_date)}</p>
                 )}
                 <div className="border-t border-border pt-3">
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Approval Timeline
+                    <Clock className="w-3 h-3" /> {t('approvals.approval_timeline')}
                   </p>
                   {item.approvals?.length > 0 ? (
                     <div className="space-y-2">
@@ -222,7 +227,7 @@ const LeaveHistory = () => {
                               </span>
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {ap.action === 'approved' ? 'Approved' : 'Rejected'} · {fmtDateTime(ap.created_at, 'MMM d, yyyy · h:mm a')}
+                              {ap.action === 'approved' ? t('approvals.approved') : t('approvals.rejected')} · {fmtDateTime(ap.created_at, 'MMM d, yyyy · h:mm a')}
                             </p>
                             {ap.notes && <p className="text-xs text-muted-foreground italic mt-1">"{ap.notes}"</p>}
                           </div>
@@ -230,7 +235,7 @@ const LeaveHistory = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground italic">No approval actions recorded yet.</p>
+                    <p className="text-xs text-muted-foreground italic">{t('approvals.no_approval_actions')}</p>
                   )}
                   {/* Cancel Approval Button */}
                   {(item.status === 'approved_by_manager' || item.status === 'approved_by_team_leader' || item.status === 'approved') && (
@@ -240,13 +245,13 @@ const LeaveHistory = () => {
                         size="sm"
                         className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                         onClick={() => {
-                          if (confirm("Are you sure you want to cancel this approved leave? This will revert the schedule.")) {
+                          if (confirm(t('approvals.confirm_cancel_leave'))) {
                             cancelLeave.mutate(item.leave_id);
                           }
                         }}
                         disabled={cancelLeave.isPending}
                       >
-                        <XCircle className="w-4 h-4" /> Cancel Approval
+                        <XCircle className="w-4 h-4" /> {t('approvals.cancel_approval')}
                       </Button>
                     </div>
                   )}
@@ -262,6 +267,7 @@ const LeaveHistory = () => {
 
 // ─── Swap History Tab ──────────────────────────────────────────────────────────
 const SwapHistory = () => {
+  const { t } = useTranslation();
   const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
   const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
   const queryClient = useQueryClient();
@@ -285,11 +291,11 @@ const SwapHistory = () => {
       cancelled: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
     };
     const labels: Record<string, string> = {
-      pending: 'Pending',
-      employee_accepted: 'Emp Accepted',
-      approved: 'Approved',
-      rejected: 'Rejected',
-      cancelled: 'Cancelled',
+      pending: t('approvals.pending'),
+      employee_accepted: t('approvals.emp_accepted'),
+      approved: t('approvals.approved'),
+      rejected: t('approvals.rejected'),
+      cancelled: t('approvals.cancelled'),
     };
     return (
       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider border ${map[status] || 'bg-muted text-muted-foreground'}`}>
@@ -306,7 +312,7 @@ const SwapHistory = () => {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
             <ArrowLeftRight className="w-10 h-10 mb-3 opacity-20" />
-            <p>No swap history yet.</p>
+            <p>{t('approvals.no_swap_history')}</p>
           </CardContent>
         </Card>
       ) : (
@@ -316,17 +322,17 @@ const SwapHistory = () => {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
-                    Shift Swap · {fmtDate(swap.shift_date)}
+                    {t('approvals.shift_swap')} · {fmtDate(swap.shift_date)}
                   </CardTitle>
                   <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
                     <span className="flex items-center gap-1">
-                      Requester
+                      {t('approvals.requester')}
                       {swap.requester_profile_image && <img src={swap.requester_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
                       {swap.requester_name}
                     </span>
                     ↔
                     <span className="flex items-center gap-1">
-                      Target
+                      {t('approvals.target')}
                       {swap.target_profile_image && <img src={swap.target_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
                       {swap.target_employee_name}
                     </span>
@@ -338,8 +344,8 @@ const SwapHistory = () => {
             <CardContent>
               {swap.reason && <p className="text-sm text-muted-foreground italic mb-2">"{swap.reason}"</p>}
               <div className="text-xs text-muted-foreground mt-2">
-                Created: {fmtDate(swap.created_at)}
-                {swap.approval_date && ` · Approved: ${fmtDate(swap.approval_date)}`}
+                {t('approvals.created')}: {fmtDate(swap.created_at)}
+                {swap.approval_date && ` · ${t('approvals.approved')}: ${fmtDate(swap.approval_date)}`}
               </div>
 
               {swap.status === 'approved' && (
@@ -349,13 +355,13 @@ const SwapHistory = () => {
                     size="sm"
                     className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                     onClick={() => {
-                      if (confirm("Are you sure you want to cancel this approved swap? This will swap the shifts back.")) {
+                      if (confirm(t('approvals.confirm_cancel_swap'))) {
                         cancelSwap.mutate(swap.id);
                       }
                     }}
                     disabled={cancelSwap.isPending}
                   >
-                    <XCircle className="w-4 h-4" /> Cancel Approval
+                    <XCircle className="w-4 h-4" /> {t('approvals.cancel_approval')}
                   </Button>
                 </div>
               )}
@@ -369,6 +375,7 @@ const SwapHistory = () => {
 
 // ─── Main Approval Dashboard ───────────────────────────────────────────────────
 export const ApprovalDashboard = () => {
+  const { t } = useTranslation();
   const { user, adminSelectedDepartmentId, managerSelectedDepartmentId } = useAuthStore();
   const selectedDeptId = user?.role === 'admin' ? adminSelectedDepartmentId : (user?.role === 'manager' ? managerSelectedDepartmentId : null);
   const queryClient = useQueryClient();
@@ -414,13 +421,13 @@ export const ApprovalDashboard = () => {
   const approveSwap = useMutation({
     mutationFn: async (swapId: string) => { setSwapError(null); await api.post(`/swaps/${swapId}/approve`); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); setSwapError(null); },
-    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || 'Failed to approve swap'),
+    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || t('approvals.failed_approve_swap')),
   });
 
   const rejectSwap = useMutation({
     mutationFn: async (swapId: string) => { setSwapError(null); await api.post(`/swaps/${swapId}/reject`, { reason: '' }); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); setSwapError(null); },
-    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || 'Failed to reject swap'),
+    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || t('approvals.failed_reject_swap')),
   });
 
   // Helper: check if shift code looks like a night shift
@@ -435,22 +442,22 @@ export const ApprovalDashboard = () => {
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
             <ShieldCheck className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-            Approval Center
+            {t('approvals.approval_center')}
           </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">Review and manage leave and swap requests.</p>
+          <p className="text-sm sm:text-base text-muted-foreground">{t('approvals.review_manage')}</p>
         </div>
 
         <div className="flex gap-2">
           <Button variant={activeTab === 'pending' ? 'default' : 'outline'} onClick={() => setActiveTab('pending')} className="gap-2">
-            <ShieldCheck className="w-4 h-4" /> Pending
-            {(pendingLeaves?.length || 0) + (pendingSwaps?.length || 0) > 0 && (
+            <ShieldCheck className="w-4 h-4" /> {t('approvals.pending')}
+            {(pendingLeaves?.length || 0) + (pendingSwaps?.length || 0) + (pendingItemRequests?.length || 0) > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20">
-                {(pendingLeaves?.length || 0) + (pendingSwaps?.length || 0)}
+                {(pendingLeaves?.length || 0) + (pendingSwaps?.length || 0) + (pendingItemRequests?.length || 0)}
               </span>
             )}
           </Button>
           <Button variant={activeTab === 'history' ? 'default' : 'outline'} onClick={() => setActiveTab('history')} className="gap-2">
-            <History className="w-4 h-4" /> History
+            <History className="w-4 h-4" /> {t('approvals.history')}
           </Button>
         </div>
       </div>
@@ -464,14 +471,14 @@ export const ApprovalDashboard = () => {
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <History className="w-5 h-5 text-muted-foreground" />
-              Leave History
+              {t('approvals.leave_history')}
             </h3>
             <LeaveHistory />
           </div>
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <History className="w-5 h-5 text-muted-foreground" />
-              Swap History
+              {t('approvals.swap_history')}
             </h3>
             <SwapHistory />
           </div>
@@ -484,7 +491,7 @@ export const ApprovalDashboard = () => {
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <CalendarOff className="w-5 h-5 text-destructive" />
-              Leave Requests
+              {t('approvals.leave_requests')}
               {pendingLeaves?.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-destructive/20 text-destructive border border-destructive/30">
                   {pendingLeaves.length}
@@ -528,7 +535,7 @@ export const ApprovalDashboard = () => {
                       {leave.total_tls > 1 && (
                         <div className="text-center px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 flex-shrink-0">
                           <div className="text-sm font-bold text-blue-500">{leave.tl_approvals}/{leave.total_tls}</div>
-                          <div className="text-[9px] text-blue-400 uppercase">TL Approved</div>
+                          <div className="text-[9px] text-blue-400 uppercase">{t('approvals.tl_approved_count')}</div>
                         </div>
                       )}
                     </div>
@@ -564,23 +571,23 @@ export const ApprovalDashboard = () => {
                       <div className="space-y-3 pt-2 border-t border-border">
                         <QuickReplacementSelect date={leave.start_date?.split('T')[0]} onSelect={(empId) => console.log('Replacement:', empId)} />
                         <div className="space-y-2">
-                          <Label className="text-destructive">Rejection Reason (if rejecting)</Label>
-                          <Input value={rejectReason} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRejectReason(e.target.value)} placeholder="Enter reason for rejection..." />
+                          <Label className="text-destructive">{t('approvals.rejection_reason_if_rejecting')}</Label>
+                          <Input value={rejectReason} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRejectReason(e.target.value)} placeholder={t('approvals.enter_rejection_reason')} />
                         </div>
                       </div>
                     )}
                   </CardContent>
                   <CardFooter className="flex justify-end gap-2 sm:gap-3 pt-0 flex-wrap">
                     {expandedLeave !== leave.id ? (
-                      <Button variant="outline" size="sm" onClick={() => setExpandedLeave(leave.id)}>Review Details</Button>
+                      <Button variant="outline" size="sm" onClick={() => setExpandedLeave(leave.id)}>{t('approvals.review_details')}</Button>
                     ) : (
                       <>
                         <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                           onClick={() => rejectLeave.mutate(leave.id)} disabled={!rejectReason || rejectLeave.isPending}>
-                          <XCircle className="w-4 h-4" /> Reject
+                          <XCircle className="w-4 h-4" /> {t('approvals.reject')}
                         </Button>
                         <Button size="sm" className="gap-1" onClick={() => approveLeave.mutate(leave.id)} disabled={approveLeave.isPending}>
-                          <CheckCircle2 className="w-4 h-4" /> Approve
+                          <CheckCircle2 className="w-4 h-4" /> {t('approvals.approve')}
                         </Button>
                       </>
                     )}
@@ -591,7 +598,7 @@ export const ApprovalDashboard = () => {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
                   <CalendarOff className="w-10 h-10 mb-3 opacity-20" />
-                  <p>No pending leave requests.</p>
+                  <p>{t('approvals.no_pending_leaves')}</p>
                 </CardContent>
               </Card>
             )}
@@ -601,7 +608,7 @@ export const ApprovalDashboard = () => {
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <ArrowLeftRight className="w-5 h-5 text-primary" />
-              Swap Requests
+              {t('approvals.swap_requests')}
               {pendingSwaps?.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
                   {pendingSwaps.length}
@@ -637,10 +644,10 @@ export const ApprovalDashboard = () => {
                   <CardFooter className="flex justify-end gap-2 sm:gap-3 pt-0">
                     <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                       onClick={() => rejectSwap.mutate(swap.id)} disabled={rejectSwap.isPending}>
-                      <XCircle className="w-4 h-4" /> Reject
+                      <XCircle className="w-4 h-4" /> {t('approvals.reject')}
                     </Button>
                     <Button size="sm" className="gap-1" onClick={() => approveSwap.mutate(swap.id)} disabled={approveSwap.isPending}>
-                      <CheckCircle2 className="w-4 h-4" /> Approve
+                      <CheckCircle2 className="w-4 h-4" /> {t('approvals.approve')}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -649,7 +656,7 @@ export const ApprovalDashboard = () => {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
                   <ArrowLeftRight className="w-10 h-10 mb-3 opacity-20" />
-                  <p>No pending swap requests.</p>
+                  <p>{t('approvals.no_pending_swaps')}</p>
                 </CardContent>
               </Card>
             )}
@@ -659,7 +666,7 @@ export const ApprovalDashboard = () => {
           <div className="space-y-4">
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <Package className="w-5 h-5 text-indigo-500" />
-              Item Requests
+              {t('approvals.item_requests')}
               {pendingItemRequests?.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-600 border border-indigo-500/30">
                   {pendingItemRequests.length}
@@ -673,7 +680,7 @@ export const ApprovalDashboard = () => {
               pendingItemRequests.map((req: any) => (
                 <Card key={req.id}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{req.category_name || 'Request'}</CardTitle>
+                    <CardTitle className="text-base">{req.category_name || t('approvals.request')}</CardTitle>
                     <CardDescription className="flex items-center gap-2 flex-wrap mt-1">
                       <span className="flex items-center gap-1">
                         {req.employee_name}
@@ -687,10 +694,10 @@ export const ApprovalDashboard = () => {
                   <CardFooter className="flex justify-end gap-2 sm:gap-3 pt-0">
                     <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
                       onClick={() => updateItemRequestStatus.mutate({ id: req.id, status: 'rejected' })} disabled={updateItemRequestStatus.isPending}>
-                      <XCircle className="w-4 h-4" /> Reject
+                      <XCircle className="w-4 h-4" /> {t('approvals.reject')}
                     </Button>
                     <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 gap-1" onClick={() => updateItemRequestStatus.mutate({ id: req.id, status: 'processed' })} disabled={updateItemRequestStatus.isPending}>
-                      <CheckCircle2 className="w-4 h-4" /> Processed
+                      <CheckCircle2 className="w-4 h-4" /> {t('approvals.processed')}
                     </Button>
                   </CardFooter>
                 </Card>
@@ -699,7 +706,7 @@ export const ApprovalDashboard = () => {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center p-10 text-muted-foreground">
                   <Package className="w-10 h-10 mb-3 opacity-20" />
-                  <p>No pending item requests.</p>
+                  <p>{t('approvals.no_pending_items')}</p>
                 </CardContent>
               </Card>
             )}

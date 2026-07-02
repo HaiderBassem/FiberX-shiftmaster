@@ -208,6 +208,9 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 		return
 	}
 
+	// If the new announcement is active, we don't deactivate others anymore. They can have multiple active announcements.
+	// Oh wait, if they only want ONE active announcement, then we should keep SetInactiveByDepartment here.
+	// Let's actually keep SetInactiveByDepartment and add it back to the repo because SetActive uses it!
 	err = h.announcementRepo.SetInactiveByDepartment(c.Request.Context(), *depID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -225,7 +228,7 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 
 func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 	idStr := c.Param("id")
-	_, err := uuid.Parse(idStr)
+	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
 		return
@@ -235,7 +238,7 @@ func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
 		return
 	}
-	err = h.announcementRepo.SetInactiveByDepartment(c.Request.Context(), *depID)
+	err = h.announcementRepo.SetInactive(c.Request.Context(), id, *depID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

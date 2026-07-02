@@ -54,7 +54,7 @@ const CompletionDialog = ({
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Complete Task</h3>
+            <h3 className="text-lg font-semibold text-foreground">{t('dashboard.complete_task')}</h3>
             <p className="text-sm text-muted-foreground">{task.task_title}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
@@ -64,12 +64,12 @@ const CompletionDialog = ({
 
         <div className="px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Notes & Attachments (optional)</label>
+            <label className="block text-sm font-medium text-foreground mb-2">{t('dashboard.notes_optional')}</label>
             <div className="overflow-y-auto max-h-[30vh]">
               <RichTextEditor
                 value={notes}
                 onChange={setNotes}
-                placeholder="Add any remarks, details, or paste screenshots..."
+                placeholder={t('dashboard.add_remarks')}
                 height={200}
               />
             </div>
@@ -82,7 +82,7 @@ const CompletionDialog = ({
               className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-white gap-2.5 text-sm font-semibold rounded-xl"
             >
               <CheckCircle2 className="w-5 h-5" />
-              Complete — Without Issue
+              {t('dashboard.complete_without_issue')}
             </Button>
             <Button
               onClick={() => onComplete('with_issue', notes)}
@@ -91,7 +91,7 @@ const CompletionDialog = ({
               className="w-full h-12 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 gap-2.5 text-sm font-semibold rounded-xl"
             >
               <AlertTriangle className="w-5 h-5" />
-              Complete — With Issue
+              {t('dashboard.complete_with_issue')}
             </Button>
           </div>
         </div>
@@ -190,10 +190,23 @@ const EmployeeDashboard = () => {
 
   // Chart Data
   const pieData = [
-    { name: 'Completed', value: completedTasks, color: '#10b981' }, // emerald-500
-    { name: 'In Progress', value: inProgressTasks, color: '#f59e0b' }, // amber-500
-    { name: 'Pending', value: pendingTasks, color: '#64748b' }, // slate-500
+    { name: t('dashboard.completed'), value: completedTasks, color: '#10b981' }, // emerald-500
+    { name: t('dashboard.active'), value: inProgressTasks, color: '#f59e0b' }, // amber-500
+    { name: t('common.pending'), value: pendingTasks, color: '#64748b' }, // slate-500
   ].filter(d => d.value > 0);
+
+  const DashboardStats = () => (
+    <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      {tasksEnabled && (
+        <>
+          <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label={t('dashboard.this_week')} value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
+          <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label={t('dashboard.completed')} value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
+          <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label={t('dashboard.progress')} value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+        </>
+      )}
+      <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label={t('dashboard.notifications')} value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
+    </motion.div>
+  );
 
   return (
     <motion.div 
@@ -215,7 +228,6 @@ const EmployeeDashboard = () => {
         />
       )}
 
-      {/* Header */}
       <motion.div variants={itemVariants}>
         <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
           {t('dashboard.welcome_back')}, {user?.first_name?.split(' ')[0]} 👋
@@ -227,32 +239,21 @@ const EmployeeDashboard = () => {
         <AnnouncementBanner />
       </motion.div>
 
-      {/* Stats */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {tasksEnabled && (
-          <>
-            <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label="This Week" value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
-            <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label="Completed" value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
-            <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label="Progress" value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
-          </>
-        )}
-        <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label="Notifications" value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
-      </motion.div>
+      <DashboardStats />
 
       {tasksEnabled && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Weekly Progress Chart */}
         <motion.div variants={itemVariants}>
           <Card className="h-full border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <BarChart3 className="w-5 h-5 text-primary" />
-                Weekly Progress
+                {t('dashboard.weekly_progress')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {totalTasks === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">No tasks assigned this week</div>
+                <div className="text-center py-12 text-muted-foreground">{t('dashboard.no_tasks_this_week')}</div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-[280px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -279,7 +280,7 @@ const EmployeeDashboard = () => {
                   </ResponsiveContainer>
                   <div className="absolute flex flex-col items-center justify-center pointer-events-none mt-[-36px]">
                     <span className="text-3xl font-bold text-foreground">{completionPct}%</span>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider">Done</span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">{t('dashboard.done')}</span>
                   </div>
                 </div>
               )}
@@ -287,22 +288,21 @@ const EmployeeDashboard = () => {
           </Card>
         </motion.div>
 
-        {/* Today's Tasks */}
         <motion.div variants={itemVariants}>
           <Card className="h-full border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <CalendarDays className="w-5 h-5 text-primary" />
-                Today's Tasks
+                {t('dashboard.todays_tasks')}
               </CardTitle>
-              <CardDescription>Your assigned tasks for today</CardDescription>
+              <CardDescription>{t('dashboard.your_assigned_tasks_today')}</CardDescription>
             </CardHeader>
             <CardContent>
               {todayTasks.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <CheckCircle2 className="w-16 h-16 mx-auto mb-4 opacity-20" />
-                  <p className="font-semibold text-lg">No tasks for today!</p>
-                  <p className="text-sm">Enjoy your day or check your weekly schedule.</p>
+                  <p className="font-semibold text-lg">{t('dashboard.no_tasks_today')}</p>
+                  <p className="text-sm">{t('dashboard.enjoy_your_day')}</p>
                 </div>
               ) : (
                 <div className="space-y-3 overflow-y-auto max-h-[280px] pr-2 no-scrollbar">
@@ -335,19 +335,19 @@ const EmployeeDashboard = () => {
                           task.status === 'in_progress' ? 'text-amber-500 bg-amber-500/10' :
                           'text-muted-foreground bg-muted'
                         }`}>
-                          {task.status === 'completed' ? 'Done' : task.status === 'in_progress' ? 'Active' : 'Pending'}
+                          {task.status === 'completed' ? t('dashboard.done') : task.status === 'in_progress' ? t('dashboard.active') : t('common.pending')}
                         </span>
                         
                         {task.execution_id && task.status === 'pending' && (
                           <Button size="sm" onClick={() => startTask.mutate(task.execution_id!)} disabled={startTask.isPending}
                             className="bg-amber-500 hover:bg-amber-400 text-white gap-1.5 text-xs h-7 px-2">
-                            <Play className="w-3 h-3" /> Start
+                            <Play className="w-3 h-3" /> {t('dashboard.start')}
                           </Button>
                         )}
                         {task.execution_id && task.status === 'in_progress' && (
                           <Button size="sm" onClick={() => setCompletingTask(task)}
                             className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-7 px-2">
-                            <CheckCircle2 className="w-3 h-3" /> Complete
+                            <CheckCircle2 className="w-3 h-3" /> {t('dashboard.complete')}
                           </Button>
                         )}
                       </div>
@@ -361,15 +361,14 @@ const EmployeeDashboard = () => {
       </div>
       )}
 
-      {/* Activity History */}
       <motion.div variants={itemVariants}>
         <Card className="border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <Play className="w-5 h-5 text-primary" />
-              Activity History
+              {t('dashboard.activity_history')}
             </CardTitle>
-            <CardDescription>Recent account/workflow activity</CardDescription>
+            <CardDescription>{t('dashboard.recent_activity')}</CardDescription>
           </CardHeader>
           <CardContent>
             {activity?.length ? (
@@ -392,7 +391,7 @@ const EmployeeDashboard = () => {
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm text-center py-6">No activity yet.</p>
+              <p className="text-muted-foreground text-sm text-center py-6">{t('dashboard.no_activity_yet')}</p>
             )}
           </CardContent>
         </Card>
@@ -469,7 +468,6 @@ const LeaderDashboard = () => {
 
   const totalEmployees = (employees || []).filter((e: any) => e.role === 'employee').length;
 
-  // Group employees by shift for Recharts Pie
   const shiftPieData = (shifts || []).map((s: any) => {
     const count = (employees || []).filter((e: any) => e.default_shift_id === s.id && e.role === 'employee').length;
     return { name: s.name, value: count, color: s.color_code || '#0CCCCC' };
@@ -479,7 +477,6 @@ const LeaderDashboard = () => {
   const totalBoardDone = boardStats?.reduce((sum: number, b: any) => sum + b.total_completed, 0) || 0;
   const overallPct = totalBoardTasks > 0 ? Math.round((totalBoardDone / totalBoardTasks) * 100) : 0;
 
-  // Board Stats for Bar Chart
   const boardBarData = (boardStats || []).map((b: any) => ({
     name: b.board_name,
     Completed: b.total_completed,
@@ -495,8 +492,7 @@ const LeaderDashboard = () => {
       initial="hidden"
       animate="show"
     >
-      {/* Header */}
-        <motion.div variants={itemVariants}>
+      <motion.div variants={itemVariants}>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
             <Shield className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
             {t('dashboard.analytics')}
@@ -510,28 +506,26 @@ const LeaderDashboard = () => {
         <AnnouncementBanner />
       </motion.div>
 
-      {/* Stats */}
       <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard icon={<Users className="w-6 h-6 text-primary" />} label="Active Employees" value={totalEmployees} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
-        <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label="Total Tasks" value={totalBoardTasks} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
-        <StatCard icon={<TrendingUp className="w-6 h-6 text-emerald-500" />} label="Overall Progress" value={`${overallPct}%`} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
-        <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label="Pending Alerts" value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
+        <StatCard icon={<Users className="w-6 h-6 text-primary" />} label={t('dashboard.active_employees')} value={totalEmployees} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+        <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label={t('dashboard.total_tasks')} value={totalBoardTasks} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+        <StatCard icon={<TrendingUp className="w-6 h-6 text-emerald-500" />} label={t('dashboard.overall_progress')} value={`${overallPct}%`} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
+        <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label={t('dashboard.pending_alerts')} value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
       </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Employees by Shift (Donut Chart) */}
         <motion.div variants={itemVariants} className="xl:col-span-1">
           <Card className="h-full border-border/50 shadow-lg bg-background/50 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Briefcase className="w-5 h-5 text-primary" />
-                Team Distribution
+                {t('dashboard.team_distribution')}
               </CardTitle>
-              <CardDescription>Employees by Shift</CardDescription>
+              <CardDescription>{t('dashboard.employees_by_shift')}</CardDescription>
             </CardHeader>
             <CardContent>
               {shiftPieData.length === 0 ? (
-                <p className="text-muted-foreground text-center py-12">No shifts configured</p>
+                <p className="text-muted-foreground text-center py-12">{t('dashboard.no_shifts_configured')}</p>
               ) : (
                 <div className="flex flex-col items-center justify-center h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -552,14 +546,14 @@ const LeaderDashboard = () => {
                       <Tooltip 
                         contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
                         itemStyle={{ color: '#fff' }}
-                        formatter={(value, name) => [`${value} employees`, name]}
+                        formatter={(value, name) => [`${value} ${t('dashboard.employees')}`, name]}
                       />
                       <Legend verticalAlign="bottom" height={36} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute flex flex-col items-center justify-center pointer-events-none mt-[-36px]">
                     <span className="text-4xl font-bold text-foreground">{totalEmployees}</span>
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Total</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">{t('dashboard.total')}</span>
                   </div>
                 </div>
               )}
@@ -573,13 +567,13 @@ const LeaderDashboard = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <BarChart3 className="w-5 h-5 text-primary" />
-                Task Board Performance
+                {t('dashboard.task_board_performance')}
               </CardTitle>
-              <CardDescription>Completion vs Pending across all boards</CardDescription>
+              <CardDescription>{t('dashboard.completion_vs_pending')}</CardDescription>
             </CardHeader>
             <CardContent>
               {!boardStats || boardStats.length === 0 ? (
-                <p className="text-muted-foreground text-center py-12">No boards with tasks yet</p>
+                <p className="text-muted-foreground text-center py-12">{t('dashboard.no_boards_yet')}</p>
               ) : (
                 <div className="h-[300px] w-full pt-4">
                   <ResponsiveContainer width="100%" height="100%">
@@ -614,9 +608,9 @@ const LeaderDashboard = () => {
             <div>
               <CardTitle className="flex items-center gap-2 text-xl">
                 <Users className="w-5 h-5 text-primary" />
-                Active Staff Today
+                {t('dashboard.active_staff_today')}
               </CardTitle>
-              <CardDescription>Employees scheduled for today</CardDescription>
+              <CardDescription>{t('dashboard.employees_scheduled_today')}</CardDescription>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <select
@@ -624,7 +618,7 @@ const LeaderDashboard = () => {
                 value={selectedShiftFilter}
                 onChange={(e) => setSelectedShiftFilter(e.target.value)}
               >
-                <option value="all">All Shifts</option>
+                <option value="all">{t('dashboard.all_shifts')}</option>
                 {shifts?.map((s: any) => (
                   <option key={s.id} value={s.id.toString()}>{s.name}</option>
                 ))}
@@ -680,7 +674,7 @@ const LeaderDashboard = () => {
                 return selectedShiftFilter === 'all' || effectiveShiftId?.toString() === selectedShiftFilter;
               });
 
-              if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">No staff found for this shift.</p>;
+              if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">{t('dashboard.no_staff_found_for_shift')}</p>;
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {staff.map((emp: any) => {
@@ -706,8 +700,8 @@ const LeaderDashboard = () => {
                           <p className="text-sm font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</p>
                           <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
-                            {shift?.name || 'No Shift'}
-                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">Swapped In</span>}
+                            {shift?.name || t('dashboard.no_shift')}
+                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">{t('dashboard.swapped_in')}</span>}
                           </p>
                         </div>
                       </div>
@@ -716,7 +710,7 @@ const LeaderDashboard = () => {
                 </div>
               );
             })() : (
-              <p className="text-muted-foreground text-sm py-6 text-center">Loading staff...</p>
+              <p className="text-muted-foreground text-sm py-6 text-center">{t('dashboard.loading_staff')}</p>
             )}
           </CardContent>
         </Card>

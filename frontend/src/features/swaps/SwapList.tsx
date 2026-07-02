@@ -11,8 +11,10 @@ import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SwapRequestModal } from './SwapRequestModal';
+import { useTranslation } from 'react-i18next';
 
 export const SwapList = () => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   
@@ -72,7 +74,7 @@ export const SwapList = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['swaps'] });
-      setSuccess("Successfully responded to swap request");
+      setSuccess(t('swaps.respond_success'));
       setTimeout(() => setSuccess(null), 3000);
     },
     onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to respond'),
@@ -88,15 +90,15 @@ export const SwapList = () => {
 
   const getStatusBadge = (status: string) => {
     if (status === 'approved' || status === 'completed') {
-      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">{status}</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">{t('common.approved')}</span>;
     }
     if (status === 'rejected') {
-      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-destructive/15 text-destructive border border-destructive/30">{status}</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-destructive/15 text-destructive border border-destructive/30">{t('common.rejected')}</span>;
     }
     if (status === 'employee_accepted') {
-      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-blue-500/15 text-blue-600 border border-blue-500/30">Awaiting TL</span>;
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-blue-500/15 text-blue-600 border border-blue-500/30">{t('swaps.awaiting_tl')}</span>;
     }
-    return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-amber-500/15 text-amber-600 border border-amber-500/30">{status}</span>;
+    return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-amber-500/15 text-amber-600 border border-amber-500/30">{t('common.pending')}</span>;
   };
 
   const getStatusIcon = (status: string) => {
@@ -122,12 +124,12 @@ export const SwapList = () => {
   return (
     <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">Shift Swaps</h3>
+        <h3 className="text-2xl font-bold text-foreground tracking-tight">{t('swaps.shift_swaps')}</h3>
         <Button 
           onClick={() => setIsModalOpen(true)} 
           className="gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
         >
-          <Plus className="w-5 h-5" /> Request Swap
+          <Plus className="w-5 h-5" /> {t('swaps.request_swap')}
         </Button>
       </div>
 
@@ -143,7 +145,7 @@ export const SwapList = () => {
               <div className="flex items-center gap-3 mb-4">
                 <Inbox className="w-6 h-6 text-amber-500" />
                 <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  Incoming Requests
+                  {t('swaps.incoming_requests')}
                   <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-amber-500 text-white shadow-sm">
                     {incomingCount}
                   </span>
@@ -180,7 +182,7 @@ export const SwapList = () => {
                       </div>
                       <div>
                         <p className="text-foreground font-semibold text-lg tracking-tight">
-                          {swap.requester_name || `Employee #${swap.requester_id?.slice(0, 8)}`}
+                          {swap.requester_name || `${t('swaps.employee_num')}${swap.requester_id?.slice(0, 8)}`}
                         </p>
                         <p className="text-sm text-muted-foreground flex items-center gap-2">
                           <Clock className="w-4 h-4 opacity-70" />
@@ -197,7 +199,7 @@ export const SwapList = () => {
                         onClick={() => respondSwap.mutate({ swapId: swap.id, accept: false })}
                         disabled={respondSwap.isPending}
                       >
-                        Decline
+                        {t('swaps.decline')}
                       </Button>
                       <Button
                         size="sm"
@@ -205,7 +207,7 @@ export const SwapList = () => {
                         onClick={() => respondSwap.mutate({ swapId: swap.id, accept: true })}
                         disabled={respondSwap.isPending}
                       >
-                        Accept
+                        {t('swaps.accept')}
                       </Button>
                     </div>
                   </motion.div>
@@ -218,7 +220,7 @@ export const SwapList = () => {
       </AnimatePresence>
 
       <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-foreground tracking-tight">Your Swap History</h3>
+        <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('swaps.your_swap_history')}</h3>
         
         {mySwapsLoading ? (
           <div className="space-y-4">
@@ -247,11 +249,11 @@ export const SwapList = () => {
                       <div>
                         <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
                           <ArrowLeftRight className="w-4 h-4 text-primary" />
-                          Swap with
+                          {t('swaps.swap_with')}
                           {swap.target_profile_image && (
                             <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
                           )}
-                          {swap.target_employee_name || 'Colleague'}
+                          {swap.target_employee_name || t('swaps.colleague')}
                         </div>
                         <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                           <Clock className="w-4 h-4 opacity-70" />
@@ -267,13 +269,13 @@ export const SwapList = () => {
                             size="sm" 
                             className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
                             onClick={() => {
-                              if (confirm("Are you sure you want to cancel this swap request?")) {
+                              if (confirm(t('swaps.cancel_confirm'))) {
                                 cancelSwapMutation.mutate(swap.id);
                               }
                             }}
                             disabled={cancelSwapMutation.isPending}
                           >
-                            <XCircle className="w-3 h-3 mr-1" /> Cancel Request
+                            <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
                           </Button>
                         )}
                         {getStatusBadge(swap.status)}
@@ -288,8 +290,8 @@ export const SwapList = () => {
                 <Card className="border-dashed border-2 bg-transparent rounded-3xl">
                   <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                     <ArrowLeftRight className="w-16 h-16 mb-6 opacity-20" />
-                    <p className="text-lg font-medium text-foreground/70">No swap requests found</p>
-                    <p className="text-sm opacity-60">You haven't requested any shift swaps yet.</p>
+                    <p className="text-lg font-medium text-foreground/70">{t('swaps.no_requests_found')}</p>
+                    <p className="text-sm opacity-60">{t('swaps.no_requests_yet')}</p>
                   </CardContent>
                 </Card>
               </motion.div>

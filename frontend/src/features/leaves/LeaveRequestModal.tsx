@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { useTranslation } from 'react-i18next';
 
 interface LeaveRequestModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
   endTime, setEndTime, reason, setReason, onSubmit, isPending, canSubmit,
   isHourly, error, remainingText
 }) => {
+  const { t } = useTranslation();
   const selectClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
   const inputClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
 
@@ -58,7 +60,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
           >
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">New Leave Request</h2>
+                <h2 className="text-xl font-bold">{t('leaves.new_leave_request')}</h2>
                 <button onClick={onClose} className="p-2 rounded-full hover:bg-muted transition-colors">
                   <X className="w-5 h-5 text-muted-foreground" />
                 </button>
@@ -72,7 +74,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground ml-1">Leave Type</Label>
+                  <Label className="text-muted-foreground ml-1">{t('leaves.leave_type')}</Label>
                   <select 
                     className={selectClass} 
                     value={leaveTypeId || (leaveTypes?.[0]?.id || '')} 
@@ -92,7 +94,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-muted-foreground ml-1">{isHourly ? 'Date' : 'Start Date'}</Label>
+                    <Label className="text-muted-foreground ml-1">{isHourly ? t('leaves.date') : t('leaves.start_date')}</Label>
                     <input 
                       type="date" 
                       className={inputClass}
@@ -105,7 +107,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                   </div>
                   {!isHourly && (
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground ml-1">End Date</Label>
+                      <Label className="text-muted-foreground ml-1">{t('leaves.end_date')}</Label>
                       <input 
                         type="date" 
                         className={inputClass}
@@ -119,7 +121,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                 {isHourly && (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground ml-1">From Time</Label>
+                      <Label className="text-muted-foreground ml-1">{t('leaves.from_time')}</Label>
                       <input 
                         type="time" 
                         className={inputClass}
@@ -128,7 +130,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-muted-foreground ml-1">To Time</Label>
+                      <Label className="text-muted-foreground ml-1">{t('leaves.to_time')}</Label>
                       <input 
                         type="time" 
                         className={inputClass}
@@ -140,10 +142,10 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground ml-1">Reason</Label>
+                  <Label className="text-muted-foreground ml-1">{t('leaves.reason')}</Label>
                   <textarea 
                     className="w-full h-28 px-4 py-3 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all"
-                    placeholder="Provide a clear reason for your request..."
+                    placeholder={t('leaves.reason_placeholder')}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                   />
@@ -155,7 +157,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                 onClick={onSubmit} 
                 disabled={isPending || !canSubmit}
               >
-                <Send className="w-5 h-5" /> Submit Request
+                <Send className="w-5 h-5" /> {t('leaves.submit_request')}
               </Button>
             </div>
           </motion.div>

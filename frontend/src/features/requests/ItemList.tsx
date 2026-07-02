@@ -65,7 +65,7 @@ export const ItemList = () => {
               size="sm" 
               className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
               onClick={() => {
-                if (confirm("Are you sure you want to cancel this item request?")) {
+                if (confirm(t('items.cancel_confirm'))) {
                   cancelItemMutation.mutate(req.id);
                 }
               }}
@@ -103,7 +103,7 @@ export const ItemList = () => {
           {isSupervisor && (
             <Button variant="outline" onClick={() => setIsCategoryManagerOpen(true)}>
               <Settings className="w-4 h-4 mr-2" />
-              Manage Categories
+              {t('items.manage_categories')}
             </Button>
           )}
           <Button onClick={() => setIsRequestModalOpen(true)}>
@@ -126,7 +126,7 @@ export const ItemList = () => {
                 pendingRequests.map(renderRequestCard)
               ) : (
                 <div className="text-center py-6 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                  <p className="text-muted-foreground text-sm">No pending requests.</p>
+                  <p className="text-muted-foreground text-sm">{t('items.no_pending_requests')}</p>
                 </div>
               )}
             </div>
@@ -137,7 +137,7 @@ export const ItemList = () => {
                 historyRequests.map(renderRequestCard)
               ) : (
                 <div className="text-center py-6 border-2 border-dashed border-border rounded-xl bg-muted/20">
-                  <p className="text-muted-foreground text-sm">No history available.</p>
+                  <p className="text-muted-foreground text-sm">{t('items.no_history_available')}</p>
                 </div>
               )}
             </div>

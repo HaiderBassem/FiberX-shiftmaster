@@ -11,6 +11,7 @@ import {
 import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-fns';
 import { useAuthStore } from '@/store/authStore';
 import { RichTextEditor } from '@/components/RichTextEditor';
+import { useTranslation } from 'react-i18next';
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -50,13 +51,14 @@ const CompletionDialog = ({
 }) => {
   const [notes, setNotes] = useState('');
 
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Complete Task</h3>
+            <h3 className="text-lg font-semibold text-foreground">{t('tasks.complete_task')}</h3>
             <p className="text-sm text-muted-foreground">{task.task_title}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
@@ -67,12 +69,12 @@ const CompletionDialog = ({
         {/* Notes */}
         <div className="px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">Notes & Attachments (optional)</label>
+            <label className="block text-sm font-medium text-foreground mb-2">{t('tasks.notes_optional')}</label>
             <div className="overflow-y-auto max-h-[30vh]">
               <RichTextEditor
                 value={notes}
                 onChange={setNotes}
-                placeholder="Add any remarks, details, or paste screenshots..."
+                placeholder={t('tasks.notes_placeholder')}
                 height={200}
               />
             </div>
@@ -86,7 +88,7 @@ const CompletionDialog = ({
               className="w-full h-12 bg-emerald-500 hover:bg-emerald-400 text-white gap-2.5 text-sm font-semibold rounded-xl"
             >
               <CheckCircle2 className="w-5 h-5" />
-              Complete — Without Issue
+              {t('tasks.complete_without_issue')}
             </Button>
             <Button
               onClick={() => onComplete('with_issue', notes)}
@@ -95,7 +97,7 @@ const CompletionDialog = ({
               className="w-full h-12 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 gap-2.5 text-sm font-semibold rounded-xl"
             >
               <AlertTriangle className="w-5 h-5" />
-              Complete — With Issue
+              {t('tasks.complete_with_issue')}
             </Button>
           </div>
         </div>
@@ -109,6 +111,7 @@ const CompletionDialog = ({
 // ───────────────────────────────────────────────────────────
 
 export const MyTasksWeekly = () => {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
 
@@ -182,9 +185,9 @@ export const MyTasksWeekly = () => {
   const completionPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const statusConfig = {
-    pending: { icon: <Clock className="w-4 h-4" />, color: 'text-muted-foreground', bg: 'bg-muted/30 border-border', label: 'Pending' },
-    in_progress: { icon: <Play className="w-4 h-4" />, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: 'In Progress' },
-    completed: { icon: <CheckCircle2 className="w-4 h-4" />, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: 'Completed' },
+    pending: { icon: <Clock className="w-4 h-4" />, color: 'text-muted-foreground', bg: 'bg-muted/30 border-border', label: t('common.pending') },
+    in_progress: { icon: <Play className="w-4 h-4" />, color: 'text-amber-500', bg: 'bg-amber-500/10 border-amber-500/20', label: t('tasks.in_progress') },
+    completed: { icon: <CheckCircle2 className="w-4 h-4" />, color: 'text-emerald-500', bg: 'bg-emerald-500/10 border-emerald-500/20', label: t('tasks.completed') },
   };
 
   const formatDuration = (startedAt: string, completedAt?: string | null) => {
@@ -219,18 +222,18 @@ export const MyTasksWeekly = () => {
         <div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1 flex items-center gap-2 sm:gap-3">
             <CheckSquare className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-            My Tasks
+            {t('tasks.my_tasks')}
           </h2>
-          <p className="text-muted-foreground">Your weekly task assignments and progress</p>
+          <p className="text-muted-foreground">{t('tasks.weekly_progress')}</p>
         </div>
       </div>
 
       {/* ── Stats Bar ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Tasks" value={totalTasks} color="text-foreground" icon={<CheckSquare className="w-5 h-5 text-primary" />} />
-        <StatCard label="Completed" value={completedTasks} color="text-emerald-500" icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />} />
-        <StatCard label="In Progress" value={inProgressTasks} color="text-amber-500" icon={<Play className="w-5 h-5 text-amber-500" />} />
-        <StatCard label="Completion" value={`${completionPct}%`} color="text-primary" icon={<Timer className="w-5 h-5 text-primary" />} />
+        <StatCard label={t('tasks.total_tasks')} value={totalTasks} color="text-foreground" icon={<CheckSquare className="w-5 h-5 text-primary" />} />
+        <StatCard label={t('tasks.completed')} value={completedTasks} color="text-emerald-500" icon={<CheckCircle2 className="w-5 h-5 text-emerald-500" />} />
+        <StatCard label={t('tasks.in_progress')} value={inProgressTasks} color="text-amber-500" icon={<Play className="w-5 h-5 text-amber-500" />} />
+        <StatCard label={t('tasks.completion')} value={`${completionPct}%`} color="text-primary" icon={<Timer className="w-5 h-5 text-primary" />} />
       </div>
 
       {/* ── View Tabs ── */}
@@ -241,7 +244,7 @@ export const MyTasksWeekly = () => {
             view === 'weekly' ? 'bg-card text-primary shadow-sm border border-border' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <Calendar className="w-4 h-4" /> Weekly View
+          <Calendar className="w-4 h-4" /> {t('tasks.weekly_view')}
         </button>
         <button
           onClick={() => setView('boards')}
@@ -249,21 +252,21 @@ export const MyTasksWeekly = () => {
             view === 'boards' ? 'bg-card text-primary shadow-sm border border-border' : 'text-muted-foreground hover:text-foreground'
           }`}
         >
-          <LayoutGrid className="w-4 h-4" /> Board View
+          <LayoutGrid className="w-4 h-4" /> {t('tasks.board_view')}
         </button>
       </div>
 
       {/* ── Week Navigation ── */}
       <div className="flex items-center justify-between bg-muted/30 rounded-xl p-3 border border-border">
         <Button variant="outline" size="sm" onClick={() => setWeekStart((prev) => subDays(prev, 7))} className="gap-2">
-          <ChevronLeft className="w-4 h-4" /> Previous
+          <ChevronLeft className="w-4 h-4" /> {t('tasks.previous')}
         </Button>
         <span className="text-sm text-foreground font-semibold flex items-center gap-2">
           <Calendar className="w-4 h-4 text-muted-foreground" />
           {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
         </span>
         <Button variant="outline" size="sm" onClick={() => setWeekStart((prev) => addDays(prev, 7))} className="gap-2">
-          Next <ChevronRight className="w-4 h-4" />
+          {t('tasks.next')} <ChevronRight className="w-4 h-4" />
         </Button>
       </div>
 
@@ -275,8 +278,8 @@ export const MyTasksWeekly = () => {
       ) : totalTasks === 0 ? (
         <div className="py-16 text-center border border-border border-dashed rounded-xl bg-muted/10">
           <CheckSquare className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
-          <h3 className="text-xl font-semibold text-muted-foreground mb-2">No tasks this week</h3>
-          <p className="text-muted-foreground">You're clear! Check back later or navigate to a different week.</p>
+          <h3 className="text-xl font-semibold text-muted-foreground mb-2">{t('tasks.no_tasks_week')}</h3>
+          <p className="text-muted-foreground">{t('tasks.youre_clear')}</p>
         </div>
       ) : view === 'boards' ? (
         <BoardView tasks={tasks || []} statusConfig={statusConfig} formatDuration={formatDuration}
@@ -322,7 +325,7 @@ export const MyTasksWeekly = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold ${today ? 'text-primary' : 'text-foreground'}`}>{format(date, 'EEEE')}</span>
-                        {today && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 uppercase tracking-wider">Today</span>}
+                        {today && <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 uppercase tracking-wider">{t('tasks.today')}</span>}
                       </div>
                       <span className="text-xs text-muted-foreground">{format(date, 'MMMM d, yyyy')}</span>
                     </div>
@@ -346,7 +349,7 @@ export const MyTasksWeekly = () => {
                     ) : dayLeave && isHourlyLeave ? (
                       <span className="text-xs font-semibold px-2 py-1 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">⏳ {dayLeave.leave_type_name_ar || dayLeave.leave_type_name_en || 'زمنية'}</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground/60">No tasks</span>
+                      <span className="text-xs text-muted-foreground/60">{t('tasks.no_tasks')}</span>
                     )}
                     <ArrowRight className={`w-4 h-4 text-muted-foreground/60 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
                   </div>
@@ -372,17 +375,17 @@ export const MyTasksWeekly = () => {
                       {isOff ? (
                         <div className="animate-in fade-in zoom-in duration-300">
                           <div className="text-4xl mb-3">🌴</div>
-                          <p className="text-base font-bold text-emerald-600">{dayLeave?.leave_type_name_ar || dayLeave?.leave_type_name_en || 'Off / Happy Holiday!'}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Enjoy your time off.</p>
+                          <p className="text-base font-bold text-emerald-600">{dayLeave?.leave_type_name_ar || dayLeave?.leave_type_name_en || t('tasks.off_holiday')}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('tasks.enjoy_time_off')}</p>
                         </div>
                       ) : dayLeave && isHourlyLeave ? (
                         <div className="animate-in fade-in zoom-in duration-300">
                           <div className="text-4xl mb-3">⏳</div>
                           <p className="text-base font-bold text-amber-600">{dayLeave.leave_type_name_ar || dayLeave.leave_type_name_en || 'زمنية'}</p>
-                          <p className="text-sm text-muted-foreground mt-1">Short leave approved for this day.</p>
+                          <p className="text-sm text-muted-foreground mt-1">{t('tasks.short_leave_approved')}</p>
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground/60">No tasks assigned for this day</p>
+                        <p className="text-sm text-muted-foreground/60">{t('tasks.no_tasks_assigned_day')}</p>
                       )}
                     </div>
                   </CardContent>
@@ -426,6 +429,7 @@ const TaskRow = ({
   onComplete: (t: MyTask) => void;
   startPending: boolean;
 }) => {
+  const { t } = useTranslation();
   const cfg = statusConfig[task.status];
   return (
     <div className={`flex items-center gap-4 px-4 py-3 rounded-xl border transition-all duration-200 ${cfg.bg}`}>
@@ -449,9 +453,9 @@ const TaskRow = ({
               <Timer className="w-3 h-3" />{formatDuration(task.started_at, task.completed_at)}
             </span>
           )}
-          {task.completed_at && <span className="text-emerald-500/70">Done at {format(new Date(task.completed_at), 'hh:mm a')}</span>}
-          {task.completion_type === 'without_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ No Issues</span>}
-          {task.completion_type === 'with_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">⚠ Has Issues</span>}
+          {task.completed_at && <span className="text-emerald-500/70">{t('tasks.done_at')} {format(new Date(task.completed_at), 'hh:mm a')}</span>}
+          {task.completion_type === 'without_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">✓ {t('tasks.no_issues')}</span>}
+          {task.completion_type === 'with_issue' && <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 border border-amber-500/20">⚠ {t('tasks.has_issues')}</span>}
         </div>
         {task.notes && task.status === 'completed' && (
           <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground italic jodit-content max-w-full overflow-hidden" dangerouslySetInnerHTML={{ __html: task.notes }} />
@@ -460,17 +464,17 @@ const TaskRow = ({
       {task.execution_id && task.status === 'pending' && (
         <Button size="sm" onClick={() => onStart(task.execution_id!)} disabled={startPending}
           className="bg-amber-500 hover:bg-amber-400 text-white gap-1.5 text-xs h-8">
-          <Play className="w-3.5 h-3.5" /> Start
+          <Play className="w-3.5 h-3.5" /> {t('tasks.start')}
         </Button>
       )}
       {task.execution_id && task.status === 'in_progress' && (
         <Button size="sm" onClick={() => onComplete(task)}
           className="bg-emerald-500 hover:bg-emerald-400 text-white gap-1.5 text-xs h-8">
-          <CheckCircle2 className="w-3.5 h-3.5" /> Complete
+          <CheckCircle2 className="w-3.5 h-3.5" /> {t('tasks.complete')}
         </Button>
       )}
       {task.status === 'completed' && (
-        <span className="text-emerald-500 text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-500/5">✓ Done</span>
+        <span className="text-emerald-500 text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-500/5">✓ {t('tasks.done')}</span>
       )}
     </div>
   );
@@ -490,6 +494,7 @@ const BoardView = ({
   onComplete: (t: MyTask) => void;
   startPending: boolean;
 }) => {
+  const { t } = useTranslation();
   // Group by board_name (null => 'Unassigned')
   const grouped: Record<string, MyTask[]> = {};
   tasks.forEach((t) => {
@@ -502,8 +507,8 @@ const BoardView = ({
     return (
       <div className="py-16 text-center border border-border border-dashed rounded-xl bg-muted/10">
         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
-        <h3 className="text-xl font-semibold text-muted-foreground mb-2">No board tasks this week</h3>
-        <p className="text-muted-foreground">Your team leader hasn't assigned any board tasks yet.</p>
+        <h3 className="text-xl font-semibold text-muted-foreground mb-2">{t('tasks.no_board_tasks_week')}</h3>
+        <p className="text-muted-foreground">{t('tasks.no_board_tasks_leader')}</p>
       </div>
     );
   }

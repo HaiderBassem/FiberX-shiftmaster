@@ -11,8 +11,11 @@ import { LeaveTypeManager } from './LeaveTypeManager';
 import { LeaveRequestModal } from './LeaveRequestModal';
 import { motion } from 'framer-motion';
 
+import { useTranslation } from 'react-i18next';
+
 export const LeaveList = () => {
   const { user } = useAuthStore();
+  const { t } = useTranslation();
   const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState<'requests' | 'types'>('requests');
   
@@ -107,24 +110,24 @@ export const LeaveList = () => {
 
     if (balance) {
       const remainingAmount = balance.allocated_amount - balance.used_amount - pendingAmount;
-      remainingText = `${remainingAmount} ${selectedType.unit} remaining`;
+      remainingText = `${remainingAmount} ${selectedType.unit} ${t('leaves.remaining')}`;
       if (selectedType.reset_cycle === 'monthly') {
-        remainingText += ` this month`;
+        remainingText += ` ${t('leaves.this_month')}`;
       } else {
-        remainingText += ` this year`;
+        remainingText += ` ${t('leaves.this_year')}`;
       }
       if (remainingAmount <= 0) {
         hasEnoughBalance = false;
-        remainingText += " (Insufficient Balance)";
+        remainingText += ` (${t('leaves.insufficient_balance')})`;
       }
     } else {
       // If no balance record exists for this month/year, they effectively have 0
       hasEnoughBalance = false;
-      remainingText = `0 ${selectedType.unit} remaining`;
+      remainingText = `0 ${selectedType.unit} ${t('leaves.remaining')}`;
       if (selectedType.reset_cycle === 'monthly') {
-        remainingText += ` this month (Insufficient Balance)`;
+        remainingText += ` ${t('leaves.this_month')} (${t('leaves.insufficient_balance')})`;
       } else {
-        remainingText += ` this year (Insufficient Balance)`;
+        remainingText += ` ${t('leaves.this_year')} (${t('leaves.insufficient_balance')})`;
       }
     }
   }
@@ -143,12 +146,12 @@ export const LeaveList = () => {
 
   const getStatusLabel = (status: string) => {
     switch(status) {
-      case 'approved_by_manager': return 'Approved';
-      case 'approved_by_team_leader': return 'TL Approved';
-      case 'rejected': return 'Rejected';
-      case 'cancelled': return 'Cancelled';
-      case 'pending': return 'Pending';
-      default: return status || 'Pending';
+      case 'approved_by_manager': return t('common.approved');
+      case 'approved_by_team_leader': return t('common.tl_approved');
+      case 'rejected': return t('common.rejected');
+      case 'cancelled': return t('common.cancelled');
+      case 'pending': return t('common.pending');
+      default: return status || t('common.pending');
     }
   };
 
@@ -173,13 +176,13 @@ export const LeaveList = () => {
             className={`font-medium text-sm transition-colors ${activeTab === 'requests' ? 'text-primary border-b-2 border-primary pb-2 -mb-[10px]' : 'text-muted-foreground hover:text-foreground pb-2 -mb-[10px]'}`} 
             onClick={() => setActiveTab('requests')}
           >
-            Leave Requests
+            {t('leaves.leave_requests')}
           </button>
           <button 
             className={`font-medium text-sm transition-colors ${activeTab === 'types' ? 'text-primary border-b-2 border-primary pb-2 -mb-[10px]' : 'text-muted-foreground hover:text-foreground pb-2 -mb-[10px]'}`} 
             onClick={() => setActiveTab('types')}
           >
-            Leave Types
+            {t('leaves.leave_types')}
           </button>
         </div>
       )}
@@ -189,12 +192,12 @@ export const LeaveList = () => {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-foreground tracking-tight">Your Requests</h3>
+            <h3 className="text-2xl font-bold text-foreground tracking-tight">{t('leaves.your_requests')}</h3>
             <Button 
               onClick={() => setIsModalOpen(true)} 
               className="gap-2 shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
             >
-              <Plus className="w-5 h-5" /> Request Leave
+              <Plus className="w-5 h-5" /> {t('leaves.request_leave')}
             </Button>
           </div>
 
@@ -224,7 +227,7 @@ export const LeaveList = () => {
                           {getStatusIcon(leave.status)}
                         </div>
                         <div>
-                          <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || 'Leave'}</div>
+                          <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || t('leaves.leave')}</div>
                           <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
                             <Clock className="w-4 h-4 opacity-70" />
                             {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
@@ -236,7 +239,7 @@ export const LeaveList = () => {
                               </>
                             ) : (
                               <>
-                                {fmtDate(leave.start_date)} <span className="opacity-50">to</span> {fmtDate(leave.end_date)}
+                                {fmtDate(leave.start_date)} <span className="opacity-50">{t('common.to')}</span> {fmtDate(leave.end_date)}
                               </>
                             )}
                           </div>
@@ -250,13 +253,13 @@ export const LeaveList = () => {
                             size="sm" 
                             className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
                             onClick={() => {
-                              if (confirm("Are you sure you want to cancel this leave request?")) {
+                              if (confirm(t('leaves.cancel_confirm'))) {
                                 cancelLeaveMutation.mutate(leave.id);
                               }
                             }}
                             disabled={cancelLeaveMutation.isPending}
                           >
-                            <XCircle className="w-3 h-3 mr-1" /> Cancel Request
+                            <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
                           </Button>
                         )}
                         <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
@@ -279,8 +282,8 @@ export const LeaveList = () => {
                   <Card className="border-dashed border-2 bg-transparent rounded-3xl">
                     <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                       <CalendarOff className="w-16 h-16 mb-6 opacity-20" />
-                      <p className="text-lg font-medium text-foreground/70">No leave requests found</p>
-                      <p className="text-sm opacity-60">You haven't requested any leaves yet.</p>
+                      <p className="text-lg font-medium text-foreground/70">{t('leaves.no_requests_found')}</p>
+                      <p className="text-sm opacity-60">{t('leaves.no_requests_yet')}</p>
                     </CardContent>
                   </Card>
                 </motion.div>

@@ -7,7 +7,9 @@ import { Building2, Crown, Plus, Edit3, Trash2, Save, X, Database } from 'lucide
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 interface Department {
   id: string;
@@ -31,6 +33,7 @@ type Employee = {
 };
 
 export const DepartmentList = () => {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const queryClient = useQueryClient();
@@ -98,7 +101,7 @@ export const DepartmentList = () => {
       setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId(''); setDeptMaxLeaves(''); setDeptMaxHourlyLeaves('');
     },
     onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to create department');
+      setError(err?.response?.data?.error || err?.message || t('departments.failed_create'));
     },
   });
 
@@ -120,7 +123,7 @@ export const DepartmentList = () => {
       setEditId(null);
     },
     onError: (err: any) =>
-      setError(err?.response?.data?.error || err?.message || 'Failed to update department'),
+      setError(err?.response?.data?.error || err?.message || t('departments.failed_update')),
   });
 
   const deleteDepartment = useMutation({
@@ -130,7 +133,7 @@ export const DepartmentList = () => {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['departments'] }),
     onError: (err: any) =>
-      setError(err?.response?.data?.error || err?.message || 'Failed to delete department'),
+      setError(err?.response?.data?.error || err?.message || t('departments.failed_delete')),
   });
 
   const filteredDepartments = useMemo(() => {
@@ -148,7 +151,7 @@ export const DepartmentList = () => {
   /** Returns the first manager's display name, or "Unassigned" */
   const primaryManagerLabel = (dept: Department) => {
     const firstId = dept.manager_ids?.[0];
-    if (!firstId || !managerMap[firstId]) return 'Unassigned';
+    if (!firstId || !managerMap[firstId]) return t('departments.unassigned');
     const m = managerMap[firstId];
     const extra = (dept.manager_ids?.length ?? 0) > 1 ? ` +${dept.manager_ids.length - 1}` : '';
     return `${m.first_name} ${m.last_name}${extra}`;
@@ -160,20 +163,20 @@ export const DepartmentList = () => {
       <div>
         <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
           <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-          Departments
+          {t('departments.title')}
         </h2>
-        <p className="text-muted-foreground">View and manage all company departments.</p>
+        <p className="text-muted-foreground">{t('departments.description')}</p>
       </div>
 
       <Card>
         <CardContent className="pt-6">
           <div className="grid md:grid-cols-3 gap-4">
             <div className="space-y-2 md:col-span-2">
-              <Label>Search</Label>
+              <Label>{t('departments.search_label')}</Label>
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name or department code..."
+                placeholder={t('departments.search_placeholder')}
               />
             </div>
           </div>
@@ -185,9 +188,9 @@ export const DepartmentList = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-primary" />
-              Create Department
+              {t('departments.create')}
             </CardTitle>
-            <CardDescription>Create a department and assign its manager</CardDescription>
+            <CardDescription>{t('departments.create_desc')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
@@ -197,21 +200,21 @@ export const DepartmentList = () => {
             )}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label>Department Code</Label>
+                <Label>{t('departments.code')}</Label>
                 <Input value={deptCode} onChange={(e) => setDeptCode(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Department Name</Label>
+                <Label>{t('departments.name')}</Label>
                 <Input value={deptName} onChange={(e) => setDeptName(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Manager</Label>
+                <Label>{t('departments.manager')}</Label>
                 <select
                   className={selectClass}
                   value={deptManagerId}
                   onChange={(e) => setDeptManagerId(e.target.value)}
                 >
-                  <option value="">Unassigned</option>
+                  <option value="">{t('departments.unassigned')}</option>
                   {managers?.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.first_name} {m.last_name} — {m.employee_code}
@@ -220,16 +223,16 @@ export const DepartmentList = () => {
                 </select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label>Description</Label>
+                <Label>{t('departments.desc')}</Label>
                 <Input value={deptDesc} onChange={(e) => setDeptDesc(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Max Leaves / Day</Label>
-                <Input type="number" min="1" value={deptMaxLeaves} onChange={(e) => setDeptMaxLeaves(e.target.value)} placeholder="No limit" />
+                <Label>{t('departments.max_leaves')}</Label>
+                <Input type="number" min="1" value={deptMaxLeaves} onChange={(e) => setDeptMaxLeaves(e.target.value)} placeholder={t('departments.no_limit')} />
               </div>
               <div className="space-y-2">
-                <Label>Max Hourly Leaves / Shift</Label>
-                <Input type="number" min="1" value={deptMaxHourlyLeaves} onChange={(e) => setDeptMaxHourlyLeaves(e.target.value)} placeholder="No limit" />
+                <Label>{t('departments.max_hourly_leaves')}</Label>
+                <Input type="number" min="1" value={deptMaxHourlyLeaves} onChange={(e) => setDeptMaxHourlyLeaves(e.target.value)} placeholder={t('departments.no_limit')} />
               </div>
             </div>
           </CardContent>
@@ -239,7 +242,7 @@ export const DepartmentList = () => {
               disabled={createDepartment.isPending || !deptCode || !deptName}
               className="gap-2"
             >
-              <Plus className="w-4 h-4" /> Create
+              <Plus className="w-4 h-4" /> {t('departments.btn_create')}
             </Button>
           </CardFooter>
         </Card>
@@ -256,7 +259,7 @@ export const DepartmentList = () => {
         </div>
       ) : isError ? (
         <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
-          Failed to load departments. Please try again.
+          {t('departments.failed_load')}
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -279,7 +282,7 @@ export const DepartmentList = () => {
                   {editId === dept.id ? (
                     <div className="space-y-3 pt-1" onClick={(e) => e.preventDefault()}>
                       <div className="space-y-2">
-                        <Label className="text-xs">Name</Label>
+                        <Label className="text-xs">{t('departments.name')}</Label>
                         <Input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
@@ -287,13 +290,13 @@ export const DepartmentList = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs">Manager</Label>
+                        <Label className="text-xs">{t('departments.manager')}</Label>
                         <select
                           className={selectClass}
                           value={editManagerId}
                           onChange={(e) => setEditManagerId(e.target.value)}
                         >
-                          <option value="">Unassigned</option>
+                          <option value="">{t('departments.unassigned')}</option>
                           {managers?.map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.first_name} {m.last_name}
@@ -303,7 +306,7 @@ export const DepartmentList = () => {
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label className="text-xs">Description</Label>
+                          <Label className="text-xs">{t('departments.desc')}</Label>
                           <Input
                             value={editDesc}
                             onChange={(e) => setEditDesc(e.target.value)}
@@ -311,25 +314,25 @@ export const DepartmentList = () => {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs">Max Leaves / Day</Label>
+                          <Label className="text-xs">{t('departments.max_leaves')}</Label>
                           <Input
                             type="number"
                             min="1"
                             value={editMaxLeaves}
                             onChange={(e) => setEditMaxLeaves(e.target.value)}
                             className="h-9"
-                            placeholder="No limit"
+                            placeholder={t('departments.no_limit')}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs">Max Hourly Leaves / Shift</Label>
+                          <Label className="text-xs">{t('departments.max_hourly_leaves')}</Label>
                           <Input
                             type="number"
                             min="1"
                             value={editMaxHourlyLeaves}
                             onChange={(e) => setEditMaxHourlyLeaves(e.target.value)}
                             className="h-9"
-                            placeholder="No limit"
+                            placeholder={t('departments.no_limit')}
                           />
                         </div>
                       </div>
@@ -339,14 +342,14 @@ export const DepartmentList = () => {
                           variant="outline"
                           onClick={(e) => { e.preventDefault(); setEditId(null); }}
                         >
-                          <X className="w-4 h-4 mr-1" /> Cancel
+                          <X className="w-4 h-4 mr-1" /> {t('departments.btn_cancel')}
                         </Button>
                         <Button
                           size="sm"
                           onClick={(e) => { e.preventDefault(); updateDepartment.mutate(); }}
                           disabled={updateDepartment.isPending || !editName}
                         >
-                          <Save className="w-4 h-4 mr-1" /> Save
+                          <Save className="w-4 h-4 mr-1" /> {t('departments.btn_save')}
                         </Button>
                       </div>
                     </div>
@@ -357,7 +360,7 @@ export const DepartmentList = () => {
                       )}
                       <div className="text-sm text-muted-foreground flex items-center gap-2">
                         <Crown className="w-4 h-4 text-amber-500/80" />
-                        <span>Manager:</span>
+                        <span>{t('departments.manager')}:</span>
                         <span className="text-foreground font-medium">
                           {primaryManagerLabel(dept)}
                         </span>
@@ -369,7 +372,7 @@ export const DepartmentList = () => {
                         >
                           <div className="flex items-center gap-2">
                             <Database className="w-4 h-4 text-indigo-500" />
-                            <span className="text-xs font-medium text-foreground">FiberX Data</span>
+                            <span className="text-xs font-medium text-foreground">{t('departments.fiberx_data')}</span>
                           </div>
                           <label className="relative inline-flex items-center cursor-pointer">
                             <input
@@ -381,7 +384,7 @@ export const DepartmentList = () => {
                                 api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: newVal }).then(() => {
                                   queryClient.invalidateQueries({ queryKey: ['departments'] });
                                 }).catch((err: any) => {
-                                  alert(err?.response?.data?.error || 'Failed to toggle FiberX Data');
+                                  alert(err?.response?.data?.error || t('departments.failed_toggle_fiberx'));
                                   queryClient.invalidateQueries({ queryKey: ['departments'] });
                                 });
                               }}
@@ -413,18 +416,18 @@ export const DepartmentList = () => {
                         setEditManagerId(dept.manager_ids?.[0] || '');
                       }}
                     >
-                      <Edit3 className="w-4 h-4 mr-1" /> Edit
+                      <Edit3 className="w-4 h-4 mr-1" /> {t('departments.btn_edit')}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="text-destructive border-destructive/30 hover:bg-destructive/10"
                       onClick={() => {
-                        if (confirm(`Delete department "${dept.name}"?`))
+                        if (confirm(t('departments.confirm_delete', { name: dept.name })))
                           deleteDepartment.mutate(dept.id);
                       }}
                     >
-                      <Trash2 className="w-4 h-4 mr-1" /> Delete
+                      <Trash2 className="w-4 h-4 mr-1" /> {t('departments.btn_delete')}
                     </Button>
                   </CardFooter>
                 )}
@@ -433,7 +436,7 @@ export const DepartmentList = () => {
           ))}
           {filteredDepartments?.length === 0 && (
             <div className="col-span-full p-8 text-center text-muted-foreground border border-border border-dashed rounded-xl bg-muted/10">
-              No departments match current filters.
+              {t('departments.no_match')}
             </div>
           )}
         </div>

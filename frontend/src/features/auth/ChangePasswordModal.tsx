@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Key } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
 
 interface ChangePasswordModalProps {
@@ -16,6 +17,7 @@ interface ChangePasswordModalProps {
 }
 
 export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPassword }: ChangePasswordModalProps) => {
+  const { t } = useTranslation();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,10 +27,10 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
     mutationFn: async () => {
       setError(null);
       if (newPassword !== confirmPassword) {
-        throw new Error("New passwords do not match.");
+        throw new Error(t('auth.passwords_do_not_match'));
       }
       if (newPassword.length < 8) {
-        throw new Error("Password must be at least 8 characters long.");
+        throw new Error(t('auth.password_min_length'));
       }
 
       await api.put(`/employees/${employeeId}/password`, {
@@ -61,12 +63,12 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Key className="w-5 h-5 text-primary" />
-            {requireOldPassword ? 'Change Password' : 'Reset Employee Password'}
+            {requireOldPassword ? t('auth.change_password') : t('auth.reset_employee_password')}
           </CardTitle>
           <CardDescription>
             {requireOldPassword 
-              ? 'Enter your current password to set a new one.'
-              : 'Set a new password for this employee.'}
+              ? t('auth.enter_current_to_set_new')
+              : t('auth.set_new_for_employee')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -78,48 +80,48 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
 
           {requireOldPassword && (
             <div className="space-y-2">
-              <Label htmlFor="old_password">Current Password</Label>
+              <Label htmlFor="old_password">{t('auth.current_password')}</Label>
               <Input
                 id="old_password"
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="Enter current password"
+                placeholder={t('auth.enter_current_password')}
               />
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="new_password">New Password</Label>
+            <Label htmlFor="new_password">{t('auth.new_password')}</Label>
             <Input
               id="new_password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Minimum 8 characters"
+              placeholder={t('auth.minimum_8_chars')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirm_password">Confirm New Password</Label>
+            <Label htmlFor="confirm_password">{t('auth.confirm_new_password')}</Label>
             <Input
               id="confirm_password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter new password"
+              placeholder={t('auth.re_enter_new_password')}
             />
           </div>
         </CardContent>
         <CardFooter className="flex justify-end gap-2">
           <Button variant="outline" onClick={handleClose} disabled={mutation.isPending}>
-            Cancel
+            {t('auth.cancel')}
           </Button>
           <Button 
             onClick={() => mutation.mutate()} 
             disabled={mutation.isPending || !newPassword || !confirmPassword || (requireOldPassword && !oldPassword)}
           >
-            {mutation.isPending ? 'Saving...' : 'Save Password'}
+            {mutation.isPending ? t('auth.saving') : t('auth.save_password')}
           </Button>
         </CardFooter>
       </Card>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useTheme } from '@/components/ThemeProvider';
+import { useTranslation } from 'react-i18next';
 import { Clock, LogIn, Loader2, Sun, Moon } from 'lucide-react';
 
 export const Login = () => {
@@ -17,6 +18,7 @@ export const Login = () => {
   const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +35,7 @@ export const Login = () => {
       setAuth(access_token, employee, refresh_token);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
+      setError(err.response?.data?.error || t('auth.login_failed'));
     } finally {
       setIsLoading(false);
     }
@@ -68,14 +70,14 @@ export const Login = () => {
             Shiftmaster
           </h1>
           <p className="text-muted-foreground text-sm">
-            Intelligent Shift & Task Management
+            {t('auth.intelligent_management')}
           </p>
         </div>
 
         <Card className="border-border/50 shadow-xl">
           <CardHeader className="text-center pb-2">
-            <CardTitle className="text-xl text-foreground">Welcome back</CardTitle>
-            <CardDescription>Sign in to access your dashboard</CardDescription>
+            <CardTitle className="text-xl text-foreground">{t('auth.welcome_back')}</CardTitle>
+            <CardDescription>{t('auth.sign_in_desc')}</CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
@@ -87,7 +89,7 @@ export const Login = () => {
               )}
 
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>{t('auth.email')}</Label>
                 <Input
                   type="email"
                   value={email}
@@ -100,7 +102,7 @@ export const Login = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Password</Label>
+                <Label>{t('auth.password')}</Label>
                 <Input
                   type="password"
                   value={password}
@@ -121,12 +123,12 @@ export const Login = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Signing in...
+                    {t('auth.signing_in')}
                   </>
                 ) : (
                   <>
                     <LogIn className="w-4 h-4" />
-                    Sign In
+                    {t('auth.sign_in')}
                   </>
                 )}
               </Button>
@@ -135,7 +137,7 @@ export const Login = () => {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          © {new Date().getFullYear()} Shiftmaster · All rights reserved
+          © {new Date().getFullYear()} Shiftmaster • {t('auth.all_rights_reserved')}
         </p>
       </div>
     </div>

@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Building2, Users, Crown, ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 type Department = {
   id: string;
@@ -37,6 +38,7 @@ type Shift = { id: string; name: string; shift_code: string };
 export const DepartmentDetail = () => {
   const { id } = useParams();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const { data: dept, isLoading: deptLoading } = useQuery<Department>({
     queryKey: ['department', id],
@@ -92,8 +94,8 @@ export const DepartmentDetail = () => {
   if (!dept) {
     return (
       <div className="space-y-4">
-        <p className="text-muted-foreground">Department not found.</p>
-        <Link to="/departments"><Button variant="outline">Back</Button></Link>
+        <p className="text-muted-foreground">{t('departments.not_found')}</p>
+        <Link to="/departments"><Button variant="outline">{t('departments.btn_back')}</Button></Link>
       </div>
     );
   }
@@ -107,7 +109,7 @@ export const DepartmentDetail = () => {
         <div className="flex items-center gap-2 sm:gap-3">
           <Link to="/departments">
             <Button variant="outline" className="gap-2">
-              <ArrowLeft className="w-4 h-4" /> Back
+              <ArrowLeft className="w-4 h-4" /> {t('departments.btn_back')}
             </Button>
           </Link>
           <div>
@@ -128,17 +130,17 @@ export const DepartmentDetail = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="w-5 h-5 text-amber-500" />
-            Department Manager{managerIds.length !== 1 ? 's' : ''}
+            {managerIds.length !== 1 ? t('departments.managers_plural') : t('departments.managers')}
           </CardTitle>
           <CardDescription>
             {managerIds.length > 1
-              ? `${managerIds.length} managers assigned to this department`
-              : 'Assigned manager for this department'}
+              ? t('departments.managers_assigned_plural', { count: managerIds.length })
+              : t('departments.managers_assigned_single')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {!managers || managers.length === 0 ? (
-            <p className="text-muted-foreground">No manager assigned yet.</p>
+            <p className="text-muted-foreground">{t('departments.no_manager')}</p>
           ) : (
             <div className="space-y-3">
               {managers.map((manager) => (
@@ -168,20 +170,20 @@ export const DepartmentDetail = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5 text-indigo-500" />
-            Module Access
+            {t('departments.module_access')}
           </CardTitle>
-          <CardDescription>Control which tabs and features are available for this department</CardDescription>
+          <CardDescription>{t('departments.module_access_desc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {[
-              { id: 'tasks', label: 'My Tasks', desc: 'Allow employees to see and complete their tasks' },
-              { id: 'handovers', label: 'Handovers', desc: 'Enable shift handover boards and logs' },
-              { id: 'calendar', label: 'Calendar', desc: 'Show the interactive shift and leave calendar' },
-              { id: 'task_center', label: 'Task Center', desc: 'Allow leaders to manage task boards' },
-              { id: 'references', label: 'References', desc: 'Allow access to informational data tables' },
-              { id: 'info_bank', label: 'Info Bank', desc: 'Provide access to help documents and guides' },
-              { id: 'fiberx_data', label: 'FiberX Data', desc: 'Access to FiberX specific documentation' },
+              { id: 'tasks', label: t('departments.module_tasks'), desc: t('departments.module_tasks_desc') },
+              { id: 'handovers', label: t('departments.module_handovers'), desc: t('departments.module_handovers_desc') },
+              { id: 'calendar', label: t('departments.module_calendar'), desc: t('departments.module_calendar_desc') },
+              { id: 'task_center', label: t('departments.module_task_center'), desc: t('departments.module_task_center_desc') },
+              { id: 'references', label: t('departments.module_references'), desc: t('departments.module_references_desc') },
+              { id: 'info_bank', label: t('departments.module_info_bank'), desc: t('departments.module_info_bank_desc') },
+              { id: 'fiberx_data', label: t('departments.module_fiberx_data'), desc: t('departments.module_fiberx_data_desc') },
             ].map((module) => {
               const isActive = (dept.active_modules || []).includes(module.id);
               return (
@@ -227,9 +229,9 @@ export const DepartmentDetail = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
-            Employees ({employeesOnly.length})
+            {t('departments.employees')} ({employeesOnly.length})
           </CardTitle>
-          <CardDescription>Employees in {dept.name}</CardDescription>
+          <CardDescription>{t('departments.employees_in', { name: dept.name })}</CardDescription>
         </CardHeader>
         <CardContent>
           {empLoading ? (
@@ -253,7 +255,7 @@ export const DepartmentDetail = () => {
                       </div>
                       {shift && (
                         <div className="text-xs text-muted-foreground mt-1">
-                          Shift: {shift.name} ({shift.shift_code})
+                          {t('departments.shift')}: {shift.name} ({shift.shift_code})
                         </div>
                       )}
                     </div>
@@ -262,7 +264,7 @@ export const DepartmentDetail = () => {
               })}
             </div>
           ) : (
-            <p className="text-muted-foreground">No employees in this department yet.</p>
+            <p className="text-muted-foreground">{t('departments.no_employees')}</p>
           )}
         </CardContent>
       </Card>

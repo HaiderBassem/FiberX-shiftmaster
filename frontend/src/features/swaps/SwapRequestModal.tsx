@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { useTranslation } from 'react-i18next';
 
 interface SwapRequestModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
 }) => {
   const selectClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
   const inputClass = "w-full h-11 px-4 py-2 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
+  const { t } = useTranslation();
 
   return (
     <AnimatePresence>
@@ -47,7 +49,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
           >
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold">Request Shift Swap</h2>
+                <h2 className="text-xl font-bold">{t('swaps.request_shift_swap')}</h2>
                 <button onClick={onClose} className="p-2 rounded-full hover:bg-muted transition-colors">
                   <X className="w-5 h-5 text-muted-foreground" />
                 </button>
@@ -61,13 +63,13 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground ml-1">Swap With Colleague</Label>
+                  <Label className="text-muted-foreground ml-1">{t('swaps.swap_with_colleague')}</Label>
                   <select 
                     className={selectClass} 
                     value={targetEmployeeId} 
                     onChange={(e) => setTargetEmployeeId(e.target.value)}
                   >
-                    <option value="">Select colleague...</option>
+                    <option value="">{t('swaps.select_colleague')}</option>
                     {employees?.map((emp: any) => (
                       <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
                     ))}
@@ -75,7 +77,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground ml-1">Your Shift Date</Label>
+                  <Label className="text-muted-foreground ml-1">{t('swaps.your_shift_date')}</Label>
                   <input 
                     type="date" 
                     className={inputClass}
@@ -85,10 +87,10 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground ml-1">Reason</Label>
+                  <Label className="text-muted-foreground ml-1">{t('common.reason')}</Label>
                   <textarea 
                     className="w-full h-28 px-4 py-3 rounded-xl bg-muted/50 border-transparent focus:bg-background focus:border-primary text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none transition-all"
-                    placeholder="Provide a clear reason for your swap request..."
+                    placeholder={t('swaps.reason_placeholder')}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                   />
@@ -100,7 +102,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                 onClick={onSubmit} 
                 disabled={isPending || !canSubmit}
               >
-                <Send className="w-5 h-5" /> Send Swap Request
+                <Send className="w-5 h-5" /> {t('swaps.send_swap_request')}
               </Button>
             </div>
           </motion.div>
