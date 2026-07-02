@@ -98,6 +98,9 @@ export const SwapList = () => {
     if (status === 'employee_accepted') {
       return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-blue-500/15 text-blue-600 border border-blue-500/30">{t('swaps.awaiting_tl')}</span>;
     }
+    if (status === 'cancelled') {
+      return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-gray-500/15 text-gray-500 border border-gray-500/30">{t('common.cancelled')}</span>;
+    }
     return <span className="inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm bg-amber-500/15 text-amber-600 border border-amber-500/30">{t('common.pending')}</span>;
   };
 
@@ -105,11 +108,14 @@ export const SwapList = () => {
     if (status === 'approved' || status === 'completed') return <CheckCircle2 className="w-6 h-6 text-emerald-500" />;
     if (status === 'rejected') return <XCircle className="w-6 h-6 text-destructive" />;
     if (status === 'employee_accepted') return <Clock className="w-6 h-6 text-blue-500" />;
+    if (status === 'cancelled') return <XCircle className="w-6 h-6 text-gray-500" />;
     return <Clock className="w-6 h-6 text-amber-500" />;
   };
 
   const incomingCount = pendingForMe?.length || 0;
   const canSubmit = targetEmployeeId && shiftDate && reason;
+  const pendingMySwaps = mySwaps?.filter((s: any) => s.status === 'pending' || s.status === 'employee_accepted') || [];
+  const historyMySwaps = mySwaps?.filter((s: any) => s.status !== 'pending' && s.status !== 'employee_accepted') || [];
 
   const containerVariants: any = {
     hidden: { opacity: 0 },
@@ -219,84 +225,144 @@ export const SwapList = () => {
         )}
       </AnimatePresence>
 
-      <div className="space-y-4">
-        <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('swaps.your_swap_history')}</h3>
-        
+      <div className="space-y-8">
         {mySwapsLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-28 rounded-2xl bg-muted/50 border-transparent" />)}
           </div>
         ) : (
-          <motion.div 
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="space-y-4"
-          >
-            {mySwaps?.map((swap: any) => (
-              <motion.div key={swap.id} variants={itemVariants}>
-                <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
-                  <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex gap-4 items-center">
-                      <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                        swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
-                        swap.status === 'rejected' ? 'bg-destructive/10' :
-                        swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
-                        'bg-amber-500/10'
-                      }`}>
-                        {getStatusIcon(swap.status)}
-                      </div>
-                      <div>
-                        <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
-                          <ArrowLeftRight className="w-4 h-4 text-primary" />
-                          {t('swaps.swap_with')}
-                          {swap.target_profile_image && (
-                            <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
-                          )}
-                          {swap.target_employee_name || t('swaps.colleague')}
+          <>
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('common.pending')}</h3>
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="space-y-4"
+              >
+                {pendingMySwaps?.map((swap: any) => (
+                  <motion.div key={swap.id} variants={itemVariants}>
+                    <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                      <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex gap-4 items-center">
+                          <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                            swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
+                            swap.status === 'rejected' ? 'bg-destructive/10' :
+                            swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
+                            swap.status === 'cancelled' ? 'bg-gray-500/10' :
+                            'bg-amber-500/10'
+                          }`}>
+                            {getStatusIcon(swap.status)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
+                              <ArrowLeftRight className="w-4 h-4 text-primary" />
+                              {t('swaps.swap_with')}
+                              {swap.target_profile_image && (
+                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                              )}
+                              {swap.target_employee_name || t('swaps.colleague')}
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                              <Clock className="w-4 h-4 opacity-70" />
+                              {fmtDate(swap.shift_date)}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                          <Clock className="w-4 h-4 opacity-70" />
-                          {fmtDate(swap.shift_date)}
+                        
+                        <div className="flex items-center self-end sm:self-auto gap-3">
+                            {(swap.status === 'pending' || swap.status === 'employee_accepted') && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
+                                onClick={() => {
+                                  if (confirm(t('swaps.cancel_confirm'))) {
+                                    cancelSwapMutation.mutate(swap.id);
+                                  }
+                                }}
+                                disabled={cancelSwapMutation.isPending}
+                              >
+                                <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
+                              </Button>
+                            )}
+                            {getStatusBadge(swap.status)}
+                          </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+                
+                {pendingMySwaps.length === 0 && (
+                  <motion.div variants={itemVariants}>
+                    <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                      <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                        <p className="text-sm opacity-60">{t('swaps.no_requests_found')}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
+              </motion.div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('common.history')}</h3>
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="space-y-4"
+              >
+                {historyMySwaps?.map((swap: any) => (
+                  <motion.div key={swap.id} variants={itemVariants}>
+                    <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                      <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex gap-4 items-center">
+                          <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                            swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
+                            swap.status === 'rejected' ? 'bg-destructive/10' :
+                            swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
+                            swap.status === 'cancelled' ? 'bg-gray-500/10' :
+                            'bg-amber-500/10'
+                          }`}>
+                            {getStatusIcon(swap.status)}
+                          </div>
+                          <div>
+                            <div className="font-semibold text-lg text-foreground capitalize tracking-tight flex items-center gap-2">
+                              <ArrowLeftRight className="w-4 h-4 text-primary" />
+                              {t('swaps.swap_with')}
+                              {swap.target_profile_image && (
+                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                              )}
+                              {swap.target_employee_name || t('swaps.colleague')}
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                              <Clock className="w-4 h-4 opacity-70" />
+                              {fmtDate(swap.shift_date)}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center self-end sm:self-auto gap-3">
-                        {swap.status === 'pending' && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
-                            onClick={() => {
-                              if (confirm(t('swaps.cancel_confirm'))) {
-                                cancelSwapMutation.mutate(swap.id);
-                              }
-                            }}
-                            disabled={cancelSwapMutation.isPending}
-                          >
-                            <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
-                          </Button>
-                        )}
-                        {getStatusBadge(swap.status)}
-                      </div>
-                  </CardContent>
-                </Card>
+                        
+                        <div className="flex items-center self-end sm:self-auto gap-3">
+                            {getStatusBadge(swap.status)}
+                          </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+                
+                {historyMySwaps.length === 0 && (
+                  <motion.div variants={itemVariants}>
+                    <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                      <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                        <p className="text-sm opacity-60">{t('swaps.no_requests_found')}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                )}
               </motion.div>
-            ))}
-            
-            {(!mySwaps || mySwaps.length === 0) && (
-              <motion.div variants={itemVariants}>
-                <Card className="border-dashed border-2 bg-transparent rounded-3xl">
-                  <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                    <ArrowLeftRight className="w-16 h-16 mb-6 opacity-20" />
-                    <p className="text-lg font-medium text-foreground/70">{t('swaps.no_requests_found')}</p>
-                    <p className="text-sm opacity-60">{t('swaps.no_requests_yet')}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </motion.div>
+            </div>
+          </>
         )}
       </div>
 

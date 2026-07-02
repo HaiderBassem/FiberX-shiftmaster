@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarOff, Clock, CheckCircle2, XCircle, Plus } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
 import { useAuthStore } from '@/store/authStore';
@@ -206,91 +206,163 @@ export const LeaveList = () => {
               {[1, 2, 3].map((i) => <Card key={i} className="animate-pulse h-28 rounded-2xl bg-muted/50 border-transparent" />)}
             </div>
           ) : (
-            <motion.div 
-              variants={containerVariants}
-              initial="hidden"
-              animate="show"
-              className="space-y-4"
-            >
-              {leaves?.map((leave: any) => (
-                <motion.div key={leave.id} variants={itemVariants}>
-                  <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
-                    <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex gap-4 items-center">
-                        <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                          leave.status === 'approved_by_manager' ? 'bg-emerald-500/10' :
-                          leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10' :
-                          leave.status === 'rejected' ? 'bg-destructive/10' :
-                          leave.status === 'cancelled' ? 'bg-gray-500/10' :
-                          'bg-amber-500/10'
-                        }`}>
-                          {getStatusIcon(leave.status)}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || t('leaves.leave')}</div>
-                          <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                            <Clock className="w-4 h-4 opacity-70" />
-                            {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
-                              <>
-                                {fmtDate(leave.start_date)}
-                                {leave.start_time && leave.end_time && (
-                                  <span className="font-medium">({leave.start_time} - {leave.end_time})</span>
+            <div className="space-y-8">
+              {/* Pending Section */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('common.pending')}</h3>
+                <motion.div 
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="space-y-4"
+                >
+                  {leaves?.filter((l: any) => l.status === 'pending' || l.status === 'approved_by_team_leader').map((leave: any) => (
+                    <motion.div key={leave.id} variants={itemVariants}>
+                      <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex gap-4 items-center">
+                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                              leave.status === 'approved_by_manager' ? 'bg-emerald-500/10' :
+                              leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10' :
+                              leave.status === 'rejected' ? 'bg-destructive/10' :
+                              leave.status === 'cancelled' ? 'bg-gray-500/10' :
+                              'bg-amber-500/10'
+                            }`}>
+                              {getStatusIcon(leave.status)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || t('leaves.leave')}</div>
+                              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                                <Clock className="w-4 h-4 opacity-70" />
+                                {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
+                                  <>
+                                    {fmtDate(leave.start_date)}
+                                    {leave.start_time && leave.end_time && (
+                                      <span className="font-medium">({leave.start_time} - {leave.end_time})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {fmtDate(leave.start_date)} <span className="opacity-50">{t('common.to')}</span> {fmtDate(leave.end_date)}
+                                  </>
                                 )}
-                              </>
-                            ) : (
-                              <>
-                                {fmtDate(leave.start_date)} <span className="opacity-50">{t('common.to')}</span> {fmtDate(leave.end_date)}
-                              </>
-                            )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center self-end sm:self-auto gap-3">
-                        {(leave.status === 'pending' || leave.status === 'approved_by_team_leader') && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
-                            onClick={() => {
-                              if (confirm(t('leaves.cancel_confirm'))) {
-                                cancelLeaveMutation.mutate(leave.id);
-                              }
-                            }}
-                            disabled={cancelLeaveMutation.isPending}
-                          >
-                            <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
-                          </Button>
-                        )}
-                        <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
-                          leave.status === 'approved_by_manager' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30' :
-                          leave.status === 'approved_by_team_leader' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' :
-                          leave.status === 'rejected' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
-                          leave.status === 'cancelled' ? 'bg-gray-500/15 text-gray-500 border border-gray-500/30' :
-                          'bg-amber-500/15 text-amber-600 border border-amber-500/30'
-                        }`}>
-                          {getStatusLabel(leave.status)}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                          
+                          <div className="flex items-center self-end sm:self-auto gap-3">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8 text-xs px-2"
+                              onClick={() => {
+                                if (confirm(t('leaves.cancel_confirm'))) {
+                                  cancelLeaveMutation.mutate(leave.id);
+                                }
+                              }}
+                              disabled={cancelLeaveMutation.isPending}
+                            >
+                              <XCircle className="w-3 h-3 mr-1" /> {t('common.cancel_request')}
+                            </Button>
+                            <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
+                              leave.status === 'approved_by_manager' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30' :
+                              leave.status === 'approved_by_team_leader' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' :
+                              leave.status === 'rejected' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
+                              leave.status === 'cancelled' ? 'bg-gray-500/15 text-gray-500 border border-gray-500/30' :
+                              'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                            }`}>
+                              {getStatusLabel(leave.status)}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  
+                  {(!leaves || leaves.filter((l: any) => l.status === 'pending' || l.status === 'approved_by_team_leader').length === 0) && (
+                    <motion.div variants={itemVariants}>
+                      <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                        <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                          <p className="text-sm opacity-60">{t('leaves.no_requests_found')}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
                 </motion.div>
-              ))}
-              
-              {(!leaves || leaves.length === 0) && (
-                <motion.div variants={itemVariants}>
-                  <Card className="border-dashed border-2 bg-transparent rounded-3xl">
-                    <CardContent className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-                      <CalendarOff className="w-16 h-16 mb-6 opacity-20" />
-                      <p className="text-lg font-medium text-foreground/70">{t('leaves.no_requests_found')}</p>
-                      <p className="text-sm opacity-60">{t('leaves.no_requests_yet')}</p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </motion.div>
-          )}
+              </div>
 
+              {/* History Section */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-semibold text-foreground tracking-tight">{t('common.history')}</h3>
+                <motion.div 
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="space-y-4"
+                >
+                  {leaves?.filter((l: any) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').map((leave: any) => (
+                    <motion.div key={leave.id} variants={itemVariants}>
+                      <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
+                        <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div className="flex gap-4 items-center">
+                            <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
+                              leave.status === 'approved_by_manager' ? 'bg-emerald-500/10' :
+                              leave.status === 'approved_by_team_leader' ? 'bg-blue-500/10' :
+                              leave.status === 'rejected' ? 'bg-destructive/10' :
+                              leave.status === 'cancelled' ? 'bg-gray-500/10' :
+                              'bg-amber-500/10'
+                            }`}>
+                              {getStatusIcon(leave.status)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-lg text-foreground capitalize tracking-tight">{leave.leave_type_name_en || t('leaves.leave')}</div>
+                              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                                <Clock className="w-4 h-4 opacity-70" />
+                                {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
+                                  <>
+                                    {fmtDate(leave.start_date)}
+                                    {leave.start_time && leave.end_time && (
+                                      <span className="font-medium">({leave.start_time} - {leave.end_time})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    {fmtDate(leave.start_date)} <span className="opacity-50">{t('common.to')}</span> {fmtDate(leave.end_date)}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center self-end sm:self-auto gap-3">
+                            <span className={`inline-flex px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${
+                              leave.status === 'approved_by_manager' ? 'bg-emerald-500/15 text-emerald-600 border border-emerald-500/30' :
+                              leave.status === 'approved_by_team_leader' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' :
+                              leave.status === 'rejected' ? 'bg-destructive/15 text-destructive border border-destructive/30' :
+                              leave.status === 'cancelled' ? 'bg-gray-500/15 text-gray-500 border border-gray-500/30' :
+                              'bg-amber-500/15 text-amber-600 border border-amber-500/30'
+                            }`}>
+                              {getStatusLabel(leave.status)}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                  
+                  {(!leaves || leaves.filter((l: any) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').length === 0) && (
+                    <motion.div variants={itemVariants}>
+                      <Card className="border-dashed border-2 bg-transparent rounded-3xl">
+                        <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                          <p className="text-sm opacity-60">{t('leaves.no_requests_found')}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+                </motion.div>
+              </div>
+            </div>
+          )}
           <LeaveRequestModal 
             isOpen={isModalOpen}
             onClose={() => { setIsModalOpen(false); setError(null); }}

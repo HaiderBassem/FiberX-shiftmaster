@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -87,7 +88,16 @@ func (r *itemRequestRepo) UpdateCategory(ctx context.Context, cat *models.ItemRe
 }
 
 func (r *itemRequestRepo) DeleteCategory(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM item_request_categories WHERE id=$1`, id)
+	var count int
+	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM item_requests WHERE category_id = $1", id).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("cannot delete category because it is used by existing requests")
+	}
+
+	_, err = r.db.Exec(ctx, `DELETE FROM item_request_categories WHERE id=$1`, id)
 	return err
 }
 

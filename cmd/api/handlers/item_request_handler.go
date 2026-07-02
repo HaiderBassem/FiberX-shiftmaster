@@ -110,6 +110,10 @@ func (h *ItemRequestHandler) DeleteCategory(c *gin.Context) {
 	}
 
 	if err := h.svc.DeleteCategory(c.Request.Context(), id); err != nil {
+		if err.Error() == "cannot delete category because it is used by existing requests" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
