@@ -7,7 +7,6 @@ import { Building2, Crown, Plus, Edit3, Trash2, Save, X, Database } from 'lucide
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 

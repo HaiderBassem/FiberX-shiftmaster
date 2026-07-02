@@ -48,6 +48,7 @@ const CompletionDialog = ({
   isPending: boolean;
 }) => {
   const [notes, setNotes] = useState('');
+  const { t } = useTranslation();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
