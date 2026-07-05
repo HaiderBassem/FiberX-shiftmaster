@@ -67,8 +67,8 @@ func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.
 		return err
 	}
 
-	// Send email to department if active
-	if a.IsActive && s.emailService != nil {
+	// Send email to department if active or ticker
+	if (a.IsActive || a.IsTicker) && s.emailService != nil {
 		emails, err := s.employeeRepo.GetEmailsByDepartment(ctx, a.DepartmentID)
 		if err == nil && len(emails) > 0 {
 			subject := fmt.Sprintf("[%s] %s", a.Priority, a.Title)
@@ -78,7 +78,7 @@ func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.
 	}
 
 	// Send Web Push Notification
-	if a.IsActive && s.pushService != nil {
+	if (a.IsActive || a.IsTicker) && s.pushService != nil {
 		go func() {
 			bgCtx := context.Background()
 			_ = s.pushService.SendToDepartment(bgCtx, a.DepartmentID, "New Announcement: "+a.Title, a.Message, "/")

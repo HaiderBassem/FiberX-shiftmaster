@@ -25,8 +25,7 @@ export const AnnouncementManager: React.FC = () => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState<'info' | 'normal' | 'important' | 'critical'>('normal');
-  const [isActive, setIsActive] = useState(true);
-  const [isTicker, setIsTicker] = useState(false);
+  const [displayType, setDisplayType] = useState<'banner' | 'ticker' | 'both'>('banner');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -90,7 +89,13 @@ export const AnnouncementManager: React.FC = () => {
     try {
       setSubmitting(true);
       await announcementService.create(
-        { title, message, priority, is_active: isActive, is_ticker: isTicker },
+        { 
+          title, 
+          message, 
+          priority, 
+          is_active: displayType === 'banner' || displayType === 'both', 
+          is_ticker: displayType === 'ticker' || displayType === 'both' 
+        },
         imageFiles.length > 0 ? imageFiles : undefined
       );
       setIsModalOpen(false);
@@ -139,8 +144,7 @@ export const AnnouncementManager: React.FC = () => {
     setTitle('');
     setMessage('');
     setPriority('normal');
-    setIsActive(true);
-    setIsTicker(false);
+    setDisplayType('banner');
     setImageFiles([]);
   };
 
@@ -368,30 +372,47 @@ export const AnnouncementManager: React.FC = () => {
                 </div>
                 
                 <div className="flex flex-col gap-3 mt-6">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(e) => setIsActive(e.target.checked)}
-                      className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-sm font-medium">Set as Main Active (Banner)</span>
-                  </label>
-
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isTicker}
-                      onChange={(e) => setIsTicker(e.target.checked)}
-                      className="rounded border-gray-300 text-primary focus:ring-primary h-4 w-4"
-                    />
-                    <span className="text-sm font-medium">Set as Ticker</span>
-                  </label>
+                  <label className="mb-1 block text-sm font-medium">Display Type</label>
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="displayType"
+                        value="banner"
+                        checked={displayType === 'banner'}
+                        onChange={() => setDisplayType('banner')}
+                        className="text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-sm">Main Banner Only</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="displayType"
+                        value="ticker"
+                        checked={displayType === 'ticker'}
+                        onChange={() => setDisplayType('ticker')}
+                        className="text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-sm">Ticker Ribbon Only</span>
+                    </label>
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="displayType"
+                        value="both"
+                        checked={displayType === 'both'}
+                        onChange={() => setDisplayType('both')}
+                        className="text-primary focus:ring-primary h-4 w-4"
+                      />
+                      <span className="text-sm">Both</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
               <div className="mt-2 text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                Note: Setting Main Active or Ticker will deactivate any currently active announcement of the same type. Active announcements send emails.
+                Note: Creating a new Banner will replace the current active Banner. Creating a new Ticker will replace the current active Ticker.
               </div>
 
               <div className="mt-6 flex justify-end space-x-3">
