@@ -88,7 +88,7 @@ func TestGetEnvHelpers(t *testing.T) {
 	os.Setenv("TEST_INT", "42")
 	os.Setenv("TEST_BOOL", "true")
 	os.Setenv("TEST_SLICE", "a, b,  c  ")
-	
+
 	defer func() {
 		os.Unsetenv("TEST_INT")
 		os.Unsetenv("TEST_BOOL")
@@ -132,4 +132,5 @@ func TestGetEnvHelpers(t *testing.T) {
 			t.Errorf("expected 42s, got %v", val)
 		}
 	})
+
 }
