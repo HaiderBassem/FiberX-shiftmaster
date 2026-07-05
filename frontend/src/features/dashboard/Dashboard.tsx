@@ -13,6 +13,7 @@ import {
 import { format, startOfWeek } from 'date-fns';
 import { fmtDateTime } from '@/lib/dateUtils';
 import { AnnouncementBanner } from '../announcements/AnnouncementBanner';
+import { AnnouncementTicker } from '../announcements/AnnouncementTicker';
 import { motion } from 'framer-motion';
 import { 
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, 
@@ -109,8 +110,14 @@ export const Dashboard = () => {
   const { user } = useAuthStore();
   const isEmployee = user?.role === 'employee';
 
-  if (isEmployee) return <EmployeeDashboard />;
-  return <LeaderDashboard />;
+  return (
+    <>
+      <div className="-mx-3 sm:-mx-4 md:-mx-6 -mt-3 sm:-mt-4 md:-mt-6 mb-6">
+        <AnnouncementTicker />
+      </div>
+      {isEmployee ? <EmployeeDashboard /> : <LeaderDashboard />}
+    </>
+  );
 };
 
 // ═══════════════════════════════════════════════════════════

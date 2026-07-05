@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { AnnouncementTicker } from '@/features/announcements/AnnouncementTicker';
 import { NotificationToastContainer } from '@/components/NotificationToast';
 
 export const DashboardLayout = () => {
@@ -30,7 +29,6 @@ export const DashboardLayout = () => {
       {/* Main content — always full width */}
       <main className="flex-1 flex flex-col min-w-0 w-full">
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} sidebarOpen={sidebarOpen} />
-        <AnnouncementTicker />
         <div className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
           <Outlet />
         </div>
