@@ -1,0 +1,255 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark, .dark *));
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar: hsl(var(--sidebar));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(100vw); }
+  100% { transform: translateX(-100%); }
+}
+
+@utility animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@utility container {
+  margin-inline: auto;
+  padding-inline: 2rem;
+  @media (width >= --theme(--breakpoint-sm)) {
+    max-width: none;
+  }
+  @media (width >= 1400px) {
+    max-width: 1400px;
+  }
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SHIFTMASTER LIGHT THEME (default)
+   Primary: #0CCCCC (teal)  Accent: #01A3A3 (dark teal)
+   Destructive: #FF4D4D     Background: white surfaces
+   ═══════════════════════════════════════════════════════════ */
+@layer base {
+  :root {
+    --background: 0 0% 97%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+    /* Primary teal: #0CCCCC → hsl(180, 90%, 42%) */
+    --primary: 180 90% 42%;
+    --primary-foreground: 0 0% 100%;
+    /* Secondary: light teal tint */
+    --secondary: 180 30% 94%;
+    --secondary-foreground: 180 50% 25%;
+    /* Muted: subtle gray */
+    --muted: 210 15% 94%;
+    --muted-foreground: 210 10% 46%;
+    /* Accent: #01A3A3 → hsl(180, 98%, 32%) */
+    --accent: 180 98% 32%;
+    --accent-foreground: 0 0% 100%;
+    /* Destructive: #FF4D4D → hsl(0, 100%, 65%) */
+    --destructive: 0 100% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 210 15% 88%;
+    --input: 210 15% 88%;
+    --ring: 180 90% 42%;
+    --radius: 0.625rem;
+
+    /* Sidebar */
+    --sidebar: 180 40% 12%;
+    --sidebar-foreground: 180 10% 95%;
+    --sidebar-accent: 180 90% 42%;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     SHIFTMASTER DARK THEME
+     Background: #000000 / very dark surfaces
+     Primary: #0CCCCC bright teal on dark
+     ═══════════════════════════════════════════════════════════ */
+  :root.dark {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 180 90% 42%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 180 15% 14%;
+    --secondary-foreground: 180 20% 85%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 180 98% 32%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 180 90% 42%;
+
+    --sidebar: 0 0% 4%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-accent: 180 90% 42%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Jodit Editor Dark Mode Overrides
+   ═══════════════════════════════════════════════════════════ */
+.dark .jodit-container {
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-workplace, .dark .jodit-wysiwyg {
+  background-color: transparent !important;
+  color: var(--color-foreground) !important;
+}
+.dark .jodit-toolbar__box {
+  background-color: var(--color-card) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-toolbar-button__button {
+  color: var(--color-foreground) !important;
+}
+.dark .jodit-toolbar-button__button:hover {
+  background-color: var(--color-muted) !important;
+}
+.dark .jodit-ui-popup__content {
+  background-color: var(--color-popover) !important;
+  color: var(--color-popover-foreground) !important;
+  border-color: var(--color-border) !important;
+}
+.dark .jodit-ui-input {
+  background-color: var(--color-input) !important;
+  color: var(--color-foreground) !important;
+}
+
+/* Force Jodit content text color in dark mode */
+.dark .jodit-content {
+  color: var(--color-foreground) !important;
+}
+/* This overrides inline color styles set by Jodit when copying from Word or setting text color to black */
+.dark .jodit-content [style*="color: rgb(0, 0, 0)"], 
+.dark .jodit-content [style*="color: #000000"],
+.dark .jodit-content [style*="color:#000000"] {
+  color: var(--color-foreground) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Custom scrollbar for dark mode
+   ═══════════════════════════════════════════════════════════ */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Utility: teal glow effect for hero elements
+   ═══════════════════════════════════════════════════════════ */
+@layer utilities {
+  .glow-teal {
+    box-shadow: 0 0 24px rgba(12, 204, 204, 0.15), 0 0 80px rgba(12, 204, 204, 0.06);
+  }
+  .glow-teal-sm {
+    box-shadow: 0 0 12px rgba(12, 204, 204, 0.12);
+  }
+  .text-gradient-teal {
+    background: linear-gradient(135deg, #0CCCCC, #01A3A3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Notification toast slide-in animation
+   ═══════════════════════════════════════════════════════════ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(110%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-toast-in {
+    animation: toast-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+}

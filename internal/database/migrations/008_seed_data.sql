@@ -1,0 +1,5 @@
+-- =====================================================
+-- Seed Data — CLEARED
+-- All sample/seed rows have been removed.
+-- Use the application's admin UI to create real data.
+-- =====================================================

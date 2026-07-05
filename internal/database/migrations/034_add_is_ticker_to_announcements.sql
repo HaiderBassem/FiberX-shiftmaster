@@ -1,0 +1,1 @@
+ALTER TABLE announcements ADD COLUMN IF NOT EXISTS is_ticker BOOLEAN DEFAULT false;
