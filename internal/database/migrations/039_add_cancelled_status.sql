@@ -1,2 +1,1 @@
--- Add 'cancelled' to leave_status
-ALTER TYPE leave_status ADD VALUE IF NOT EXISTS 'cancelled';
+-- Replaced by 040_fix_cancelled_enum_recreate.sql
