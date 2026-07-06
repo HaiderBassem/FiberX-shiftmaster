@@ -101,7 +101,9 @@ export const TicketList = () => {
 
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !targetDeptId) return;
+    if (!targetDeptId) { toast.error(t('tickets.select_department', 'Please select a department')); return; }
+    if (!title.trim()) { toast.error(t('tickets.title_required', 'Please enter a title')); return; }
+    if (!description.trim()) { toast.error(t('tickets.desc_required', 'Please enter a description')); return; }
     createTicket.mutate();
   };
 
