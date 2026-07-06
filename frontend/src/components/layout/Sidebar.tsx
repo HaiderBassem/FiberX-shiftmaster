@@ -6,7 +6,7 @@ import api from '@/lib/api';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2, Database,
-  Clock, X, Table, BookOpen, Inbox, Megaphone, CalendarDays, Link as LinkIcon, LogOut
+  Clock, X, Table, BookOpen, Inbox, Megaphone, CalendarDays, Link as LinkIcon, LogOut, Ticket
 } from 'lucide-react';
 
 const navItems = [
@@ -25,6 +25,7 @@ const navItems = [
   { to: '/help', labelKey: 'info_bank', icon: BookOpen, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'info_bank' },
   { to: '/fiberx-data', labelKey: 'fiber_data', icon: Database, roles: ['employee', 'team_leader', 'manager', 'admin'], requiresFiberx: true, moduleId: 'fiberx_data' },
   { to: '/external-tools', labelKey: 'external_tools', icon: LinkIcon, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
+  { to: '/tickets', labelKey: 'tickets', icon: Ticket, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'tickets' },
   { to: '/announcements/manage', labelKey: 'announcements', icon: Megaphone, roles: ['manager', 'admin'], permission: 'can_post_announcements', core: true },
   { to: '/module-settings', labelKey: 'external_modules', icon: ShieldCheck, roles: ['admin', 'manager', 'team_leader'], core: true },
 ];

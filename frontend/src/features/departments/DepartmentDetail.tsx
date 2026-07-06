@@ -184,6 +184,7 @@ export const DepartmentDetail = () => {
               { id: 'references', label: t('departments.module_references'), desc: t('departments.module_references_desc') },
               { id: 'info_bank', label: t('departments.module_info_bank'), desc: t('departments.module_info_bank_desc') },
               { id: 'fiberx_data', label: t('departments.module_fiberx_data'), desc: t('departments.module_fiberx_data_desc') },
+              { id: 'tickets', label: t('departments.module_tickets'), desc: t('departments.module_tickets_desc') },
             ].map((module) => {
               const isActive = (dept.active_modules || []).includes(module.id);
               return (

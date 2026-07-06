@@ -17,6 +17,7 @@
     "external_tools": "External Tools",
     "announcements": "Announcements",
     "external_modules": "External Modules",
+    "tickets": "Tickets",
     "logout": "Logout"
   },
   "topbar": {
@@ -352,6 +353,8 @@
     "module_info_bank_desc": "Provide access to help documents and guides",
     "module_fiberx_data": "FiberX Data",
     "module_fiberx_data_desc": "Access to FiberX specific documentation",
+    "module_tickets": "Tickets",
+    "module_tickets_desc": "Create and track support requests with other departments",
     "employees": "Employees",
     "employees_in": "Employees in {{name}}",
     "shift": "Shift",
@@ -394,5 +397,32 @@
     "save_password": "Save Password",
     "passwords_do_not_match": "New passwords do not match.",
     "password_min_length": "Password must be at least 8 characters long."
+  },
+  "tickets": {
+    "title": "Department Tickets",
+    "desc": "Manage cross-department issues and support requests.",
+    "create": "Create Ticket",
+    "create_ticket": "Create Cross-Department Ticket",
+    "no_tickets": "No tickets found.",
+    "target_department": "Target Department",
+    "select_department": "Select target department...",
+    "ticket_title": "Title / Subject",
+    "title_placeholder": "A short summary of the issue...",
+    "description": "Description",
+    "desc_placeholder": "What do you need help with from the other department?",
+    "submit": "Submit Ticket",
+    "ticket_from": "Ticket from",
+    "to": "to",
+    "status_open": "Open",
+    "status_closed": "Closed",
+    "mark_as_closed": "Close Ticket",
+    "closed_by": "Closed by",
+    "type_comment": "Type your comment here...",
+    "add_comment": "Add Comment",
+    "save_comment": "Save",
+    "failed_create": "Failed to create ticket",
+    "failed_close": "Failed to close ticket",
+    "title_required": "Title is required",
+    "desc_required": "Description is required"
   }
 }

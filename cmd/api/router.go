@@ -34,6 +34,7 @@ func SetupRouter(
 	fiberxDataH *handlers.FiberxDataHandler,
 	securityH *handlers.SecurityHandler,
 	itemReqH *handlers.ItemRequestHandler,
+	ticketH *handlers.TicketHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -412,6 +413,15 @@ func SetupRouter(
 			announcements.DELETE("/:id", announcementH.Delete)
 			announcements.PUT("/:id/activate", announcementH.SetActive)
 			announcements.PUT("/:id/deactivate", announcementH.Deactivate)
+		}
+
+		// --- Tickets (Cross-Department) ---
+		tickets := protected.Group("/tickets")
+		{
+			tickets.GET("", ticketH.GetTickets)
+			tickets.POST("", ticketH.CreateTicket)
+			tickets.POST("/:id/comments", ticketH.AddComment)
+			tickets.PUT("/:id/close", ticketH.CloseTicket)
 		}
 
 	}

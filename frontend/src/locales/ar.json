@@ -17,6 +17,7 @@
     "external_tools": "الأدوات الخارجية",
     "announcements": "التبليغات",
     "external_modules": "الوحدات الإضافية",
+    "tickets": "تذاكر الأقسام",
     "logout": "تسجيل الخروج"
   },
   "topbar": {
@@ -352,6 +353,8 @@
     "module_info_bank_desc": "توفير الوصول إلى مستندات وأدلة المساعدة",
     "module_fiberx_data": "بيانات FiberX",
     "module_fiberx_data_desc": "الوصول إلى الوثائق الخاصة بـ FiberX",
+    "module_tickets": "تذاكر الأقسام",
+    "module_tickets_desc": "إنشاء ومتابعة طلبات الدعم مع الأقسام الأخرى",
     "employees": "الموظفين",
     "employees_in": "الموظفين في {{name}}",
     "shift": "النوبة",
@@ -394,5 +397,32 @@
     "save_password": "حفظ كلمة المرور",
     "passwords_do_not_match": "كلمات المرور الجديدة غير متطابقة.",
     "password_min_length": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل."
+  },
+  "tickets": {
+    "title": "تذاكر الأقسام",
+    "desc": "إدارة المشاكل وطلبات الدعم مع الأقسام الأخرى.",
+    "create": "إنشاء تذكرة",
+    "create_ticket": "إنشاء تذكرة بين الأقسام",
+    "no_tickets": "لا توجد تذاكر حالياً.",
+    "target_department": "القسم المستهدف",
+    "select_department": "اختر القسم المستهدف...",
+    "ticket_title": "العنوان / الموضوع",
+    "title_placeholder": "ملخص قصير للمشكلة...",
+    "description": "الوصف",
+    "desc_placeholder": "ما هي المشكلة التي تحتاج قسم آخر للمساعدة بها؟",
+    "submit": "تقديم التذكرة",
+    "ticket_from": "تذكرة من",
+    "to": "إلى",
+    "status_open": "مفتوحة",
+    "status_closed": "مغلقة",
+    "mark_as_closed": "إغلاق التذكرة",
+    "closed_by": "أُغلقت بواسطة",
+    "type_comment": "اكتب تعليقك هنا...",
+    "add_comment": "إضافة تعليق",
+    "save_comment": "حفظ",
+    "failed_create": "فشل في إنشاء التذكرة",
+    "failed_close": "فشل في إغلاق التذكرة",
+    "title_required": "العنوان مطلوب",
+    "desc_required": "الوصف مطلوب"
   }
 }
