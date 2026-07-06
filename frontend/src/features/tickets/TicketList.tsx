@@ -55,8 +55,10 @@ export const TicketList = () => {
       const res = await api.post('/upload/image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      if (res.data.url) {
-        setImages((prev) => [...prev, res.data.url]);
+      if (res.data?.data?.url) {
+        setImages((prev) => [...prev, res.data.data.url]);
+      } else if (res.data?.file) {
+        setImages((prev) => [...prev, res.data.file]);
       }
     } catch (err) {
       toast.error(t('common.failed_upload'));
@@ -101,129 +103,6 @@ export const TicketList = () => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !targetDeptId) return;
     createTicket.mutate();
-  };
-
-  // Comments component
-  const TicketComments = ({ ticket }: { ticket: any }) => {
-    const [commentText, setCommentText] = useState('');
-    const [commentImages, setCommentImages] = useState<string[]>([]);
-    const [uploading, setUploading] = useState(false);
-
-    const uploadCommentImage = async (file: File) => {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('image', file);
-      try {
-        const res = await api.post('/upload/image', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        if (res.data.url) setCommentImages((prev) => [...prev, res.data.url]);
-      } catch (err) {
-        toast.error('Upload failed');
-      } finally {
-        setUploading(false);
-      }
-    };
-
-    const addComment = useMutation({
-      mutationFn: async () => {
-        await api.post(`/tickets/${ticket.id}/comments`, {
-          comment: commentText,
-          attachments: commentImages.length > 0 ? JSON.stringify(commentImages) : null,
-        });
-      },
-      onSuccess: () => {
-        setCommentText('');
-        setCommentImages([]);
-        queryClient.invalidateQueries({ queryKey: ['tickets'] });
-      }
-    });
-
-    return (
-      <div className="mt-6 pt-6 border-t border-border">
-        <h4 className="text-sm font-semibold mb-4 text-muted-foreground flex items-center gap-2">
-          <MessageSquare className="w-4 h-4" />
-          {t('handovers.comments_colon')}
-        </h4>
-
-        {/* Existing Comments */}
-        <div className="space-y-4 mb-4">
-          {(ticket.comments || []).map((c: any) => (
-            <div key={c.id} className="bg-muted/30 p-3 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
-                  {c.author_name.charAt(0)}
-                </div>
-                <span className="text-sm font-medium">{c.author_name}</span>
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {format(new Date(c.created_at), 'PPp', { locale: dateLocale })}
-                </span>
-              </div>
-              <p className="text-sm text-foreground whitespace-pre-wrap pl-8">{c.comment}</p>
-              {c.attachments && (
-                <div className="flex gap-2 mt-2 pl-8 overflow-x-auto">
-                  {JSON.parse(c.attachments).map((url: string, i: number) => (
-                    <a key={i} href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt="Attachment" className="h-16 w-16 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Add Comment */}
-        {ticket.status === 'open' && (
-          <div className="flex gap-2 items-start mt-4">
-            <div className="flex-1 space-y-2">
-              <textarea
-                placeholder={t('tickets.type_comment')}
-                value={commentText}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(e.target.value)}
-                className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-muted/50 border-transparent focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none transition-all"
-              />
-              {commentImages.length > 0 && (
-                <div className="flex gap-2">
-                  {commentImages.map((img, i) => (
-                    <div key={i} className="relative w-12 h-12">
-                      <img src={img} alt="preview" className="w-full h-full object-cover rounded-lg border border-border" />
-                      <button onClick={() => setCommentImages(commentImages.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2 shrink-0">
-              <Label className="cursor-pointer h-11 px-3 bg-muted/50 hover:bg-muted text-muted-foreground rounded-xl border border-transparent flex items-center justify-center transition-colors">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) uploadCommentImage(e.target.files[0]);
-                    e.target.value = '';
-                  }}
-                  disabled={uploading}
-                />
-                <ImageIcon className="w-5 h-5" />
-              </Label>
-              <Button
-                size="icon"
-                className="h-11 w-11 rounded-xl shrink-0"
-                onClick={() => addComment.mutate()}
-                disabled={!commentText.trim() || addComment.isPending}
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
   };
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading...</div>;
@@ -429,3 +308,135 @@ export const TicketList = () => {
     </div>
   );
 };
+
+// Extracted outside to prevent remounting on every parent render
+const TicketComments = ({ ticket }: { ticket: any }) => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'ar' ? ar : enUS;
+  const queryClient = useQueryClient();
+
+  const [commentText, setCommentText] = useState('');
+  const [commentImages, setCommentImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadCommentImage = async (file: File) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+    try {
+      const res = await api.post('/upload/image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data?.data?.url) {
+        setCommentImages((prev) => [...prev, res.data.data.url]);
+      } else if (res.data?.file) {
+        setCommentImages((prev) => [...prev, res.data.file]);
+      }
+    } catch (err) {
+      toast.error('Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const addComment = useMutation({
+    mutationFn: async () => {
+      await api.post(`/tickets/${ticket.id}/comments`, {
+        comment: commentText,
+        attachments: commentImages.length > 0 ? JSON.stringify(commentImages) : null,
+      });
+    },
+    onSuccess: () => {
+      setCommentText('');
+      setCommentImages([]);
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+    }
+  });
+
+  return (
+    <div className="mt-6 pt-6 border-t border-border">
+      <h4 className="text-sm font-semibold mb-4 text-muted-foreground flex items-center gap-2">
+        <MessageSquare className="w-4 h-4" />
+        {t('tickets.add_comment', 'Add Comment')}
+      </h4>
+
+      {/* Existing Comments */}
+      <div className="space-y-4 mb-4">
+        {(ticket.comments || []).map((c: any) => (
+          <div key={c.id} className="bg-muted/30 p-3 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                {c.author_name.charAt(0)}
+              </div>
+              <span className="text-sm font-medium">{c.author_name}</span>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {format(new Date(c.created_at), 'PPp', { locale: dateLocale })}
+              </span>
+            </div>
+            <p className="text-sm text-foreground whitespace-pre-wrap pl-8">{c.comment}</p>
+            {c.attachments && JSON.parse(c.attachments).length > 0 && (
+              <div className="flex gap-2 mt-2 pl-8 overflow-x-auto">
+                {JSON.parse(c.attachments).map((url: string, i: number) => (
+                  <a key={i} href={url} target="_blank" rel="noreferrer">
+                    <img src={url} alt="Attachment" className="h-16 w-16 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add Comment */}
+      {ticket.status === 'open' && (
+        <div className="flex gap-2 items-start mt-4">
+          <div className="flex-1 space-y-2">
+            <textarea
+              placeholder={t('tickets.type_comment')}
+              value={commentText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCommentText(e.target.value)}
+              className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-muted/50 border-transparent focus:border-primary/50 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none transition-all"
+            />
+            {commentImages.length > 0 && (
+              <div className="flex gap-2">
+                {commentImages.map((img, i) => (
+                  <div key={i} className="relative w-12 h-12">
+                    <img src={img} alt="preview" className="w-full h-full object-cover rounded-lg border border-border" />
+                    <button onClick={() => setCommentImages(commentImages.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 shrink-0">
+            <Label className="cursor-pointer h-11 px-3 bg-muted/50 hover:bg-muted text-muted-foreground rounded-xl border border-transparent flex items-center justify-center transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) uploadCommentImage(e.target.files[0]);
+                  e.target.value = '';
+                }}
+                disabled={uploading}
+              />
+              <ImageIcon className="w-5 h-5" />
+            </Label>
+            <Button
+              size="icon"
+              className="h-11 w-11 rounded-xl shrink-0"
+              onClick={() => addComment.mutate()}
+              disabled={!commentText.trim() || addComment.isPending}
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
