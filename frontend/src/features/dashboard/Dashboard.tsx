@@ -711,8 +711,11 @@ const LeaderDashboard = () => {
                     // Determine if the shift is active right now
                     let isActiveNow = false;
                     if (shift && shift.start_time && shift.end_time) {
-                       const [startH, startM] = shift.start_time.split(':').map(Number);
-                       const [endH, endM] = shift.end_time.split(':').map(Number);
+                       const st = shift.start_time.includes('T') ? shift.start_time.split('T')[1] : shift.start_time;
+                       const et = shift.end_time.includes('T') ? shift.end_time.split('T')[1] : shift.end_time;
+                       
+                       const [startH, startM] = st.split(':').map(Number);
+                       const [endH, endM] = et.split(':').map(Number);
                        const startMins = startH * 60 + startM;
                        let endMins = endH * 60 + endM;
                        
