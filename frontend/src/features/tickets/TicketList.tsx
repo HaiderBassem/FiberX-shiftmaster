@@ -29,7 +29,7 @@ export const TicketList = () => {
   const [isUploading, setIsUploading] = useState(false);
 
   // Fetch Departments
-  const { data: departments } = useQuery({
+  const { data: departments = [] } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
@@ -38,7 +38,7 @@ export const TicketList = () => {
   });
 
   // Fetch Tickets
-  const { data: tickets, isLoading } = useQuery({
+  const { data: tickets = [], isLoading } = useQuery({
     queryKey: ['tickets'],
     queryFn: async () => {
       const res = await api.get('/tickets');
