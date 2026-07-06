@@ -40,8 +40,8 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     navigate('/login');
   };
 
-  // Fetch the user's department to check fiberx_enabled
-  const { data: userDepartment } = useQuery({
+  // Fetch the user's department to check fiberx_enabled and active_modules
+  const { data: userDepartment, isLoading: deptLoading } = useQuery({
     queryKey: ['my-department', user?.department_id],
     queryFn: async () => {
       const res = await api.get(`/departments/${user?.department_id}`);
@@ -52,34 +52,42 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
 
   const visibleItems = navItems.filter((item) => {
     if (!user) return false;
-    
+
     // Check role
     let hasAccess = item.roles.includes(user.role);
-    
-    // Additional permission checks
+
+    // Additional permission checks (e.g. can_post_announcements)
     if (!hasAccess && (item as any).permission) {
       if ((item as any).permission === 'can_post_announcements' && (user as any).can_post_announcements) {
         hasAccess = true;
       }
     }
 
-    // FiberX Data fallback logic (if active_modules is used, this may be redundant, but kept for safety)
-    if ((item as any).requiresFiberx && hasAccess) {
+    if (!hasAccess) return false;
+
+    // While department is still loading, show all items the user has role access to
+    // so the sidebar doesn't flicker/disappear on page load
+    if (deptLoading || !userDepartment) return true;
+
+    // FiberX: hide for non-leadership if not enabled for department
+    if ((item as any).requiresFiberx) {
       const isLeadership = user.role === 'admin' || user.role === 'manager' || user.role === 'team_leader';
       if (!isLeadership && !userDepartment?.fiberx_enabled) {
-        hasAccess = false;
+        return false;
       }
     }
 
-    // Module toggling logic based on active_modules in department
-    if (hasAccess && (item as any).moduleId && userDepartment) {
-       const activeModules = userDepartment.active_modules || [];
-       if (!activeModules.includes((item as any).moduleId)) {
-         hasAccess = false;
-       }
+    // Module toggling: only hide if active_modules explicitly excludes this module
+    if ((item as any).moduleId) {
+      const activeModules: string[] = userDepartment?.active_modules || [];
+      // If active_modules is an empty array, that means ALL modules are disabled (intentional)
+      // If it's missing/null (shouldn't happen after migration fix), show everything
+      if (activeModules.length > 0 && !activeModules.includes((item as any).moduleId)) {
+        return false;
+      }
     }
-    
-    return hasAccess;
+
+    return true;
   });
 
   return (
