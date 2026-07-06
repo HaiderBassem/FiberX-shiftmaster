@@ -1,8 +1,8 @@
 -- =====================================================
--- Migration: Dynamic Leave Types
+-- Migration: Dynamic Leave Types (idempotent)
 -- =====================================================
 
-CREATE TABLE leave_types (
+CREATE TABLE IF NOT EXISTS leave_types (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name_ar VARCHAR(100) NOT NULL,
     name_en VARCHAR(100) NOT NULL,
@@ -16,14 +16,10 @@ CREATE TABLE leave_types (
 
 COMMENT ON TABLE leave_types IS 'Dynamic types of leaves available to employees';
 
--- Add the new foreign key to leaves table
-ALTER TABLE leaves ADD COLUMN leave_type_id UUID REFERENCES leave_types(id);
+-- Add the new foreign key to leaves table (idempotent)
+ALTER TABLE leaves ADD COLUMN IF NOT EXISTS leave_type_id UUID REFERENCES leave_types(id);
 
--- Note: In existing systems with data, you must manually populate leave_types
--- and UPDATE leaves.leave_type_id BEFORE dropping the old column.
--- For fresh installs, we can just proceed.
-
--- Drop the old enum column (if it exists and is empty/migrated)
+-- Drop the old enum column (if it exists)
 ALTER TABLE leaves DROP COLUMN IF EXISTS leave_type;
 
 -- Drop the enum type (if not used elsewhere)

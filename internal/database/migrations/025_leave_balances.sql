@@ -1,14 +1,14 @@
 -- =====================================================
--- Migration: Leave Balances System
+-- Migration: Leave Balances System (idempotent)
 -- =====================================================
 
 -- Add quota and carry forward settings to leave_types
-ALTER TABLE leave_types 
-ADD COLUMN days_per_year INT DEFAULT 0,
-ADD COLUMN carries_forward BOOLEAN DEFAULT false;
+ALTER TABLE leave_types
+ADD COLUMN IF NOT EXISTS days_per_year INT DEFAULT 0,
+ADD COLUMN IF NOT EXISTS carries_forward BOOLEAN DEFAULT false;
 
 -- Create employee_leave_balances table
-CREATE TABLE employee_leave_balances (
+CREATE TABLE IF NOT EXISTS employee_leave_balances (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     employee_id UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     leave_type_id UUID NOT NULL REFERENCES leave_types(id) ON DELETE CASCADE,
@@ -21,6 +21,7 @@ CREATE TABLE employee_leave_balances (
 );
 
 -- Trigger for updating updated_at timestamp
+DROP TRIGGER IF EXISTS set_timestamp_employee_leave_balances ON employee_leave_balances;
 CREATE TRIGGER set_timestamp_employee_leave_balances
 BEFORE UPDATE ON employee_leave_balances
 FOR EACH ROW
