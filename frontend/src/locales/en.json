@@ -150,7 +150,16 @@
     "select_colleague": "Select colleague...",
     "your_shift_date": "Your Shift Date",
     "reason_placeholder": "Provide a clear reason for your swap request...",
-    "send_swap_request": "Send Swap Request"
+    "send_swap_request": "Send Swap Request",
+    "swap_mode": "Swap Type",
+    "mode_off": "Off Day",
+    "mode_off_desc": "Employees with an Off day",
+    "mode_shift": "Shift Swap",
+    "mode_shift_desc": "Employees in a different shift",
+    "select_off_colleague": "Select a colleague with an Off day",
+    "select_shift_colleague": "Select a colleague in a different shift",
+    "no_off_employees": "No employees have an Off day on this date",
+    "no_other_shift_employees": "No employees in a different shift on this date"
   },
   "items": {
     "manage_categories": "Manage Categories",

@@ -90,7 +90,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
 
               {/* Swap Mode Selector */}
               <div className="space-y-2">
-                <Label className="text-muted-foreground ml-1">{t('swaps.swap_mode', 'نوع الـ Swap')}</Label>
+                <Label className="text-muted-foreground ml-1">{t('swaps.swap_mode')}</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {/* Off Mode */}
                   <label
@@ -112,8 +112,8 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                     />
                     <MoonStar className="w-4 h-4 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold">{t('swaps.mode_off', 'استراحة (Off)')}</p>
-                      <p className="text-xs opacity-70">{t('swaps.mode_off_desc', 'موظفين عندهم Off')}</p>
+                      <p className="text-sm font-semibold">{t('swaps.mode_off')}</p>
+                      <p className="text-xs opacity-70">{t('swaps.mode_off_desc')}</p>
                     </div>
                   </label>
 
@@ -137,8 +137,8 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                     />
                     <Shuffle className="w-4 h-4 shrink-0" />
                     <div>
-                      <p className="text-sm font-semibold">{t('swaps.mode_shift', 'تبادل شفت')}</p>
-                      <p className="text-xs opacity-70">{t('swaps.mode_shift_desc', 'موظفين بشفت ثاني')}</p>
+                      <p className="text-sm font-semibold">{t('swaps.mode_shift')}</p>
+                      <p className="text-xs opacity-70">{t('swaps.mode_shift_desc')}</p>
                     </div>
                   </label>
                 </div>
@@ -159,9 +159,9 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                 {/* Employee Selector */}
                 <div className="space-y-2">
                   <Label className="text-muted-foreground ml-1">
-                    {swapMode === 'off'
-                      ? t('swaps.select_off_colleague', 'اختر موظف عنده Off')
-                      : t('swaps.select_shift_colleague', 'اختر موظف بشفت ثاني')}
+                     {swapMode === 'off'
+                      ? t('swaps.select_off_colleague')
+                      : t('swaps.select_shift_colleague')}
                   </Label>
 
                   {loadingEmployees ? (
@@ -169,8 +169,8 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                   ) : employees.length === 0 ? (
                     <div className="h-11 flex items-center px-4 rounded-xl bg-muted/30 border border-border text-muted-foreground text-sm">
                       {swapMode === 'off'
-                        ? t('swaps.no_off_employees', 'ما في موظفين عندهم Off في هذا اليوم')
-                        : t('swaps.no_other_shift_employees', 'ما في موظفين بشفت ثاني في هذا اليوم')}
+                        ? t('swaps.no_off_employees')
+                        : t('swaps.no_other_shift_employees')}
                     </div>
                   ) : (
                     <select
