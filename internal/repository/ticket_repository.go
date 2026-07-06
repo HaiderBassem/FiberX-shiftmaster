@@ -30,7 +30,7 @@ func NewTicketRepository(db *database.DB) TicketRepository {
 func (r *ticketRepo) Create(ctx context.Context, t *models.Ticket) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO tickets (source_department_id, target_department_id, creator_id, title, description, attachments)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		 VALUES ($1, $2, $3, $4, $5, $6::jsonb)
 		 RETURNING id, created_at, updated_at`,
 		t.SourceDepartmentID, t.TargetDepartmentID, t.CreatorID, t.Title, t.Description, t.Attachments,
 	).Scan(&t.ID, &t.CreatedAt, &t.UpdatedAt)
@@ -39,9 +39,9 @@ func (r *ticketRepo) Create(ctx context.Context, t *models.Ticket) error {
 func (r *ticketRepo) GetTicketsForDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Ticket, error) {
 	query := `
 		SELECT t.id, t.source_department_id, t.target_department_id, t.creator_id, t.title, t.description, t.status, t.closed_by, t.attachments, t.created_at, t.updated_at,
-		       e.first_name || ' ' || e.last_name as creator_name, e.profile_image as creator_profile_image,
+		       e.first_name || ' ' || e.last_name as creator_name, COALESCE(e.profile_image, '') as creator_profile_image,
 		       sd.name as source_department, td.name as target_department,
-		       cb.first_name || ' ' || cb.last_name as closed_by_name
+		       COALESCE(cb.first_name || ' ' || cb.last_name, '') as closed_by_name
 		FROM tickets t
 		JOIN employees e ON t.creator_id = e.id
 		JOIN departments sd ON t.source_department_id = sd.id
@@ -69,7 +69,7 @@ func (r *ticketRepo) GetTicketsForDepartment(ctx context.Context, departmentID u
 		// Load comments
 		cQuery := `
 			SELECT tc.id, tc.ticket_id, tc.employee_id, tc.comment, tc.attachments, tc.created_at,
-			       e.first_name || ' ' || e.last_name as author_name, e.profile_image as author_image
+			       e.first_name || ' ' || e.last_name as author_name, COALESCE(e.profile_image, '') as author_image
 			FROM ticket_comments tc
 			JOIN employees e ON tc.employee_id = e.id
 			WHERE tc.ticket_id = $1
@@ -97,9 +97,9 @@ func (r *ticketRepo) GetTicketsForDepartment(ctx context.Context, departmentID u
 func (r *ticketRepo) GetTicketByID(ctx context.Context, id uuid.UUID) (*models.Ticket, error) {
 	query := `
 		SELECT t.id, t.source_department_id, t.target_department_id, t.creator_id, t.title, t.description, t.status, t.closed_by, t.attachments, t.created_at, t.updated_at,
-		       e.first_name || ' ' || e.last_name as creator_name, e.profile_image as creator_profile_image,
+		       e.first_name || ' ' || e.last_name as creator_name, COALESCE(e.profile_image, '') as creator_profile_image,
 		       sd.name as source_department, td.name as target_department,
-		       cb.first_name || ' ' || cb.last_name as closed_by_name
+		       COALESCE(cb.first_name || ' ' || cb.last_name, '') as closed_by_name
 		FROM tickets t
 		JOIN employees e ON t.creator_id = e.id
 		JOIN departments sd ON t.source_department_id = sd.id
@@ -130,7 +130,7 @@ func (r *ticketRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status stri
 func (r *ticketRepo) AddComment(ctx context.Context, comment *models.TicketComment) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO ticket_comments (ticket_id, employee_id, comment, attachments)
-		 VALUES ($1, $2, $3, $4)
+		 VALUES ($1, $2, $3, $4::jsonb)
 		 RETURNING id, created_at`,
 		comment.TicketID, comment.EmployeeID, comment.Comment, comment.Attachments,
 	).Scan(&comment.ID, &comment.CreatedAt)
