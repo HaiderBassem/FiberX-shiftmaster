@@ -56,6 +56,7 @@ func main() {
 	fiberxDataRepo := repository.NewFiberxDataRepository(db)
 	securityRepo := repository.NewSecurityRepository(db)
 	itemReqRepo := repository.NewItemRequestRepository(db)
+	ticketRepo := repository.NewTicketRepository(db)
 
 	// --- Initialize Services ---
 	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
@@ -101,6 +102,7 @@ func main() {
 	fiberxDataHandler := handlers.NewFiberxDataHandler(fiberxDataService)
 	securityHandler := handlers.NewSecurityHandler(securityService)
 	itemReqHandler := handlers.NewItemRequestHandler(itemReqService)
+	ticketHandler := handlers.NewTicketHandler(ticketRepo)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -135,7 +137,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler,
 	)
 
 	// --- Start HTTP Server ---

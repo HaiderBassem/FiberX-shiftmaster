@@ -29,6 +29,8 @@ import { FiberxDataHub } from '../features/fiberx-data/FiberxDataHub';
 import { FiberxDataView } from '../features/fiberx-data/FiberxDataView';
 import { FiberxDataEditor } from '../features/fiberx-data/FiberxDataEditor';
 import { ExternalToolsList } from '../features/external-tools/ExternalToolsList';
+import { TicketList } from '../features/tickets/TicketList';
+
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
   
@@ -198,6 +200,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <HandoverBoard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="tickets"
+            element={
+              <ProtectedRoute>
+                <TicketList />
               </ProtectedRoute>
             }
           />
