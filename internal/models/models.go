@@ -116,6 +116,7 @@ type EmployeeShiftExtended struct {
 	EmployeeShift
 	FirstName      string     `json:"first_name"`
 	LastName       string     `json:"last_name"`
+	EmployeeRole   string     `json:"employee_role"`
 	DefaultShiftID *uuid.UUID `json:"default_shift_id"`
 }
 

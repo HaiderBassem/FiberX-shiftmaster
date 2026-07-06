@@ -350,30 +350,6 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		}
 	}
 
-	// Send email to department managers
-	var managers []models.Employee
-	if emp.DepartmentID != nil {
-		deptEmps, _ := s.employeeRepo.GetByDepartment(ctx, *emp.DepartmentID)
-		for _, e := range deptEmps {
-			if e.Role == "manager" {
-				managers = append(managers, e)
-			}
-		}
-	}
-	if len(managers) == 0 {
-		managers, _ = s.employeeRepo.GetByRole(ctx, "manager")
-	}
-
-	for _, mgr := range managers {
-		if mgr.Email != "" {
-			s.emailService.SendEmailAsync(
-				[]string{mgr.Email},
-				"New Leave Request Pending Team Leader Approval",
-				msg+"\n\nThis request is currently pending approval by the team leader.",
-			)
-		}
-	}
-
 	return nil
 }
 

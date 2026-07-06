@@ -95,6 +95,10 @@ export const InteractiveCalendar = () => {
       if (isSupervisor && selectedShiftId !== 'all') {
         if (s.default_shift_id !== selectedShiftId && s.shift_id !== selectedShiftId) return;
       }
+      if (user?.role === 'team_leader') {
+        if (s.employee_role === 'manager' || s.employee_role === 'admin') return;
+        if (s.employee_role === 'team_leader' && s.employee_id !== user.id) return;
+      }
       const dateKey = s.shift_date?.split('T')[0];
       if (map[dateKey]) map[dateKey].shifts.push(s);
     });

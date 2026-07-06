@@ -78,7 +78,7 @@ export const ScheduleView = () => {
     if (!rawEmployees) return [];
     if (user?.role === 'admin') return rawEmployees;
     if (user?.role === 'manager') return rawEmployees.filter((e: any) => e.role !== 'admin');
-    if (user?.role === 'team_leader') return rawEmployees.filter((e: any) => e.role !== 'admin' && e.role !== 'manager');
+    if (user?.role === 'team_leader') return rawEmployees.filter((e: any) => e.role !== 'admin' && e.role !== 'manager' && (e.role !== 'team_leader' || e.id === user.id));
     return rawEmployees;
   }, [rawEmployees, user]);
 
