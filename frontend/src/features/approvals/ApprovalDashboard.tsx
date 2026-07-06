@@ -392,7 +392,7 @@ export const ApprovalDashboard = () => {
 
   const { data: pendingSwaps, isLoading: swapsLoading } = useQuery({
     queryKey: ['swaps', 'pending', selectedDeptId],
-    queryFn: async () => { const res = await api.get(user?.role === 'manager' ? '/swaps/pending/manager' : '/swaps/pending'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get(['manager', 'admin', 'team_leader'].includes(user?.role || '') ? '/swaps/pending/manager' : '/swaps/pending'); return res.data?.data || []; },
   });
 
   const { data: pendingItemRequests, isLoading: itemRequestsLoading } = useQuery({

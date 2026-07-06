@@ -263,7 +263,7 @@ func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to 
 		es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
 		es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
 		es.created_at, es.updated_at, es.created_by,
-		e.first_name, e.last_name, e.default_shift_id
+		e.first_name, e.last_name, e.role, e.default_shift_id
 		FROM employee_shifts es
 		JOIN employees e ON e.id = es.employee_id
 		WHERE es.shift_date BETWEEN $1 AND $2
@@ -284,7 +284,7 @@ func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to 
 			&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
 			&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
 			&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
-			&es.FirstName, &es.LastName, &es.DefaultShiftID,
+			&es.FirstName, &es.LastName, &es.EmployeeRole, &es.DefaultShiftID,
 		); err != nil {
 			return nil, fmt.Errorf("scan department shift: %w", err)
 		}
