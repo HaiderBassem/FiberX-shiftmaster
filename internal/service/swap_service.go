@@ -567,6 +567,45 @@ func (s *SwapService) GetEligibleSwapTargets(ctx context.Context, employeeID uui
 	return filtered, nil
 }
 
+// GetEligibleShiftSwapTargets returns employees in the same department whose shift
+// on `date` differs from the requester's effective shift. Used for "swap by shift" mode.
+func (s *SwapService) GetEligibleShiftSwapTargets(ctx context.Context, employeeID uuid.UUID, date time.Time) ([]models.SwapEligibleEmployee, error) {
+	emp, err := s.employeeRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("employee not found: %w", err)
+	}
+	if emp.DepartmentID == nil {
+		return []models.SwapEligibleEmployee{}, nil
+	}
+
+	// Determine the requester's effective shift on the given date.
+	var requesterShiftID *uuid.UUID
+	dailyShift, err := s.scheduleRepo.GetEmployeeShift(ctx, employeeID, date)
+	if err == nil && dailyShift != nil {
+		requesterShiftID = dailyShift.ShiftID
+	} else {
+		// Fallback: use the employee's default shift
+		requesterShiftID = emp.DefaultShiftID
+	}
+
+	all, err := s.scheduleRepo.GetDeptEmployeesNotInSameShift(ctx, *emp.DepartmentID, employeeID, requesterShiftID, date)
+	if err != nil {
+		return nil, err
+	}
+
+	allowedRole := "employee"
+	if emp.Role == "team_leader" {
+		allowedRole = "team_leader"
+	}
+	filtered := make([]models.SwapEligibleEmployee, 0, len(all))
+	for _, candidate := range all {
+		if candidate.Role == allowedRole {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered, nil
+}
+
 func sameDayOrAfter(a, b time.Time) bool {
 	ay, am, ad := a.Date()
 	by, bm, bd := b.Date()

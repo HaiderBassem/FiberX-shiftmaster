@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +15,6 @@ import { useTranslation } from 'react-i18next';
 export const SwapList = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { user } = useAuthStore();
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,19 +37,6 @@ export const SwapList = () => {
     queryKey: ['swaps', 'pending', 'for-me'],
     queryFn: async () => { const res = await api.get('/swaps/pending/for-me'); return res.data?.data || []; },
     refetchInterval: 30000, // Poll every 30s for new requests
-  });
-
-  // All employees for the dropdown
-  const { data: employees } = useQuery({
-    queryKey: ['employees', 'active'],
-    queryFn: async () => { const res = await api.get('/employees?active=true'); return res.data?.data || []; },
-  });
-
-  const swapEligible = (employees || []).filter((emp: any) => {
-    if (emp.id === user?.id) return false;
-    if (emp.role !== 'employee') return false;
-    if (user?.department_id && emp.department_id !== user.department_id) return false;
-    return true;
   });
 
   const createSwap = useMutation({
@@ -369,7 +354,6 @@ export const SwapList = () => {
       <SwapRequestModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        employees={swapEligible}
         targetEmployeeId={targetEmployeeId}
         setTargetEmployeeId={setTargetEmployeeId}
         shiftDate={shiftDate}

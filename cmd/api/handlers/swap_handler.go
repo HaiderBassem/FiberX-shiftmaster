@@ -166,6 +166,30 @@ func (h *SwapHandler) EligibleTargets(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": targets, "meta": gin.H{"count": len(targets)}})
 }
 
+// EligibleShiftTargets returns employees in the requester's department who are in a DIFFERENT shift
+// on the given date (swap-by-shift mode).
+func (h *SwapHandler) EligibleShiftTargets(c *gin.Context) {
+	date, err := parseTime(c.Query("date"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid date format"})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	targets, err := h.swapSvc.GetEligibleShiftSwapTargets(c.Request.Context(), empID, date)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	if targets == nil {
+		targets = []models.SwapEligibleEmployee{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": targets, "meta": gin.H{"count": len(targets)}})
+}
+
 type respondRequest struct {
 	Accept bool `json:"accept"`
 }
