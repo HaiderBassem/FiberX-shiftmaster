@@ -683,24 +683,52 @@ const LeaderDashboard = () => {
               });
 
               if (!staff.length) return <p className="text-muted-foreground text-sm py-6 text-center">{t('dashboard.no_staff_found_for_shift')}</p>;
+              
+              const now = new Date();
+              const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {staff.map((emp: any) => {
-                    // Re-calculate effective shift for display
+                    // Re-calculate effective shift for display based on schedules and swaps
                     let effectiveShiftId = emp.default_shift_id;
+                    const todaySched = todaySchedules?.find((s: any) => s.employee_id === emp.id && s.shift_date?.startsWith(todayStr));
+                    if (todaySched && todaySched.shift_id) {
+                        effectiveShiftId = todaySched.shift_id;
+                    }
+                    
                     const todaysSwap = todaySwaps?.find((s: any) => s.shift_date?.startsWith(todayStr) && s.status === 'approved' && s.target_employee_id === emp.id);
                     if (todaysSwap) {
                         const requester = employees.find((req: any) => req.id === todaysSwap.requester_id);
-                        if (requester) effectiveShiftId = requester.default_shift_id;
+                        if (requester) {
+                           const reqSched = todaySchedules?.find((s: any) => s.employee_id === requester.id && s.shift_date?.startsWith(todayStr));
+                           if (reqSched && reqSched.shift_id) effectiveShiftId = reqSched.shift_id;
+                           else effectiveShiftId = requester.default_shift_id;
+                        }
                     }
                     const shift = shifts?.find((s: any) => s.id === effectiveShiftId);
                     
+                    // Determine if the shift is active right now
+                    let isActiveNow = false;
+                    if (shift && shift.start_time && shift.end_time) {
+                       const [startH, startM] = shift.start_time.split(':').map(Number);
+                       const [endH, endM] = shift.end_time.split(':').map(Number);
+                       const startMins = startH * 60 + startM;
+                       let endMins = endH * 60 + endM;
+                       
+                       if (endMins < startMins) {
+                         isActiveNow = currentMinutes >= startMins || currentMinutes <= endMins;
+                       } else {
+                         isActiveNow = currentMinutes >= startMins && currentMinutes <= endMins;
+                       }
+                    }
+                    
                     return (
-                      <div key={emp.id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors">
+                      <div key={emp.id} className={`flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm transition-colors ${isActiveNow ? 'hover:border-primary/40' : 'opacity-40 hover:opacity-70 grayscale'}`}>
                         {emp.profile_image ? (
                           <img src={emp.profile_image} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
                         ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg shrink-0">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${isActiveNow ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                             {emp.first_name?.[0]}{emp.last_name?.[0]}
                           </div>
                         )}
@@ -710,6 +738,7 @@ const LeaderDashboard = () => {
                             <span className="w-2 h-2 rounded-full" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
                             {shift?.name || t('dashboard.no_shift')}
                             {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">{t('dashboard.swapped_in')}</span>}
+                            {!isActiveNow && <span className="ml-1 text-[9px] text-muted-foreground px-1 rounded border border-border/50 uppercase tracking-widest">{t('dashboard.inactive') || 'INACTIVE'}</span>}
                           </p>
                         </div>
                       </div>
