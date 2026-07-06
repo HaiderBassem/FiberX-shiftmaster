@@ -50,6 +50,10 @@ type ScheduleRepository interface {
 	GetAvailableReplacements(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.Employee, error)
 	GetEligibleAssignees(ctx context.Context, shiftID uuid.UUID, date time.Time) ([]models.Employee, error)
 	GetSwapEligibleEmployees(ctx context.Context, departmentID uuid.UUID, excludeEmployeeID uuid.UUID, date time.Time) ([]models.SwapEligibleEmployee, error)
+	// GetDeptEmployeesNotInSameShift returns active dept employees whose shift on `date` differs from
+	// the requester's shift. Used for "swap by shift" mode. employeeShiftID may be uuid.Nil if the
+	// requester has no explicit daily row (fallback: matches by default_shift_id).
+	GetDeptEmployeesNotInSameShift(ctx context.Context, departmentID uuid.UUID, excludeEmployeeID uuid.UUID, requesterShiftID *uuid.UUID, date time.Time) ([]models.SwapEligibleEmployee, error)
 	GetShiftCoveragePreview(ctx context.Context, shiftID uuid.UUID, date time.Time) (*models.ShiftCoverage, error)
 }
 
@@ -536,6 +540,71 @@ func (r *scheduleRepo) GetSwapEligibleEmployees(ctx context.Context, departmentI
 			return nil, fmt.Errorf("scan swap eligible employee: %w", err)
 		}
 		emp.IsOff = true // always true since we filter by shift_status='off'
+		employees = append(employees, emp)
+	}
+	return employees, rows.Err()
+}
+
+// GetDeptEmployeesNotInSameShift returns all active employees in `departmentID` (excluding the requester)
+// whose effective shift on `date` is different from `requesterShiftID`.
+// "Effective shift" = employee_shifts.shift_id for that date if a row exists,
+// otherwise the employee's default_shift_id.
+// If `requesterShiftID` is nil (requester has no shift), we return all dept employees.
+func (r *scheduleRepo) GetDeptEmployeesNotInSameShift(
+	ctx context.Context,
+	departmentID uuid.UUID,
+	excludeEmployeeID uuid.UUID,
+	requesterShiftID *uuid.UUID,
+	date time.Time,
+) ([]models.SwapEligibleEmployee, error) {
+	// COALESCE(es.shift_id, e.default_shift_id) gives the "effective shift"
+	// for the employee on the requested date.
+	query := `
+		SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
+			   e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
+			   e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
+			   e.created_at, e.updated_at, e.created_by,
+			   COALESCE(es.shift_status, 'working') AS effective_status
+		FROM employees e
+		LEFT JOIN employee_shifts es ON es.employee_id = e.id AND es.shift_date = $1::date
+		WHERE e.department_id = $2
+		  AND e.id != $3
+		  AND e.status = 'active'`
+
+	args := []interface{}{date, departmentID, excludeEmployeeID}
+
+	if requesterShiftID != nil {
+		// Exclude employees that share the same effective shift_id as the requester
+		query += `
+		  AND COALESCE(es.shift_id, e.default_shift_id) IS DISTINCT FROM $4`
+		args = append(args, *requesterShiftID)
+	}
+
+	query += `
+		ORDER BY e.first_name, e.last_name`
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("get dept employees not in same shift: %w", err)
+	}
+	defer rows.Close()
+
+	var employees []models.SwapEligibleEmployee
+	for rows.Next() {
+		var emp models.SwapEligibleEmployee
+		var effectiveStatus string
+		if err := rows.Scan(
+			&emp.ID, &emp.EmployeeCode, &emp.FirstName, &emp.LastName, &emp.Gender,
+			&emp.Phone, &emp.Email, &emp.PasswordHash,
+			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
+			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
+			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail,
+			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
+			&effectiveStatus,
+		); err != nil {
+			return nil, fmt.Errorf("scan dept employee not in same shift: %w", err)
+		}
+		emp.IsOff = effectiveStatus == "off"
 		employees = append(employees, emp)
 	}
 	return employees, rows.Err()
