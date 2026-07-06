@@ -106,8 +106,9 @@ func (r *scheduleRepo) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 }
 
 // UpsertTemplateForDay sets a permanent off/working template for an employee day.
-// It updates the existing row if one exists for (employee_id, day_of_week),
-// otherwise inserts a new one with valid_to=NULL (permanent).
+// Guarantees exactly ONE row per (employee_id, day_of_week) by deleting any
+// stale rows first and then inserting fresh. This prevents the multiple-valid_from
+// rows problem that caused shifts to not persist across week boundaries.
 func (r *scheduleRepo) UpsertTemplateForDay(
 	ctx context.Context,
 	employeeID uuid.UUID,
@@ -115,22 +116,19 @@ func (r *scheduleRepo) UpsertTemplateForDay(
 	isOff bool,
 	shiftID *uuid.UUID,
 ) error {
-	// Attempt to update existing template for this employee + day
-	tag, err := r.db.Exec(ctx,
-		`UPDATE schedule_templates
-		 SET is_off=$3, shift_id=$4, valid_to=NULL, updated_at=CURRENT_TIMESTAMP
-		 WHERE employee_id=$1 AND day_of_week=$2`,
-		employeeID, dayOfWeek, isOff, shiftID)
+	// Delete all existing templates for this employee+day (there should be at most one,
+	// but clean up duplicates defensively).
+	_, err := r.db.Exec(ctx,
+		`DELETE FROM schedule_templates WHERE employee_id=$1 AND day_of_week=$2`,
+		employeeID, dayOfWeek)
 	if err != nil {
-		return fmt.Errorf("upsert template (update): %w", err)
+		return fmt.Errorf("upsert template (delete old): %w", err)
 	}
-	if tag.RowsAffected() > 0 {
-		return nil // updated in place
-	}
-	// No existing row — insert a new permanent template
+
+	// Insert the single authoritative row.
 	_, err = r.db.Exec(ctx,
 		`INSERT INTO schedule_templates (employee_id, day_of_week, shift_id, is_off, valid_from, valid_to)
-		 VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP,NULL)`,
+		 VALUES ($1, $2, $3, $4, CURRENT_DATE, NULL)`,
 		employeeID, dayOfWeek, shiftID, isOff)
 	if err != nil {
 		return fmt.Errorf("upsert template (insert): %w", err)
@@ -503,16 +501,18 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 	return employees, rows.Err()
 }
 
-// GetSwapEligibleEmployees returns all employees in the department and indicates if they are off on the requested date.
+// GetSwapEligibleEmployees returns employees in the department who have shift_status='off'
+// (NOT leave/vacation) on the requested date. These are the only valid swap targets.
 func (r *scheduleRepo) GetSwapEligibleEmployees(ctx context.Context, departmentID uuid.UUID, excludeEmployeeID uuid.UUID, date time.Time) ([]models.SwapEligibleEmployee, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
 				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
-				e.created_at, e.updated_at, e.created_by,
-				CASE WHEN es.shift_status IN ('off', 'leave', 'vacation') THEN true ELSE false END as is_off
+				e.created_at, e.updated_at, e.created_by
 		 FROM employees e
-		 LEFT JOIN employee_shifts es ON e.id = es.employee_id AND es.shift_date = $1
+		 INNER JOIN employee_shifts es ON e.id = es.employee_id
+		                               AND es.shift_date = $1
+		                               AND es.shift_status = 'off'
 		 WHERE e.department_id = $2
 		   AND e.id != $3
 		   AND e.status = 'active'
@@ -531,10 +531,11 @@ func (r *scheduleRepo) GetSwapEligibleEmployees(ctx context.Context, departmentI
 			&emp.HireDate, &emp.Role, &emp.DepartmentID, &emp.Position,
 			&emp.DefaultShiftID, &emp.WeeklyOffDays, &emp.CanCoverNightShift,
 			&emp.Status, &emp.ProfileImage, &emp.RememberToken, &emp.LastLogin, &emp.SecondaryPhone, &emp.SecondaryEmail,
-			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy, &emp.IsOff,
+			&emp.CreatedAt, &emp.UpdatedAt, &emp.CreatedBy,
 		); err != nil {
 			return nil, fmt.Errorf("scan swap eligible employee: %w", err)
 		}
+		emp.IsOff = true // always true since we filter by shift_status='off'
 		employees = append(employees, emp)
 	}
 	return employees, rows.Err()

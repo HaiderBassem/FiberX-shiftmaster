@@ -512,9 +512,9 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 		dayOfWeek := int(shiftDate.Weekday()) // 0=Sunday … 6=Saturday
 		isOff := shiftStatus == "off"
 		if tmplErr := s.scheduleRepo.UpsertTemplateForDay(ctx, employeeID, dayOfWeek, isOff, shiftID); tmplErr != nil {
-			// Log the failure but don't roll back the shift — the weekly entry
-			// was already saved successfully.
-			_ = tmplErr
+			// Template save failed — return the error so the caller knows
+			// the shift was saved but will NOT persist to future weeks.
+			return nil, fmt.Errorf("shift saved but template update failed (shift will not carry forward): %w", tmplErr)
 		}
 	}
 
