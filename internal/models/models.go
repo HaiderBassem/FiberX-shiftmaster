@@ -50,6 +50,7 @@ type Employee struct {
 	CanManageHelpDocs  bool      `json:"can_manage_help_docs"`
 	CanPostAnnouncements bool    `json:"can_post_announcements"`
 	CanManageFiberxData  bool      `json:"can_manage_fiberx_data"`
+	CanManageServices    bool      `json:"can_manage_services"`
 	UIPreferences      map[string]interface{} `json:"ui_preferences"`
 }
 

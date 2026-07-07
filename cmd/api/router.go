@@ -35,6 +35,7 @@ func SetupRouter(
 	securityH *handlers.SecurityHandler,
 	itemReqH *handlers.ItemRequestHandler,
 	ticketH *handlers.TicketHandler,
+	serviceH *handlers.ServiceHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -78,6 +79,7 @@ func SetupRouter(
 			employees.PUT("/:id/help-permission", empH.UpdateHelpPermission)
 			employees.PUT("/:id/announcement-permission", empH.UpdateAnnouncementPermission)
 			employees.PUT("/:id/table-permission", empH.UpdateTablePermission)
+			employees.PUT("/:id/service-permission", empH.UpdateServicePermission)
 			employees.PUT("/:id/preferences", empH.UpdatePreferences)
 		}
 
@@ -422,6 +424,23 @@ func SetupRouter(
 			tickets.POST("", ticketH.CreateTicket)
 			tickets.POST("/:id/comments", ticketH.AddComment)
 			tickets.PUT("/:id/close", ticketH.CloseTicket)
+		}
+
+		// --- FTTH Services Catalog ---
+		services := protected.Group("/services")
+		{
+			// Read – all authenticated users
+			services.GET("/categories", serviceH.ListCategories)
+			services.GET("/categories/:id/plans", serviceH.ListPlans)
+			services.GET("/plans/:id", serviceH.GetPlan)
+
+			// Write – permission checked inside handler
+			services.POST("/categories", serviceH.CreateCategory)
+			services.PUT("/categories/:id", serviceH.UpdateCategory)
+			services.DELETE("/categories/:id", serviceH.DeleteCategory)
+			services.POST("/categories/:id/plans", serviceH.CreatePlan)
+			services.PUT("/plans/:id", serviceH.UpdatePlan)
+			services.DELETE("/plans/:id", serviceH.DeletePlan)
 		}
 
 	}
