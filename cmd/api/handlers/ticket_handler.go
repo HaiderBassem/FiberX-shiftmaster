@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -28,14 +28,36 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 		Attachments        *string   `json:"attachments"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request payload: " + err.Error()})
 		return
 	}
 
-	empIDStr, _ := c.Get("employee_id")
-	empID, _ := uuid.Parse(empIDStr.(string))
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
+	empIDStr, ok := c.Get("employee_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing employee context"})
+		return
+	}
+	empID, err := uuid.Parse(empIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid employee ID"})
+		return
+	}
+
+	deptIDStr, ok := c.Get("department_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing department context"})
+		return
+	}
+	deptID, err := uuid.Parse(deptIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
+
+	if req.TargetDepartmentID == deptID {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Cannot create ticket to your own department"})
+		return
+	}
 
 	ticket := &models.Ticket{
 		SourceDepartmentID: deptID,
@@ -47,8 +69,8 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 	}
 
 	if err := h.repo.Create(c.Request.Context(), ticket); err != nil {
-		fmt.Printf("CreateTicket error: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ticket: " + err.Error()})
+		log.Printf("CreateTicket error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to create ticket"})
 		return
 	}
 
@@ -57,13 +79,21 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 
 // GetTickets lists tickets relevant to the user's department
 func (h *TicketHandler) GetTickets(c *gin.Context) {
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
+	deptIDStr, ok := c.Get("department_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing department context"})
+		return
+	}
+	deptID, err := uuid.Parse(deptIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
 
 	tickets, err := h.repo.GetTicketsForDepartment(c.Request.Context(), deptID)
 	if err != nil {
-		fmt.Println("GetTicketsForDepartment error:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tickets"})
+		log.Printf("GetTicketsForDepartment error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to fetch tickets"})
 		return
 	}
 	if tickets == nil {
@@ -77,29 +107,52 @@ func (h *TicketHandler) GetTickets(c *gin.Context) {
 func (h *TicketHandler) CloseTicket(c *gin.Context) {
 	ticketID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ticket ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ticket ID"})
 		return
 	}
 
-	empIDStr, _ := c.Get("employee_id")
-	empID, _ := uuid.Parse(empIDStr.(string))
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
+	empIDStr, ok := c.Get("employee_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing employee context"})
+		return
+	}
+	empID, err := uuid.Parse(empIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid employee ID"})
+		return
+	}
+
+	deptIDStr, ok := c.Get("department_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing department context"})
+		return
+	}
+	deptID, err := uuid.Parse(deptIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
 
 	ticket, err := h.repo.GetTicketByID(c.Request.Context(), ticketID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Ticket not found"})
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Ticket not found"})
 		return
 	}
 
 	// Verify department has access
 	if ticket.SourceDepartmentID != deptID && ticket.TargetDepartmentID != deptID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this ticket"})
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have access to this ticket"})
+		return
+	}
+
+	if ticket.Status == "closed" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Ticket is already closed"})
 		return
 	}
 
 	if err := h.repo.UpdateStatus(c.Request.Context(), ticketID, "closed", &empID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to close ticket"})
+		log.Printf("CloseTicket error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to close ticket"})
 		return
 	}
 
@@ -110,7 +163,7 @@ func (h *TicketHandler) CloseTicket(c *gin.Context) {
 func (h *TicketHandler) AddComment(c *gin.Context) {
 	ticketID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ticket ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid ticket ID"})
 		return
 	}
 
@@ -119,24 +172,46 @@ func (h *TicketHandler) AddComment(c *gin.Context) {
 		Attachments *string `json:"attachments"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request payload"})
 		return
 	}
 
-	empIDStr, _ := c.Get("employee_id")
-	empID, _ := uuid.Parse(empIDStr.(string))
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
+	empIDStr, ok := c.Get("employee_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing employee context"})
+		return
+	}
+	empID, err := uuid.Parse(empIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid employee ID"})
+		return
+	}
+
+	deptIDStr, ok := c.Get("department_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Missing department context"})
+		return
+	}
+	deptID, err := uuid.Parse(deptIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
 
 	ticket, err := h.repo.GetTicketByID(c.Request.Context(), ticketID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Ticket not found"})
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Ticket not found"})
 		return
 	}
 
 	// Verify department has access
 	if ticket.SourceDepartmentID != deptID && ticket.TargetDepartmentID != deptID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You don't have access to this ticket"})
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have access to this ticket"})
+		return
+	}
+
+	if ticket.Status == "closed" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Cannot comment on a closed ticket"})
 		return
 	}
 
@@ -148,7 +223,8 @@ func (h *TicketHandler) AddComment(c *gin.Context) {
 	}
 
 	if err := h.repo.AddComment(c.Request.Context(), comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add comment"})
+		log.Printf("AddComment error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to add comment"})
 		return
 	}
 
