@@ -57,6 +57,7 @@ func main() {
 	securityRepo := repository.NewSecurityRepository(db)
 	itemReqRepo := repository.NewItemRequestRepository(db)
 	ticketRepo := repository.NewTicketRepository(db)
+	serviceRepo := repository.NewServiceRepository(db)
 
 	// --- Initialize Services ---
 	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
@@ -103,6 +104,7 @@ func main() {
 	securityHandler := handlers.NewSecurityHandler(securityService)
 	itemReqHandler := handlers.NewItemRequestHandler(itemReqService)
 	ticketHandler := handlers.NewTicketHandler(ticketRepo)
+	serviceHandler := handlers.NewServiceHandler(serviceRepo, db)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -137,7 +139,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler,
 	)
 
 	// --- Start HTTP Server ---

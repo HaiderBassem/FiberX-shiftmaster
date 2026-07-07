@@ -28,6 +28,7 @@ interface Employee {
   can_manage_help_docs: boolean;
   can_post_announcements: boolean;
   can_manage_fiberx_data: boolean;
+  can_manage_services: boolean;
   status: string;
   secondary_phone: string | null;
   secondary_email: string | null;
@@ -86,6 +87,7 @@ export const EmployeeList = () => {
   const [createCanManageHelpDocs, setCreateCanManageHelpDocs] = useState(false);
   const [createCanPostAnnouncements, setCreateCanPostAnnouncements] = useState(false);
   const [createCanManageFiberxData, setCreateCanManageFiberxData] = useState(false);
+  const [createCanManageServices, setCreateCanManageServices] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
   const [createSecPhone, setCreateSecPhone] = useState('');
   const [createSecEmail, setCreateSecEmail] = useState('');
@@ -106,6 +108,7 @@ export const EmployeeList = () => {
   const [editCanManageHelpDocs, setEditCanManageHelpDocs] = useState(false);
   const [editCanPostAnnouncements, setEditCanPostAnnouncements] = useState(false);
   const [editCanManageFiberxData, setEditCanManageFiberxData] = useState(false);
+  const [editCanManageServices, setEditCanManageServices] = useState(false);
   const [editSecPhone, setEditSecPhone] = useState('');
   const [editSecEmail, setEditSecEmail] = useState('');
 
@@ -167,6 +170,7 @@ export const EmployeeList = () => {
         can_manage_help_docs: createCanManageHelpDocs,
         can_post_announcements: createCanPostAnnouncements,
         can_manage_fiberx_data: createCanManageFiberxData,
+        can_manage_services: createCanManageServices,
         password: createPassword,
         secondary_phone: createSecPhone || null,
         secondary_email: createSecEmail || null,
@@ -205,6 +209,7 @@ export const EmployeeList = () => {
         can_manage_help_docs: editCanManageHelpDocs,
         can_post_announcements: editCanPostAnnouncements,
         can_manage_fiberx_data: editCanManageFiberxData,
+        can_manage_services: editCanManageServices,
         secondary_phone: editSecPhone || null,
         secondary_email: editSecEmail || null,
       });
@@ -242,6 +247,7 @@ export const EmployeeList = () => {
     setEditCanManageHelpDocs(emp.can_manage_help_docs);
     setEditCanPostAnnouncements(emp.can_post_announcements);
     setEditCanManageFiberxData(emp.can_manage_fiberx_data);
+    setEditCanManageServices(emp.can_manage_services);
     setEditSecPhone(emp.secondary_phone || '');
     setEditSecEmail(emp.secondary_email || '');
   };
@@ -446,6 +452,10 @@ export const EmployeeList = () => {
                 <input id="create-fiberx" type="checkbox" checked={createCanManageFiberxData} onChange={(e) => setCreateCanManageFiberxData(e.target.checked)} />
                 <Label htmlFor="create-fiberx">Can create FiberX Data</Label>
               </div>
+              <div className="flex items-center gap-2 pt-6">
+                <input id="create-services" type="checkbox" checked={createCanManageServices} onChange={(e) => setCreateCanManageServices(e.target.checked)} />
+                <Label htmlFor="create-services">Can manage Services</Label>
+              </div>
             </div>
           </CardContent>
           <CardFooter>
@@ -489,6 +499,7 @@ export const EmployeeList = () => {
                     <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-help" type="checkbox" checked={editCanManageHelpDocs} onChange={(e) => setEditCanManageHelpDocs(e.target.checked)} /><Label htmlFor="edit-help" className="text-xs">Can manage Help Docs</Label></div>
                     <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-announcements" type="checkbox" checked={editCanPostAnnouncements} onChange={(e) => setEditCanPostAnnouncements(e.target.checked)} /><Label htmlFor="edit-announcements" className="text-xs">Can post Announcements</Label></div>
                     <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-fiberx" type="checkbox" checked={editCanManageFiberxData} onChange={(e) => setEditCanManageFiberxData(e.target.checked)} /><Label htmlFor="edit-fiberx" className="text-xs">Can create FiberX Data</Label></div>
+                    <div className="space-y-1 flex items-center gap-2 pt-6"><input id="edit-services" type="checkbox" checked={editCanManageServices} onChange={(e) => setEditCanManageServices(e.target.checked)} /><Label htmlFor="edit-services" className="text-xs">Can manage Services</Label></div>
                     <div className="space-y-1"><Label className="text-xs">Department</Label>
                       <select className={selectClass + " h-9"} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
                         <option value="">None</option>{departments?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}

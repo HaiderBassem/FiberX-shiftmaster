@@ -338,6 +338,7 @@ type updateEmployeeRequest struct {
 	CanManageHelpDocs    *bool      `json:"can_manage_help_docs"`
 	CanPostAnnouncements *bool      `json:"can_post_announcements"`
 	CanManageFiberxData  *bool      `json:"can_manage_fiberx_data"`
+	CanManageServices    *bool      `json:"can_manage_services"`
 	Status               string     `json:"status"`
 	ProfileImage         *string    `json:"profile_image"`
 	SecondaryPhone       *string    `json:"secondary_phone"`
@@ -476,6 +477,7 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
 		CanPostAnnouncements: func() bool { if req.CanPostAnnouncements != nil { return *req.CanPostAnnouncements }; return current.CanPostAnnouncements }(),
 		CanManageFiberxData:  func() bool { if req.CanManageFiberxData != nil { return *req.CanManageFiberxData }; return current.CanManageFiberxData }(),
+		CanManageServices:    func() bool { if req.CanManageServices != nil { return *req.CanManageServices }; return current.CanManageServices }(),
 		CanCreateTables:    current.CanCreateTables,
 		UIPreferences:      current.UIPreferences,
 		Status:             req.Status,
@@ -843,6 +845,50 @@ func (h *EmployeeHandler) UpdateTablePermission(c *gin.Context) {
 	}
 
 	if err := h.employeeService.UpdateTablePermission(c.Request.Context(), id, req.CanCreateTables); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+type updateServicePermissionRequest struct {
+	CanManageServices bool `json:"can_manage_services"`
+}
+
+func (h *EmployeeHandler) UpdateServicePermission(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	var req updateServicePermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+
+	roleAny, _ := c.Get("role")
+	role, _ := roleAny.(string)
+
+	if role != "admin" && role != "manager" {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+		return
+	}
+
+	if role == "manager" {
+		requesterStr, _ := c.Get("employee_id")
+		requesterID, _ := uuid.Parse(requesterStr.(string))
+		me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
+		target, _ := h.employeeService.GetByID(c.Request.Context(), id)
+		if me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden"})
+			return
+		}
+	}
+
+	if err := h.employeeService.UpdateServicePermission(c.Request.Context(), id, req.CanManageServices); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
