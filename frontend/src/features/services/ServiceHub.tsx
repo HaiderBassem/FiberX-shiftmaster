@@ -4,14 +4,15 @@ import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
 import type { ServiceCategory } from './types';
 import { ServicePlans } from './ServicePlans';
+import { useTranslation } from 'react-i18next';
 import {
-  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight,
+  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search,
 } from 'lucide-react';
 
 /* ─── helpers ─────────────────────────────────────────── */
 const canManage = (user: any) =>
   user?.role === 'admin' ||
-  (user?.role === 'team_leader' && user?.can_manage_services === true);
+  ((user?.role === 'team_leader' || user?.role === 'manager') && user?.can_manage_services === true);
 
 /* ─── Category Form Modal ──────────────────────────────── */
 function CategoryModal({
@@ -21,6 +22,7 @@ function CategoryModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initial?.name ?? '');
   const [desc, setDesc] = useState(initial?.description ?? '');
   const [busy, setBusy] = useState(false);
@@ -28,7 +30,7 @@ function CategoryModal({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return setErr('الاسم مطلوب');
+    if (!name.trim()) return setErr(t('services.name_required'));
     setBusy(true); setErr('');
     try {
       const payload = { name: name.trim(), description: desc.trim() || undefined };
@@ -40,7 +42,7 @@ function CategoryModal({
       onSaved();
       onClose();
     } catch (e: any) {
-      setErr(e.response?.data?.error ?? 'حدث خطأ');
+      setErr(e.response?.data?.error ?? t('services.error_occurred'));
     } finally { setBusy(false); }
   };
 
@@ -49,7 +51,7 @@ function CategoryModal({
       <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between px-6 py-5 border-b border-border">
           <h2 className="text-lg font-bold text-foreground">
-            {initial ? 'تعديل التصنيف' : 'تصنيف جديد'}
+            {initial ? t('services.edit_category') : t('services.new_category')}
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
@@ -57,18 +59,18 @@ function CategoryModal({
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">اسم التصنيف *</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('services.category_name')}</label>
             <input
               value={name} onChange={e => setName(e.target.value)}
-              placeholder="مثال: عروض بغداد الشمالية"
+              placeholder={t('services.category_name_ph')}
               className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">وصف (اختياري)</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">{t('services.category_desc')}</label>
             <textarea
               value={desc} onChange={e => setDesc(e.target.value)} rows={3}
-              placeholder="وصف مختصر لهذا التصنيف..."
+              placeholder={t('services.category_desc_ph')}
               className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 transition-colors resize-none"
             />
           </div>
@@ -76,12 +78,12 @@ function CategoryModal({
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-white/5 transition-colors text-sm font-medium">
-              إلغاء
+              {t('services.cancel')}
             </button>
             <button type="submit" disabled={busy}
               className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm font-medium flex items-center justify-center gap-2">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {initial ? 'حفظ التعديلات' : 'إنشاء'}
+              {initial ? t('services.save_changes') : t('services.create')}
             </button>
           </div>
         </form>
@@ -92,6 +94,7 @@ function CategoryModal({
 
 /* ─── Main ServiceHub ──────────────────────────────────── */
 export function ServiceHub() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const qc = useQueryClient();
   const manager = canManage(user);
@@ -99,6 +102,7 @@ export function ServiceHub() {
   const [openCatID, setOpenCatID] = useState<string | null>(null);
   const [modalCat, setModalCat] = useState<ServiceCategory | null | undefined>(undefined); // undefined=closed
   const [delConfirm, setDelConfirm] = useState<ServiceCategory | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data, isLoading } = useQuery<ServiceCategory[]>({
     queryKey: ['service-categories'],
@@ -136,10 +140,10 @@ export function ServiceHub() {
             <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
               <Wifi className="w-5 h-5 text-primary" />
             </div>
-            خدمات الإنترنت
+            {t('services.title')}
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            كتالوج باقات FTTH — الأسعار والمحافظات والكابينات
+            {t('services.desc')}
           </p>
         </div>
         {manager && (
@@ -147,9 +151,21 @@ export function ServiceHub() {
             onClick={() => setModalCat(null)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
           >
-            <Plus className="w-4 h-4" /> تصنيف جديد
+            <Plus className="w-4 h-4" /> {t('services.new_category')}
           </button>
         )}
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative max-w-md w-full mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('services.search_categories_placeholder')}
+          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
       </div>
 
       {/* Grid */}
@@ -162,14 +178,14 @@ export function ServiceHub() {
           <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
             <FolderOpen className="w-8 h-8 text-muted-foreground" />
           </div>
-          <p className="text-foreground font-semibold text-lg">لا توجد تصنيفات بعد</p>
+          <p className="text-foreground font-semibold text-lg">{t('services.no_categories')}</p>
           <p className="text-muted-foreground text-sm mt-1">
-            {manager ? 'اضغط "تصنيف جديد" لإضافة أول تصنيف' : 'لا توجد خدمات متاحة حالياً'}
+            {manager ? t('services.no_categories_desc_manager') : t('services.no_categories_desc_employee')}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {data.map(cat => (
+          {data.filter(cat => cat.name.toLowerCase().includes(searchQuery.toLowerCase()) || (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()))).map(cat => (
             <div
               key={cat.id}
               className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
@@ -189,11 +205,11 @@ export function ServiceHub() {
               {/* Plan count badge */}
               <div className="flex items-center gap-1.5 mt-auto">
                 <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                  {cat.plan_count} باقة
+                  {t('services.plan_count', { count: cat.plan_count })}
                 </span>
                 {!cat.is_active && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
-                    معطّل
+                    {t('services.disabled')}
                   </span>
                 )}
               </div>
@@ -209,7 +225,7 @@ export function ServiceHub() {
                   <button
                     onClick={() => toggleMut.mutate(cat)}
                     className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
-                    title={cat.is_active ? 'تعطيل' : 'تفعيل'}
+                    title={cat.is_active ? t('services.disable') : t('services.enable')}
                   >
                     {cat.is_active
                       ? <ToggleRight className="w-3.5 h-3.5 text-primary" />
@@ -251,22 +267,22 @@ export function ServiceHub() {
               <Trash2 className="w-6 h-6 text-destructive" />
             </div>
             <div>
-              <p className="font-bold text-foreground">حذف التصنيف؟</p>
+              <p className="font-bold text-foreground">{t('services.delete_category_title')}</p>
               <p className="text-muted-foreground text-sm mt-1">
-                سيتم حذف <span className="font-semibold text-foreground">"{delConfirm.name}"</span> وجميع باقاته. لا يمكن التراجع.
+                {t('services.delete_category_desc', { name: delConfirm.name })}
               </p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDelConfirm(null)}
                 className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-white/5 transition-colors text-sm font-medium">
-                إلغاء
+                {t('services.cancel')}
               </button>
               <button
                 onClick={() => deleteMut.mutate(delConfirm.id)}
                 disabled={deleteMut.isPending}
                 className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors text-sm font-medium flex items-center justify-center gap-2">
                 {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                حذف
+                {t('services.delete')}
               </button>
             </div>
           </div>

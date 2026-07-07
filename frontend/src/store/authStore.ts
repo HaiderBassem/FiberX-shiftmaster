@@ -11,6 +11,7 @@ interface User {
   department_id: string | null;
   can_create_tables?: boolean;
   can_manage_help_docs?: boolean;
+  can_manage_services?: boolean;
   ui_preferences?: Record<string, any>;
   profile_image?: string;
 }

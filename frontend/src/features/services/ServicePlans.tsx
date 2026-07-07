@@ -3,13 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import type { ServiceCategory, ServicePlan } from './types';
 import { IRAQ_PROVINCES } from './types';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
-  Clock, DollarSign, Zap, MapPin, Server, Router, Cpu, StickyNote,
+  Clock, DollarSign, Zap, MapPin, Server, Router, Cpu, StickyNote, Search,
 } from 'lucide-react';
 
 /* ─── Plan Detail Modal ────────────────────────────────── */
 function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -32,12 +34,12 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
           {/* Key metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
-              { icon: DollarSign, label: 'السعر الشهري', value: `${plan.price.toLocaleString()} د.ع`, color: 'text-emerald-400' },
-              { icon: Clock, label: 'مدة الباقة', value: `${plan.duration_days} يوم`, color: 'text-blue-400' },
-              { icon: MapPin, label: 'المحافظة', value: plan.province, color: 'text-amber-400' },
-              { icon: Zap, label: 'سرعة التحميل', value: plan.speed_download ?? '—', color: 'text-primary' },
-              { icon: Zap, label: 'سرعة الرفع', value: plan.speed_upload ?? '—', color: 'text-primary' },
-              { icon: Server, label: 'نوع IP', value: plan.ip_type, color: 'text-purple-400' },
+              { icon: DollarSign, label: t('services.monthly_price'), value: `${plan.price.toLocaleString()} ${t('services.iqd_per_plan').split('/')[0]}`, color: 'text-emerald-400' },
+              { icon: Clock, label: t('services.plan_duration'), value: `${plan.duration_days} ${t('services.days')}`, color: 'text-blue-400' },
+              { icon: MapPin, label: t('services.province'), value: plan.province, color: 'text-amber-400' },
+              { icon: Zap, label: t('services.speed_down'), value: plan.speed_download ?? '—', color: 'text-primary' },
+              { icon: Zap, label: t('services.speed_up'), value: plan.speed_upload ?? '—', color: 'text-primary' },
+              { icon: Server, label: t('services.ip_type'), value: plan.ip_type, color: 'text-purple-400' },
             ].map(item => (
               <div key={item.label} className="bg-background rounded-xl p-3 border border-border">
                 <item.icon className={`w-4 h-4 mb-1.5 ${item.color}`} />
@@ -51,26 +53,26 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Cpu className="w-4 h-4 shrink-0" />
-              <span>نوع الاتصال: <span className="text-foreground font-medium">{plan.connection_type}</span></span>
+              <span>{t('services.connection_type')} <span className="text-foreground font-medium">{plan.connection_type}</span></span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Server className="w-4 h-4 shrink-0" />
-              <span>الحد الأقصى للبيانات: <span className="text-foreground font-medium">{plan.data_cap ?? 'غير محدود'}</span></span>
+              <span>{t('services.max_data')} <span className="text-foreground font-medium">{plan.data_cap ?? t('services.unlimited')}</span></span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <DollarSign className="w-4 h-4 shrink-0" />
-              <span>رسوم التركيب: <span className="text-foreground font-medium">{plan.installation_fee > 0 ? `${plan.installation_fee.toLocaleString()} د.ع` : 'مجاني'}</span></span>
+              <span>{t('services.install_fee_label')} <span className="text-foreground font-medium">{plan.installation_fee > 0 ? `${plan.installation_fee.toLocaleString()} ${t('services.iqd_per_plan').split('/')[0]}` : t('services.free')}</span></span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Router className="w-4 h-4 shrink-0" />
-              <span>راوتر مشمول: <span className="text-foreground font-medium">{plan.router_included ? 'نعم ✓' : 'لا'}</span></span>
+              <span>{t('services.router_label')} <span className="text-foreground font-medium">{plan.router_included ? t('services.yes') : t('services.no')}</span></span>
             </div>
           </div>
 
           {/* Description */}
           {plan.description && (
             <div className="bg-background rounded-xl p-4 border border-border">
-              <p className="text-xs text-muted-foreground mb-1">تفاصيل إضافية</p>
+              <p className="text-xs text-muted-foreground mb-1">{t('services.additional_details')}</p>
               <p className="text-foreground text-sm whitespace-pre-line">{plan.description}</p>
             </div>
           )}
@@ -80,16 +82,16 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
             <div className="bg-amber-500/5 rounded-xl p-4 border border-amber-500/20">
               <div className="flex items-center gap-2 mb-2">
                 <StickyNote className="w-4 h-4 text-amber-400" />
-                <p className="text-amber-400 text-xs font-semibold">ملاحظات الكابينات المشمولة</p>
+                <p className="text-amber-400 text-xs font-semibold">{t('services.cabinet_notes')}</p>
               </div>
               <p className="text-foreground text-sm whitespace-pre-line leading-relaxed">{plan.cabinet_notes}</p>
             </div>
           )}
 
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border">
-            <span>أُنشئت بواسطة: {plan.creator_name ?? '—'}</span>
+            <span>{t('services.created_by', { name: plan.creator_name ?? '—' })}</span>
             <span className={`px-2 py-0.5 rounded-full font-medium ${plan.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-destructive/10 text-destructive'}`}>
-              {plan.is_active ? 'نشطة' : 'معطّلة'}
+              {plan.is_active ? t('services.active') : t('services.disabled')}
             </span>
           </div>
         </div>
@@ -102,6 +104,7 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
 function PlanModal({ categoryId, initial, onClose, onSaved }: {
   categoryId: string; initial?: ServicePlan | null; onClose: () => void; onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [f, setF] = useState({
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
@@ -124,7 +127,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!f.name.trim() || !f.price || !f.province) return setErr('الاسم والسعر والمحافظة مطلوبة');
+    if (!f.name.trim() || !f.price || !f.province) return setErr(t('services.req_fields'));
     setBusy(true); setErr('');
     try {
       const payload = {
@@ -144,7 +147,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
       }
       onSaved(); onClose();
     } catch (e: any) {
-      setErr(e.response?.data?.error ?? 'حدث خطأ');
+      setErr(e.response?.data?.error ?? t('services.error_occurred'));
     } finally { setBusy(false); }
   };
 
@@ -161,28 +164,28 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-card border border-border rounded-2xl w-full max-w-2xl shadow-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-          <h2 className="font-bold text-foreground">{initial ? 'تعديل الباقة' : 'باقة جديدة'}</h2>
+          <h2 className="font-bold text-foreground">{initial ? t('services.edit_plan') : t('services.new_plan')}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
         <form onSubmit={submit} className="p-6 overflow-y-auto space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {field('اسم الباقة *', 'name', 'text', 'مثال: باقة 100 ميغا')}
-            {field('السعر (د.ع) *', 'price', 'number', '50000')}
-            {field('المدة (أيام) *', 'duration_days', 'number', '30')}
-            {field('سرعة التحميل', 'speed_download', 'text', '100 Mbps')}
-            {field('سرعة الرفع', 'speed_upload', 'text', '50 Mbps')}
-            {field('الحد الأقصى للبيانات', 'data_cap', 'text', 'Unlimited')}
-            {field('رسوم التركيب (د.ع)', 'installation_fee', 'number', '0')}
+            {field(t('services.plan_name'), 'name', 'text', t('services.plan_name_ph'))}
+            {field(t('services.price'), 'price', 'number', t('services.price_ph'))}
+            {field(t('services.duration'), 'duration_days', 'number', t('services.duration_ph'))}
+            {field(t('services.speed_down'), 'speed_download', 'text', t('services.speed_down_ph'))}
+            {field(t('services.speed_up'), 'speed_upload', 'text', t('services.speed_up_ph'))}
+            {field(t('services.data_cap'), 'data_cap', 'text', t('services.data_cap_ph'))}
+            {field(t('services.install_fee'), 'installation_fee', 'number', t('services.install_fee_ph'))}
           </div>
 
           {/* Province */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">المحافظة *</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.province')}</label>
             <select value={f.province} onChange={e => set('province', e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
-              <option value="">اختر المحافظة...</option>
+              <option value="">{t('services.select_province')}</option>
               {IRAQ_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
@@ -190,7 +193,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
           <div className="grid grid-cols-2 gap-4">
             {/* IP Type */}
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">نوع IP</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.ip_type')}</label>
               <select value={f.ip_type} onChange={e => set('ip_type', e.target.value)}
                 className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
                 <option value="Dynamic">Dynamic</option>
@@ -202,25 +205,25 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
               <input type="checkbox" id="router" checked={f.router_included}
                 onChange={e => set('router_included', e.target.checked)}
                 className="w-4 h-4 accent-primary" />
-              <label htmlFor="router" className="text-sm text-foreground">راوتر مشمول مع الباقة</label>
+              <label htmlFor="router" className="text-sm text-foreground">{t('services.router_included')}</label>
             </div>
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">وصف إضافي</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.extra_desc')}</label>
             <textarea value={f.description} onChange={e => set('description', e.target.value)}
-              rows={2} placeholder="تفاصيل الباقة..."
+              rows={2} placeholder={t('services.extra_desc_ph')}
               className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 resize-none" />
           </div>
 
           {/* Cabinet Notes */}
           <div>
             <label className="block text-xs font-medium text-amber-400 mb-1 flex items-center gap-1.5">
-              <StickyNote className="w-3.5 h-3.5" /> ملاحظات الكابينات المشمولة
+              <StickyNote className="w-3.5 h-3.5" /> {t('services.cabinet_notes')}
             </label>
             <textarea value={f.cabinet_notes} onChange={e => set('cabinet_notes', e.target.value)}
-              rows={3} placeholder="اكتب أسماء أو أرقام الكابينات المشمولة بهذا العرض..."
+              rows={3} placeholder={t('services.cabinet_notes_ph')}
               className="w-full bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-amber-500/40 resize-none" />
           </div>
 
@@ -229,12 +232,12 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
           <div className="flex gap-3 pt-2 sticky bottom-0 bg-card pb-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-white/5 text-sm font-medium">
-              إلغاء
+              {t('services.cancel')}
             </button>
             <button type="submit" disabled={busy}
               className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium flex items-center justify-center gap-2">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {initial ? 'حفظ' : 'إنشاء الباقة'}
+              {initial ? t('services.save_changes') : t('services.create')}
             </button>
           </div>
         </form>
@@ -247,12 +250,14 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
 export function ServicePlans({ category, manager, onBack }: {
   category: ServiceCategory; manager: boolean; onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const key = ['service-plans', category.id];
 
   const [detailPlan, setDetailPlan] = useState<ServicePlan | null>(null);
   const [editPlan, setEditPlan] = useState<ServicePlan | null | undefined>(undefined);
   const [delPlan, setDelPlan] = useState<ServicePlan | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: plans, isLoading } = useQuery<ServicePlan[]>({
     queryKey: key,
@@ -283,9 +288,21 @@ export function ServicePlans({ category, manager, onBack }: {
         {manager && (
           <button onClick={() => setEditPlan(null)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" /> باقة جديدة
+            <Plus className="w-4 h-4" /> {t('services.new_plan')}
           </button>
         )}
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative max-w-md w-full">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={t('services.search_plans_placeholder')}
+          className="w-full pl-9 pr-4 py-2 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+        />
       </div>
 
       {/* Plans grid */}
@@ -298,14 +315,14 @@ export function ServicePlans({ category, manager, onBack }: {
           <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
             <Wifi className="w-8 h-8 text-muted-foreground" />
           </div>
-          <p className="font-semibold text-foreground">لا توجد باقات في هذا التصنيف</p>
+          <p className="font-semibold text-foreground">{t('services.no_plans')}</p>
           <p className="text-muted-foreground text-sm mt-1">
-            {manager ? 'اضغط "باقة جديدة" لإضافة أول باقة' : 'لا توجد باقات متاحة حالياً'}
+            {manager ? t('services.no_plans_desc_manager') : t('services.no_plans_desc_employee')}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {plans.map(plan => (
+          {plans.filter(plan => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || (plan.province && plan.province.toLowerCase().includes(searchQuery.toLowerCase()))).map(plan => (
             <div key={plan.id}
               className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
               onClick={() => setDetailPlan(plan)}>
@@ -316,7 +333,7 @@ export function ServicePlans({ category, manager, onBack }: {
                   <MapPin className="w-3 h-3" /> {plan.province}
                 </span>
                 {!plan.is_active && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">معطّلة</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">{t('services.disabled')}</span>
                 )}
               </div>
 
@@ -327,11 +344,11 @@ export function ServicePlans({ category, manager, onBack }: {
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <div className="bg-background rounded-xl p-2.5 text-center">
                   <p className="text-emerald-400 font-bold text-sm">{plan.price.toLocaleString()}</p>
-                  <p className="text-muted-foreground text-xs">د.ع / الباقة</p>
+                  <p className="text-muted-foreground text-xs">{t('services.iqd_per_plan')}</p>
                 </div>
                 <div className="bg-background rounded-xl p-2.5 text-center">
                   <p className="text-blue-400 font-bold text-sm">{plan.duration_days}</p>
-                  <p className="text-muted-foreground text-xs">يوم</p>
+                  <p className="text-muted-foreground text-xs">{t('services.days')}</p>
                 </div>
               </div>
 
@@ -348,7 +365,7 @@ export function ServicePlans({ category, manager, onBack }: {
               {plan.cabinet_notes && (
                 <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-2">
                   <StickyNote className="w-3.5 h-3.5" />
-                  <span>يحتوي ملاحظات كابينات</span>
+                  <span>{t('services.has_cabinet_notes')}</span>
                 </div>
               )}
 
@@ -389,16 +406,16 @@ export function ServicePlans({ category, manager, onBack }: {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center space-y-4">
             <Trash2 className="w-10 h-10 text-destructive mx-auto" />
-            <p className="font-bold text-foreground">حذف الباقة "{delPlan.name}"؟</p>
-            <p className="text-muted-foreground text-sm">لا يمكن التراجع عن هذا الإجراء.</p>
+            <p className="font-bold text-foreground">{t('services.delete_plan_title', { name: delPlan.name })}</p>
+            <p className="text-muted-foreground text-sm">{t('services.delete_plan_desc')}</p>
             <div className="flex gap-3">
               <button onClick={() => setDelPlan(null)}
                 className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-white/5 text-sm font-medium">
-                إلغاء
+                {t('services.cancel')}
               </button>
               <button onClick={() => deleteMut.mutate(delPlan.id)} disabled={deleteMut.isPending}
                 className="flex-1 py-2.5 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 text-sm font-medium flex items-center justify-center gap-2">
-                {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null} حذف
+                {deleteMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null} {t('services.delete')}
               </button>
             </div>
           </div>
