@@ -47,7 +47,8 @@ func (h *TicketHandler) CreateTicket(c *gin.Context) {
 	}
 
 	if err := h.repo.Create(c.Request.Context(), ticket); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ticket"})
+		fmt.Printf("CreateTicket error: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ticket: " + err.Error()})
 		return
 	}
 
