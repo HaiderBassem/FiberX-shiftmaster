@@ -481,7 +481,7 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		CanCreateTables:    current.CanCreateTables,
 		UIPreferences:      current.UIPreferences,
 		Status:             req.Status,
-		ProfileImage:       req.ProfileImage,
+		ProfileImage:       func() *string { if req.ProfileImage != nil { return req.ProfileImage }; return current.ProfileImage }(),
 		SecondaryPhone:     req.SecondaryPhone,
 		SecondaryEmail:     req.SecondaryEmail,
 	}
