@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -60,6 +61,7 @@ func (h *TicketHandler) GetTickets(c *gin.Context) {
 
 	tickets, err := h.repo.GetTicketsForDepartment(c.Request.Context(), deptID)
 	if err != nil {
+		fmt.Println("GetTicketsForDepartment error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tickets"})
 		return
 	}
