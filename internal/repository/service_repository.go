@@ -140,51 +140,7 @@ func (r *serviceRepo) DeleteCategory(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-// ═══════════════════════════════════════════════════════════
-// Sharing
-// ═══════════════════════════════════════════════════════════
 
-func (r *serviceRepo) ShareCategory(ctx context.Context, share *models.ServiceCategoryShare) error {
-	return r.db.QueryRow(ctx,
-		`INSERT INTO service_category_department_shares (category_id, department_id, granted_by)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (category_id, department_id) DO NOTHING
-		 RETURNING id, created_at`,
-		share.CategoryID, share.DepartmentID, share.GrantedBy,
-	).Scan(&share.ID, &share.CreatedAt)
-}
-
-func (r *serviceRepo) UnshareCategory(ctx context.Context, categoryID, departmentID uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
-		`DELETE FROM service_category_department_shares WHERE category_id = $1 AND department_id = $2`,
-		categoryID, departmentID)
-	return err
-}
-
-func (r *serviceRepo) GetCategoryShares(ctx context.Context, categoryID uuid.UUID) ([]models.ServiceCategoryShare, error) {
-	query := `
-		SELECT s.id, s.category_id, s.department_id, s.granted_by, s.created_at, d.name AS department_name
-		FROM service_category_department_shares s
-		JOIN departments d ON s.department_id = d.id
-		WHERE s.category_id = $1
-		ORDER BY d.name
-	`
-	rows, err := r.db.Query(ctx, query, categoryID)
-	if err != nil {
-		return nil, fmt.Errorf("get category shares: %w", err)
-	}
-	defer rows.Close()
-
-	var shares []models.ServiceCategoryShare
-	for rows.Next() {
-		var s models.ServiceCategoryShare
-		if err := rows.Scan(&s.ID, &s.CategoryID, &s.DepartmentID, &s.GrantedBy, &s.CreatedAt, &s.DepartmentName); err != nil {
-			return nil, fmt.Errorf("scan share: %w", err)
-		}
-		shares = append(shares, s)
-	}
-	return shares, nil
-}
 
 // ═══════════════════════════════════════════════════════════
 // Plans
