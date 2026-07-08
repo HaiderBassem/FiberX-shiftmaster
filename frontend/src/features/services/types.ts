@@ -22,7 +22,6 @@ export interface ServiceCategoryShare {
   created_at: string;
   department_name?: string;
 }
-}
 
 export interface ServicePlan {
   id: string;
