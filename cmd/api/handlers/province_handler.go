@@ -140,8 +140,8 @@ func (h *ProvinceHandler) Share(c *gin.Context) {
 	deptIDStr := c.GetString("department_id")
 	deptID, _ := uuid.Parse(deptIDStr)
 
-	province, err := h.svc.GetAll(c.Request.Context(), deptID)
-	// We'll trust the caller for now, but ideally we'd check if `province.DepartmentID == deptID`
+	_, err = h.svc.GetAll(c.Request.Context(), deptID)
+	// We'll trust the caller for now, but ideally we'd check if the province belongs to deptID
 
 	var req struct {
 		DepartmentID uuid.UUID `json:"department_id" binding:"required"`

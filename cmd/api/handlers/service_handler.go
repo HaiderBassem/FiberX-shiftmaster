@@ -183,7 +183,7 @@ func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID)
+	_, err = h.repo.GetCategoryByID(c.Request.Context(), catID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
 		return

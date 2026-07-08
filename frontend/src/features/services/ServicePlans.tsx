@@ -120,11 +120,6 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  const { data: provincesData } = useQuery<Province[]>({
-    queryKey: ['provinces'],
-    queryFn: async () => (await api.get('/provinces')).data.data ?? [],
-  });
-  const activeProvinces = provincesData?.filter(p => p.is_active) ?? [];
 
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
 
@@ -280,7 +275,7 @@ export function ServicePlans({ category, manager, onBack }: {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {manager && !category.is_shared && (
+          {manager && (
             <button onClick={() => setEditPlan(null)}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
               <Plus className="w-4 h-4" /> {t('services.new_plan')}
@@ -330,9 +325,6 @@ export function ServicePlans({ category, manager, onBack }: {
 
               {/* Badges Row */}
               <div className="flex items-center justify-between mb-4">
-                <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 font-medium">
-                  <MapPin className="w-3 h-3" /> {plan.province}
-                </span>
                 <div className="flex gap-1.5">
                   {plan.price === 0 ? (
                     <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
@@ -400,7 +392,7 @@ export function ServicePlans({ category, manager, onBack }: {
               )}
 
               {/* Manager actions */}
-              {manager && !category.is_shared && (
+              {manager && (
                 <div className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => e.stopPropagation()}>
                   <button onClick={() => setEditPlan(plan)}
