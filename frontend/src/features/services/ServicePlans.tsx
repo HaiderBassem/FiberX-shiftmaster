@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import type { ServiceCategory, ServicePlan, Province } from './types';
+import type { ServiceCategory, ServicePlan } from './types';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
-  Clock, DollarSign, Zap, MapPin, Server, Router, Cpu, StickyNote, Search,
+  Clock, DollarSign, Zap, Server, Router, Cpu, StickyNote, Search,
 } from 'lucide-react';
 
 /* ─── Plan Detail Modal ────────────────────────────────── */
