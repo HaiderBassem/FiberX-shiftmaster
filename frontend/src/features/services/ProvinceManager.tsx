@@ -123,7 +123,7 @@ export function ProvinceManager({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <div className="space-y-2">
-              {provinces?.map(p => (
+              {provinces?.filter(p => !p.is_shared).map(p => (
                 <div key={p.id} className="flex items-center justify-between p-3 bg-background border border-border rounded-xl">
                   {editingId === p.id ? (
                     <div className="flex items-center gap-2 flex-1 mr-2">
@@ -174,7 +174,7 @@ export function ProvinceManager({ onClose }: { onClose: () => void }) {
                   )}
                 </div>
               ))}
-              {provinces?.length === 0 && !isAdding && (
+              {provinces?.filter(p => !p.is_shared).length === 0 && !isAdding && (
                 <p className="text-center text-sm text-muted-foreground py-4">{t('services.no_provinces')}</p>
               )}
             </div>

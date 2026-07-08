@@ -3,16 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { X, Loader2, Share2, Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import type { ServiceCategory, ServiceCategoryShare } from './types';
+import type { Province, ProvinceShare } from './types';
 
-export function CategoryShareModal({ category, onClose }: { category: ServiceCategory; onClose: () => void }) {
+export function ProvinceShareModal({ province, onClose }: { province: Province; onClose: () => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [selectedDept, setSelectedDept] = useState('');
 
-  const { data: shares, isLoading: loadingShares } = useQuery<ServiceCategoryShare[]>({
-    queryKey: ['category-shares', category.id],
-    queryFn: async () => (await api.get(`/services/categories/${category.id}/shares`)).data.data ?? [],
+  const { data: shares, isLoading: loadingShares } = useQuery<ProvinceShare[]>({
+    queryKey: ['province-shares', province.id],
+    queryFn: async () => (await api.get(`/provinces/${province.id}/shares`)).data.data ?? [],
   });
 
   const { data: allDepts } = useQuery({
@@ -21,21 +21,21 @@ export function CategoryShareModal({ category, onClose }: { category: ServiceCat
   });
 
   const shareMut = useMutation({
-    mutationFn: (departmentId: string) => api.post(`/services/categories/${category.id}/shares`, { department_id: departmentId }),
+    mutationFn: (departmentId: string) => api.post(`/provinces/${province.id}/shares`, { department_id: departmentId }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['category-shares', category.id] });
+      qc.invalidateQueries({ queryKey: ['province-shares', province.id] });
       setSelectedDept('');
     },
   });
 
   const removeMut = useMutation({
-    mutationFn: (departmentId: string) => api.delete(`/services/categories/${category.id}/shares/${departmentId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['category-shares', category.id] }),
+    mutationFn: (departmentId: string) => api.delete(`/provinces/${province.id}/shares/${departmentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['province-shares', province.id] }),
   });
 
   // Filter out departments that already have shares
   const availableDepts = allDepts?.filter((d: any) => 
-    !shares?.find(s => s.department_id === d.id) && d.id !== category.department_id
+    !shares?.find(s => s.department_id === d.id) && d.id !== province.department_id
   ) ?? [];
 
   return (
@@ -47,8 +47,8 @@ export function CategoryShareModal({ category, onClose }: { category: ServiceCat
               <Share2 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground">{t('services.share_category')}</h2>
-              <p className="text-xs text-muted-foreground">{category.name}</p>
+              <h2 className="text-lg font-bold text-foreground">{t('services.share_province')}</h2>
+              <p className="text-xs text-muted-foreground">{province.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">

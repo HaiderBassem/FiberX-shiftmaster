@@ -15,15 +15,10 @@ import (
 type ServiceRepository interface {
 	// Categories
 	CreateCategory(ctx context.Context, cat *models.ServiceCategory) error
-	GetAllCategories(ctx context.Context, departmentID uuid.UUID) ([]models.ServiceCategory, error)
-	GetCategoryByID(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) (*models.ServiceCategory, error)
+	GetCategoriesByProvince(ctx context.Context, provinceID uuid.UUID) ([]models.ServiceCategory, error)
+	GetCategoryByID(ctx context.Context, id uuid.UUID) (*models.ServiceCategory, error)
 	UpdateCategory(ctx context.Context, cat *models.ServiceCategory) error
 	DeleteCategory(ctx context.Context, id uuid.UUID) error
-
-	// Sharing
-	ShareCategory(ctx context.Context, share *models.ServiceCategoryShare) error
-	UnshareCategory(ctx context.Context, categoryID, departmentID uuid.UUID) error
-	GetCategoryShares(ctx context.Context, categoryID uuid.UUID) ([]models.ServiceCategoryShare, error)
 
 	// Plans
 	CreatePlan(ctx context.Context, plan *models.ServicePlan) error
@@ -48,36 +43,34 @@ func NewServiceRepository(db *database.DB) ServiceRepository {
 
 func (r *serviceRepo) CreateCategory(ctx context.Context, cat *models.ServiceCategory) error {
 	return r.db.QueryRow(ctx,
-		`INSERT INTO service_categories (department_id, name, description, is_active, sort_order, created_by)
+		`INSERT INTO service_categories (province_id, name, description, is_active, sort_order, created_by)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, created_at, updated_at`,
-		cat.DepartmentID, cat.Name, cat.Description, cat.IsActive, cat.SortOrder, cat.CreatedBy,
+		cat.ProvinceID, cat.Name, cat.Description, cat.IsActive, cat.SortOrder, cat.CreatedBy,
 	).Scan(&cat.ID, &cat.CreatedAt, &cat.UpdatedAt)
 }
 
-func (r *serviceRepo) GetAllCategories(ctx context.Context, departmentID uuid.UUID) ([]models.ServiceCategory, error) {
+func (r *serviceRepo) GetCategoriesByProvince(ctx context.Context, provinceID uuid.UUID) ([]models.ServiceCategory, error) {
 	query := `
-		SELECT DISTINCT
-			sc.id, sc.department_id, sc.name, sc.description, sc.is_active, sc.sort_order,
+		SELECT
+			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
-			dep.name AS department_name,
-			COALESCE(pc.plan_count, 0) AS plan_count,
-			CASE WHEN sc.department_id = $1 THEN false ELSE true END AS is_shared
+			p.name AS province_name,
+			COALESCE(pc.plan_count, 0) AS plan_count
 		FROM service_categories sc
 		JOIN employees e ON sc.created_by = e.id
-		JOIN departments dep ON sc.department_id = dep.id
-		LEFT JOIN service_category_department_shares scs ON sc.id = scs.category_id AND scs.department_id = $1
+		JOIN provinces p ON sc.province_id = p.id
 		LEFT JOIN (
 			SELECT category_id, COUNT(*) AS plan_count
 			FROM service_plans
 			GROUP BY category_id
 		) pc ON pc.category_id = sc.id
-		WHERE sc.department_id = $1 OR scs.id IS NOT NULL
+		WHERE sc.province_id = $1
 		ORDER BY sc.sort_order, sc.created_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query, departmentID)
+	rows, err := r.db.Query(ctx, query, provinceID)
 	if err != nil {
 		return nil, fmt.Errorf("get categories: %w", err)
 	}
@@ -87,9 +80,9 @@ func (r *serviceRepo) GetAllCategories(ctx context.Context, departmentID uuid.UU
 	for rows.Next() {
 		var c models.ServiceCategory
 		if err := rows.Scan(
-			&c.ID, &c.DepartmentID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+			&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
 			&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
-			&c.CreatorName, &c.DepartmentName, &c.PlanCount, &c.IsShared,
+			&c.CreatorName, &c.ProvinceName, &c.PlanCount,
 		); err != nil {
 			return nil, fmt.Errorf("scan category: %w", err)
 		}
@@ -101,30 +94,28 @@ func (r *serviceRepo) GetAllCategories(ctx context.Context, departmentID uuid.UU
 	return cats, nil
 }
 
-func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) (*models.ServiceCategory, error) {
+func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*models.ServiceCategory, error) {
 	var c models.ServiceCategory
 	err := r.db.QueryRow(ctx,
-		`SELECT DISTINCT
-			sc.id, sc.department_id, sc.name, sc.description, sc.is_active, sc.sort_order,
+		`SELECT
+			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
-			dep.name AS department_name,
-			COALESCE(pc.plan_count, 0) AS plan_count,
-			CASE WHEN sc.department_id = $2 THEN false ELSE true END AS is_shared
+			p.name AS province_name,
+			COALESCE(pc.plan_count, 0) AS plan_count
 		FROM service_categories sc
 		JOIN employees e ON sc.created_by = e.id
-		JOIN departments dep ON sc.department_id = dep.id
-		LEFT JOIN service_category_department_shares scs ON sc.id = scs.category_id AND scs.department_id = $2
+		JOIN provinces p ON sc.province_id = p.id
 		LEFT JOIN (
 			SELECT category_id, COUNT(*) AS plan_count
 			FROM service_plans
 			GROUP BY category_id
 		) pc ON pc.category_id = sc.id
-		WHERE sc.id = $1 AND (sc.department_id = $2 OR scs.id IS NOT NULL)`, id, departmentID,
+		WHERE sc.id = $1`, id,
 	).Scan(
-		&c.ID, &c.DepartmentID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+		&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
 		&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
-		&c.CreatorName, &c.DepartmentName, &c.PlanCount, &c.IsShared,
+		&c.CreatorName, &c.ProvinceName, &c.PlanCount,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -204,14 +195,14 @@ func (r *serviceRepo) CreatePlan(ctx context.Context, plan *models.ServicePlan) 
 		`INSERT INTO service_plans
 			(category_id, name, price, duration_days,
 			 speed_download, speed_upload, data_cap,
-			 province, connection_type, installation_fee,
+			 connection_type, installation_fee,
 			 router_included, ip_type, description,
 			 cabinet_notes, features, is_active, sort_order, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17)
 		 RETURNING id, created_at, updated_at`,
 		plan.CategoryID, plan.Name, plan.Price, plan.DurationDays,
 		plan.SpeedDownload, plan.SpeedUpload, plan.DataCap,
-		plan.Province, plan.ConnectionType, plan.InstallationFee,
+		plan.ConnectionType, plan.InstallationFee,
 		plan.RouterIncluded, plan.IPType, plan.Description,
 		plan.CabinetNotes, plan.Features, plan.IsActive, plan.SortOrder, plan.CreatedBy,
 	).Scan(&plan.ID, &plan.CreatedAt, &plan.UpdatedAt)
@@ -222,7 +213,7 @@ func (r *serviceRepo) GetPlansByCategory(ctx context.Context, categoryID uuid.UU
 		SELECT
 			sp.id, sp.category_id, sp.name, sp.price, sp.duration_days,
 			sp.speed_download, sp.speed_upload, sp.data_cap,
-			sp.province, sp.connection_type, sp.installation_fee,
+			sp.connection_type, sp.installation_fee,
 			sp.router_included, sp.ip_type, sp.description,
 			sp.cabinet_notes, sp.features, sp.is_active, sp.sort_order,
 			sp.created_by, sp.created_at, sp.updated_at,
@@ -247,7 +238,7 @@ func (r *serviceRepo) GetPlansByCategory(ctx context.Context, categoryID uuid.UU
 		if err := rows.Scan(
 			&p.ID, &p.CategoryID, &p.Name, &p.Price, &p.DurationDays,
 			&p.SpeedDownload, &p.SpeedUpload, &p.DataCap,
-			&p.Province, &p.ConnectionType, &p.InstallationFee,
+			&p.ConnectionType, &p.InstallationFee,
 			&p.RouterIncluded, &p.IPType, &p.Description,
 			&p.CabinetNotes, &p.Features, &p.IsActive, &p.SortOrder,
 			&p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
@@ -269,7 +260,7 @@ func (r *serviceRepo) GetPlanByID(ctx context.Context, id uuid.UUID) (*models.Se
 		`SELECT
 			sp.id, sp.category_id, sp.name, sp.price, sp.duration_days,
 			sp.speed_download, sp.speed_upload, sp.data_cap,
-			sp.province, sp.connection_type, sp.installation_fee,
+			sp.connection_type, sp.installation_fee,
 			sp.router_included, sp.ip_type, sp.description,
 			sp.cabinet_notes, sp.features, sp.is_active, sp.sort_order,
 			sp.created_by, sp.created_at, sp.updated_at,
@@ -282,7 +273,7 @@ func (r *serviceRepo) GetPlanByID(ctx context.Context, id uuid.UUID) (*models.Se
 	).Scan(
 		&p.ID, &p.CategoryID, &p.Name, &p.Price, &p.DurationDays,
 		&p.SpeedDownload, &p.SpeedUpload, &p.DataCap,
-		&p.Province, &p.ConnectionType, &p.InstallationFee,
+		&p.ConnectionType, &p.InstallationFee,
 		&p.RouterIncluded, &p.IPType, &p.Description,
 		&p.CabinetNotes, &p.Features, &p.IsActive, &p.SortOrder,
 		&p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
@@ -302,14 +293,14 @@ func (r *serviceRepo) UpdatePlan(ctx context.Context, plan *models.ServicePlan) 
 		`UPDATE service_plans SET
 			name=$1, price=$2, duration_days=$3,
 			speed_download=$4, speed_upload=$5, data_cap=$6,
-			province=$7, connection_type=$8, installation_fee=$9,
-			router_included=$10, ip_type=$11, description=$12,
-			cabinet_notes=$13, features=$14::jsonb, is_active=$15, sort_order=$16,
+			connection_type=$7, installation_fee=$8,
+			router_included=$9, ip_type=$10, description=$11,
+			cabinet_notes=$12, features=$13::jsonb, is_active=$14, sort_order=$15,
 			updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$17`,
+		 WHERE id=$16`,
 		plan.Name, plan.Price, plan.DurationDays,
 		plan.SpeedDownload, plan.SpeedUpload, plan.DataCap,
-		plan.Province, plan.ConnectionType, plan.InstallationFee,
+		plan.ConnectionType, plan.InstallationFee,
 		plan.RouterIncluded, plan.IPType, plan.Description,
 		plan.CabinetNotes, plan.Features, plan.IsActive, plan.SortOrder,
 		plan.ID)

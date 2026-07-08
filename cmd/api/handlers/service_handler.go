@@ -60,22 +60,22 @@ func (h *ServiceHandler) canManageServices(c *gin.Context) bool {
 // Category Endpoints
 // ═══════════════════════════════════════════════════════════
 
-// ListCategories returns all service categories.
-func (h *ServiceHandler) ListCategories(c *gin.Context) {
-	deptIDStr, ok := c.Get("department_id")
-	if !ok || deptIDStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Department ID not found"})
+// ListCategoriesByProvince returns all service categories for a province.
+func (h *ServiceHandler) ListCategoriesByProvince(c *gin.Context) {
+	provinceIDStr := c.Query("province_id")
+	if provinceIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "province_id is required"})
 		return
 	}
-	deptID, err := uuid.Parse(deptIDStr.(string))
+	provinceID, err := uuid.Parse(provinceIDStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid department ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid province ID"})
 		return
 	}
 
-	cats, err := h.repo.GetAllCategories(c.Request.Context(), deptID)
+	cats, err := h.repo.GetCategoriesByProvince(c.Request.Context(), provinceID)
 	if err != nil {
-		log.Printf("ListCategories error: %v", err)
+		log.Printf("ListCategoriesByProvince error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to load categories"})
 		return
 	}
@@ -93,8 +93,9 @@ func (h *ServiceHandler) CreateCategory(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        string  `json:"name" binding:"required"`
-		Description *string `json:"description"`
+		ProvinceID  uuid.UUID `json:"province_id" binding:"required"`
+		Name        string    `json:"name" binding:"required"`
+		Description *string   `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
@@ -103,11 +104,9 @@ func (h *ServiceHandler) CreateCategory(c *gin.Context) {
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
 
 	cat := &models.ServiceCategory{
-		DepartmentID: deptID,
+		ProvinceID:  req.ProvinceID,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    true,
@@ -147,17 +146,9 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
-
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
-		return
-	}
-
-	if existing.IsShared {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot edit shared categories"})
 		return
 	}
 
@@ -192,118 +183,15 @@ func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 		return
 	}
 
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
-
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
-		return
-	}
-	if existing.IsShared {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot delete shared categories"})
 		return
 	}
 
 	if err := h.repo.DeleteCategory(c.Request.Context(), catID); err != nil {
 		log.Printf("DeleteCategory error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to delete category"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-// ═══════════════════════════════════════════════════════════
-// Sharing Endpoints
-// ═══════════════════════════════════════════════════════════
-
-func (h *ServiceHandler) GetShares(c *gin.Context) {
-	catID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
-		return
-	}
-	shares, err := h.repo.GetCategoryShares(c.Request.Context(), catID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to get shares"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": shares})
-}
-
-func (h *ServiceHandler) ShareCategory(c *gin.Context) {
-	if !h.canManageServices(c) {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
-		return
-	}
-	catID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
-		return
-	}
-
-	var req struct {
-		DepartmentID uuid.UUID `json:"department_id" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
-		return
-	}
-
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
-
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
-	if err != nil || existing.IsShared {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot share this category"})
-		return
-	}
-
-	empIDStr, _ := c.Get("employee_id")
-	empID, _ := uuid.Parse(empIDStr.(string))
-
-	share := &models.ServiceCategoryShare{
-		CategoryID:   catID,
-		DepartmentID: req.DepartmentID,
-		GrantedBy:    empID,
-	}
-
-	if err := h.repo.ShareCategory(c.Request.Context(), share); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to share category"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": share})
-}
-
-func (h *ServiceHandler) UnshareCategory(c *gin.Context) {
-	if !h.canManageServices(c) {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
-		return
-	}
-	catID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
-		return
-	}
-	targetDeptID, err := uuid.Parse(c.Param("department_id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid department ID"})
-		return
-	}
-
-	deptIDStr, _ := c.Get("department_id")
-	deptID, _ := uuid.Parse(deptIDStr.(string))
-
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
-	if err != nil || existing.IsShared {
-		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot unshare this category"})
-		return
-	}
-
-	if err := h.repo.UnshareCategory(c.Request.Context(), catID, targetDeptID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to unshare category"})
 		return
 	}
 
@@ -372,7 +260,6 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 		SpeedDownload   *string `json:"speed_download"`
 		SpeedUpload     *string `json:"speed_upload"`
 		DataCap         *string `json:"data_cap"`
-		Province        string  `json:"province" binding:"required"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
@@ -406,7 +293,6 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 		SpeedDownload:   req.SpeedDownload,
 		SpeedUpload:     req.SpeedUpload,
 		DataCap:         req.DataCap,
-		Province:        req.Province,
 		ConnectionType:  connType,
 		InstallationFee: req.InstallationFee,
 		RouterIncluded:  req.RouterIncluded,
@@ -447,7 +333,6 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 		SpeedDownload   *string `json:"speed_download"`
 		SpeedUpload     *string `json:"speed_upload"`
 		DataCap         *string `json:"data_cap"`
-		Province        string  `json:"province" binding:"required"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
@@ -483,7 +368,6 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 	existing.SpeedDownload = req.SpeedDownload
 	existing.SpeedUpload = req.SpeedUpload
 	existing.DataCap = req.DataCap
-	existing.Province = req.Province
 	existing.ConnectionType = connType
 	existing.InstallationFee = req.InstallationFee
 	existing.RouterIncluded = req.RouterIncluded

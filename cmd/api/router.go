@@ -431,7 +431,7 @@ func SetupRouter(
 		services := protected.Group("/services")
 		{
 			// Read – all authenticated users
-			services.GET("/categories", serviceH.ListCategories)
+			services.GET("/categories", serviceH.ListCategoriesByProvince)
 			services.GET("/categories/:id/plans", serviceH.ListPlans)
 			services.GET("/plans/:id", serviceH.GetPlan)
 
@@ -442,11 +442,6 @@ func SetupRouter(
 			services.POST("/categories/:id/plans", serviceH.CreatePlan)
 			services.PUT("/plans/:id", serviceH.UpdatePlan)
 			services.DELETE("/plans/:id", serviceH.DeletePlan)
-
-			// Sharing
-			services.GET("/categories/:id/shares", serviceH.GetShares)
-			services.POST("/categories/:id/shares", serviceH.ShareCategory)
-			services.DELETE("/categories/:id/shares/:department_id", serviceH.UnshareCategory)
 		}
 
 		// --- Provinces ---
@@ -456,6 +451,11 @@ func SetupRouter(
 			provinces.POST("", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Create)
 			provinces.PUT("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Update)
 			provinces.DELETE("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Delete)
+
+			// Sharing
+			provinces.GET("/:id/shares", provinceH.GetShares)
+			provinces.POST("/:id/shares", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Share)
+			provinces.DELETE("/:id/shares/:departmentId", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Unshare)
 		}
 
 	}

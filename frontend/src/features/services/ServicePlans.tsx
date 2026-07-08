@@ -35,7 +35,6 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
             {[
               { icon: DollarSign, label: t('services.monthly_price'), value: `${plan.price.toLocaleString()} ${t('services.iqd_per_plan').split('/')[0]}`, color: 'text-emerald-400' },
               { icon: Clock, label: t('services.plan_duration'), value: `${plan.duration_days} ${t('services.days')}`, color: 'text-blue-400' },
-              { icon: MapPin, label: t('services.province'), value: plan.province, color: 'text-amber-400' },
               { icon: Zap, label: t('services.speed_down'), value: plan.speed_download ?? '—', color: 'text-primary' },
               { icon: Zap, label: t('services.speed_up'), value: plan.speed_upload ?? '—', color: 'text-primary' },
               { icon: Server, label: t('services.ip_type'), value: plan.ip_type, color: 'text-purple-400' },
@@ -100,15 +99,14 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
 }
 
 /* ─── Plan Form Modal ──────────────────────────────────── */
-function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
-  categoryId: string; initial?: ServicePlan | null; defaultProvince?: string; onClose: () => void; onSaved: () => void;
+function PlanModal({ categoryId, initial, onClose, onSaved }: {
+  categoryId: string; initial?: ServicePlan | null; onClose: () => void; onSaved: () => void;
 }) {
   const { t } = useTranslation();
   const [f, setF] = useState({
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
     duration_days: initial?.duration_days?.toString() ?? '30',
-    province: initial?.province ?? defaultProvince ?? '',
     speed_download: initial?.speed_download ?? '',
     speed_upload: initial?.speed_upload ?? '',
     data_cap: initial?.data_cap ?? 'Unlimited',
@@ -132,7 +130,7 @@ function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!f.name.trim() || !f.price || !f.province) return setErr(t('services.req_fields'));
+    if (!f.name.trim() || !f.price) return setErr(t('services.req_fields'));
     setBusy(true); setErr('');
     try {
       const payload = {
@@ -185,15 +183,6 @@ function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
             {field(t('services.install_fee'), 'installation_fee', 'number', t('services.install_fee_ph'))}
           </div>
 
-          {/* Province */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.province')}</label>
-            <select value={f.province} onChange={e => set('province', e.target.value)}
-              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
-              <option value="">{t('services.select_province')}</option>
-              {activeProvinces.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-            </select>
-          </div>
 
           <div className="grid grid-cols-2 gap-4">
             {/* IP Type */}
@@ -252,8 +241,8 @@ function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
 }
 
 /* ─── ServicePlans Page ────────────────────────────────── */
-export function ServicePlans({ category, manager, selectedProvince, onBack }: {
-  category: ServiceCategory; manager: boolean; selectedProvince: string; onBack: () => void;
+export function ServicePlans({ category, manager, onBack }: {
+  category: ServiceCategory; manager: boolean; onBack: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -274,14 +263,9 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelPlan(null); },
   });
 
-  // Filter plans to only show those belonging to the selected province
-  const filteredPlans = (plans ?? []).filter(plan => {
-    const belongsToProvince = plan.province === selectedProvince;
-    const matchesSearch = plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      (plan.province && plan.province.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    return belongsToProvince && matchesSearch;
-  });
+  const filteredPlans = (plans ?? []).filter(plan => 
+    plan.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -290,9 +274,6 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
         <div className="flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Wifi className="w-5 h-5 text-primary" /> {category.name}
-            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold">
-              {selectedProvince}
-            </span>
           </h1>
           {category.description && (
             <p className="text-muted-foreground text-sm">{category.description}</p>
@@ -445,7 +426,6 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
         <PlanModal
           categoryId={category.id}
           initial={editPlan}
-          defaultProvince={selectedProvince}
           onClose={() => setEditPlan(undefined)}
           onSaved={() => qc.invalidateQueries({ queryKey: key })}
         />
