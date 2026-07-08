@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
-import type { ServiceCategory } from './types';
+import type { ServiceCategory, ServicePlan } from './types';
 import { IRAQ_PROVINCES } from './types';
 import { ServicePlans } from './ServicePlans';
 import { useTranslation } from 'react-i18next';
@@ -231,7 +231,7 @@ export function ServiceHub() {
     if (!matchesSearch) return false;
 
     const catPlans = getPlansForCategory(cat.id);
-    const hasPlansInProvince = catPlans.some(plan => plan.province === selectedProvince && plan.is_active);
+    const hasPlansInProvince = catPlans.some((plan: ServicePlan) => plan.province === selectedProvince && plan.is_active);
 
     if (showEmptyCategories && manager) {
       return true;
@@ -330,7 +330,7 @@ export function ServiceHub() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {filteredCategories.map(cat => {
             const catPlans = getPlansForCategory(cat.id);
-            const activePlansInProvinceCount = catPlans.filter(p => p.province === selectedProvince && p.is_active).length;
+            const activePlansInProvinceCount = catPlans.filter((p: ServicePlan) => p.province === selectedProvince && p.is_active).length;
 
             return (
               <div
