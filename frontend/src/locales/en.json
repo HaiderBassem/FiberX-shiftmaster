@@ -499,6 +499,15 @@
     "created_by": "Created by: {{name}}",
     "active": "Active",
     "search_categories_placeholder": "Search categories or description...",
-    "search_plans_placeholder": "Search plans or province..."
+    "search_plans_placeholder": "Search plans or province...",
+    "paid": "Paid",
+    "device_type_label": "Device Type:",
+    "speed_label": "Speed:",
+    "price_label": "Price:",
+    "select_province_title": "Select Governorate",
+    "select_province_desc": "Please choose a governorate to view available categories and packages",
+    "back_to_provinces": "Back to Governorates",
+    "show_empty_categories": "Show Empty Categories",
+    "search_provinces_placeholder": "Search governorates..."
   }
 }

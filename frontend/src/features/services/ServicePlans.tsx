@@ -101,15 +101,15 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
 }
 
 /* ─── Plan Form Modal ──────────────────────────────────── */
-function PlanModal({ categoryId, initial, onClose, onSaved }: {
-  categoryId: string; initial?: ServicePlan | null; onClose: () => void; onSaved: () => void;
+function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
+  categoryId: string; initial?: ServicePlan | null; defaultProvince?: string; onClose: () => void; onSaved: () => void;
 }) {
   const { t } = useTranslation();
   const [f, setF] = useState({
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
     duration_days: initial?.duration_days?.toString() ?? '30',
-    province: initial?.province ?? '',
+    province: initial?.province ?? defaultProvince ?? '',
     speed_download: initial?.speed_download ?? '',
     speed_upload: initial?.speed_upload ?? '',
     data_cap: initial?.data_cap ?? 'Unlimited',
@@ -247,8 +247,8 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
 }
 
 /* ─── ServicePlans Page ────────────────────────────────── */
-export function ServicePlans({ category, manager, onBack }: {
-  category: ServiceCategory; manager: boolean; onBack: () => void;
+export function ServicePlans({ category, manager, selectedProvince, onBack }: {
+  category: ServiceCategory; manager: boolean; selectedProvince: string; onBack: () => void;
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -269,6 +269,15 @@ export function ServicePlans({ category, manager, onBack }: {
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelPlan(null); },
   });
 
+  // Filter plans to only show those belonging to the selected province
+  const filteredPlans = (plans ?? []).filter(plan => {
+    const belongsToProvince = plan.province === selectedProvince;
+    const matchesSearch = plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (plan.province && plan.province.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    return belongsToProvince && matchesSearch;
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -280,6 +289,9 @@ export function ServicePlans({ category, manager, onBack }: {
         <div className="flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Wifi className="w-5 h-5 text-primary" /> {category.name}
+            <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-semibold">
+              {selectedProvince}
+            </span>
           </h1>
           {category.description && (
             <p className="text-muted-foreground text-sm">{category.description}</p>
@@ -310,7 +322,7 @@ export function ServicePlans({ category, manager, onBack }: {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
-      ) : !plans?.length ? (
+      ) : !filteredPlans.length ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
             <Wifi className="w-8 h-8 text-muted-foreground" />
@@ -322,48 +334,77 @@ export function ServicePlans({ category, manager, onBack }: {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {plans.filter(plan => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || (plan.province && plan.province.toLowerCase().includes(searchQuery.toLowerCase()))).map(plan => (
+          {filteredPlans.map(plan => (
             <div key={plan.id}
-              className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
+              className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer flex flex-col"
               onClick={() => setDetailPlan(plan)}>
 
-              {/* Province badge */}
+              {/* Badges Row */}
               <div className="flex items-center justify-between mb-4">
                 <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 font-medium">
                   <MapPin className="w-3 h-3" /> {plan.province}
                 </span>
-                {!plan.is_active && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">{t('services.disabled')}</span>
-                )}
+                <div className="flex gap-1.5">
+                  {plan.price === 0 ? (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
+                      {t('services.free')}
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 font-semibold">
+                      {t('services.paid')}
+                    </span>
+                  )}
+                  {!plan.is_active && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-destructive/10 text-destructive font-medium">
+                      {t('services.disabled')}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Name */}
-              <h3 className="font-bold text-foreground text-base mb-3">{plan.name}</h3>
+              <h3 className="font-bold text-foreground text-base mb-3 leading-snug">{plan.name}</h3>
 
               {/* Stats row */}
               <div className="grid grid-cols-2 gap-2 mb-4">
-                <div className="bg-background rounded-xl p-2.5 text-center">
-                  <p className="text-emerald-400 font-bold text-sm">{plan.price.toLocaleString()}</p>
-                  <p className="text-muted-foreground text-xs">{t('services.iqd_per_plan')}</p>
+                <div className="bg-background rounded-xl p-2.5 text-center flex flex-col justify-center min-h-[60px]">
+                  <p className="text-emerald-400 font-bold text-sm">
+                    {plan.price === 0 ? t('services.free') : `${plan.price.toLocaleString()} د.ع`}
+                  </p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{t('services.price_label')}</p>
                 </div>
-                <div className="bg-background rounded-xl p-2.5 text-center">
+                <div className="bg-background rounded-xl p-2.5 text-center flex flex-col justify-center min-h-[60px]">
                   <p className="text-blue-400 font-bold text-sm">{plan.duration_days}</p>
-                  <p className="text-muted-foreground text-xs">{t('services.days')}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{t('services.days')}</p>
                 </div>
               </div>
 
-              {/* Speed */}
-              {(plan.speed_download || plan.speed_upload) && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Zap className="w-3.5 h-3.5 text-primary" />
-                  {plan.speed_download && <span>{plan.speed_download}↓</span>}
-                  {plan.speed_upload && <span>{plan.speed_upload}↑</span>}
+              {/* Speed & Connection details */}
+              <div className="space-y-2.5 mt-auto pt-3 border-t border-border/50">
+                {/* Connection/Device Type */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Router className="w-3.5 h-3.5 text-primary" />
+                    {t('services.device_type_label')}
+                  </span>
+                  <span className="text-foreground font-semibold">{plan.connection_type || 'FTTH'}</span>
                 </div>
-              )}
+
+                {/* Speed (Single Speed) */}
+                {plan.speed_download && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5 text-primary" />
+                      {t('services.speed_label')}
+                    </span>
+                    <span className="text-foreground font-semibold">{plan.speed_download}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Cabinet notes indicator */}
               {plan.cabinet_notes && (
-                <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-2">
+                <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-3 bg-amber-500/5 p-1.5 rounded-lg border border-amber-500/10 justify-center w-full">
                   <StickyNote className="w-3.5 h-3.5" />
                   <span>{t('services.has_cabinet_notes')}</span>
                 </div>
@@ -396,6 +437,7 @@ export function ServicePlans({ category, manager, onBack }: {
         <PlanModal
           categoryId={category.id}
           initial={editPlan}
+          defaultProvince={selectedProvince}
           onClose={() => setEditPlan(undefined)}
           onSaved={() => qc.invalidateQueries({ queryKey: key })}
         />

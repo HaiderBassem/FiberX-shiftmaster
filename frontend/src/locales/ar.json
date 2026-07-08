@@ -499,6 +499,15 @@
     "created_by": "أُنشئت بواسطة: {{name}}",
     "active": "نشطة",
     "search_categories_placeholder": "ابحث عن تصنيف أو وصف...",
-    "search_plans_placeholder": "ابحث عن باقة أو محافظة..."
+    "search_plans_placeholder": "ابحث عن باقة أو محافظة...",
+    "paid": "مدفوع",
+    "device_type_label": "نوع الجهاز:",
+    "speed_label": "السرعة:",
+    "price_label": "السعر:",
+    "select_province_title": "اختر المحافظة",
+    "select_province_desc": "يرجى اختيار محافظة لعرض التصنيفات والباقات المتاحة فيها",
+    "back_to_provinces": "العودة للمحافظات",
+    "show_empty_categories": "عرض التصنيفات الفارغة",
+    "search_provinces_placeholder": "ابحث عن محافظة..."
   }
 }
