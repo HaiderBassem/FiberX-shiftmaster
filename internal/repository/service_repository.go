@@ -53,7 +53,7 @@ func (r *serviceRepo) CreateCategory(ctx context.Context, cat *models.ServiceCat
 func (r *serviceRepo) GetCategoriesByProvince(ctx context.Context, provinceID uuid.UUID) ([]models.ServiceCategory, error) {
 	query := `
 		SELECT
-			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.sort_order,
+			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.disabled_at, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
 			p.name AS province_name,
@@ -80,7 +80,7 @@ func (r *serviceRepo) GetCategoriesByProvince(ctx context.Context, provinceID uu
 	for rows.Next() {
 		var c models.ServiceCategory
 		if err := rows.Scan(
-			&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+			&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.DisabledAt, &c.SortOrder,
 			&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
 			&c.CreatorName, &c.ProvinceName, &c.PlanCount,
 		); err != nil {
@@ -98,7 +98,7 @@ func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*model
 	var c models.ServiceCategory
 	err := r.db.QueryRow(ctx,
 		`SELECT
-			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.sort_order,
+			sc.id, sc.province_id, sc.name, sc.description, sc.is_active, sc.disabled_at, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
 			p.name AS province_name,
@@ -113,7 +113,7 @@ func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*model
 		) pc ON pc.category_id = sc.id
 		WHERE sc.id = $1`, id,
 	).Scan(
-		&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+		&c.ID, &c.ProvinceID, &c.Name, &c.Description, &c.IsActive, &c.DisabledAt, &c.SortOrder,
 		&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
 		&c.CreatorName, &c.ProvinceName, &c.PlanCount,
 	)
@@ -129,9 +129,9 @@ func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*model
 func (r *serviceRepo) UpdateCategory(ctx context.Context, cat *models.ServiceCategory) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE service_categories
-		 SET name=$1, description=$2, is_active=$3, sort_order=$4, updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$5`,
-		cat.Name, cat.Description, cat.IsActive, cat.SortOrder, cat.ID)
+		 SET name=$1, description=$2, is_active=$3, disabled_at=$4, sort_order=$5, updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$6`,
+		cat.Name, cat.Description, cat.IsActive, cat.DisabledAt, cat.SortOrder, cat.ID)
 	return err
 }
 
@@ -150,16 +150,16 @@ func (r *serviceRepo) CreatePlan(ctx context.Context, plan *models.ServicePlan) 
 	return r.db.QueryRow(ctx,
 		`INSERT INTO service_plans
 			(category_id, name, price, duration_days,
-			 speed_download, speed_upload, data_cap,
+			 speed, data_cap,
 			 connection_type, installation_fee,
-			 router_included, ip_type, description,
+			 router_included, description,
 			 cabinet_notes, features, is_active, sort_order, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,$15)
 		 RETURNING id, created_at, updated_at`,
 		plan.CategoryID, plan.Name, plan.Price, plan.DurationDays,
-		plan.SpeedDownload, plan.SpeedUpload, plan.DataCap,
+		plan.Speed, plan.DataCap,
 		plan.ConnectionType, plan.InstallationFee,
-		plan.RouterIncluded, plan.IPType, plan.Description,
+		plan.RouterIncluded, plan.Description,
 		plan.CabinetNotes, plan.Features, plan.IsActive, plan.SortOrder, plan.CreatedBy,
 	).Scan(&plan.ID, &plan.CreatedAt, &plan.UpdatedAt)
 }
@@ -168,10 +168,10 @@ func (r *serviceRepo) GetPlansByCategory(ctx context.Context, categoryID uuid.UU
 	query := `
 		SELECT
 			sp.id, sp.category_id, sp.name, sp.price, sp.duration_days,
-			sp.speed_download, sp.speed_upload, sp.data_cap,
+			sp.speed, sp.data_cap,
 			sp.connection_type, sp.installation_fee,
-			sp.router_included, sp.ip_type, sp.description,
-			sp.cabinet_notes, sp.features, sp.is_active, sp.sort_order,
+			sp.router_included, sp.description,
+			sp.cabinet_notes, sp.features, sp.is_active, sp.disabled_at, sp.sort_order,
 			sp.created_by, sp.created_at, sp.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
 			sc.name                             AS category_name
@@ -193,10 +193,10 @@ func (r *serviceRepo) GetPlansByCategory(ctx context.Context, categoryID uuid.UU
 		var p models.ServicePlan
 		if err := rows.Scan(
 			&p.ID, &p.CategoryID, &p.Name, &p.Price, &p.DurationDays,
-			&p.SpeedDownload, &p.SpeedUpload, &p.DataCap,
+			&p.Speed, &p.DataCap,
 			&p.ConnectionType, &p.InstallationFee,
-			&p.RouterIncluded, &p.IPType, &p.Description,
-			&p.CabinetNotes, &p.Features, &p.IsActive, &p.SortOrder,
+			&p.RouterIncluded, &p.Description,
+			&p.CabinetNotes, &p.Features, &p.IsActive, &p.DisabledAt, &p.SortOrder,
 			&p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
 			&p.CreatorName, &p.CategoryName,
 		); err != nil {
@@ -215,10 +215,10 @@ func (r *serviceRepo) GetPlanByID(ctx context.Context, id uuid.UUID) (*models.Se
 	err := r.db.QueryRow(ctx,
 		`SELECT
 			sp.id, sp.category_id, sp.name, sp.price, sp.duration_days,
-			sp.speed_download, sp.speed_upload, sp.data_cap,
+			sp.speed, sp.data_cap,
 			sp.connection_type, sp.installation_fee,
-			sp.router_included, sp.ip_type, sp.description,
-			sp.cabinet_notes, sp.features, sp.is_active, sp.sort_order,
+			sp.router_included, sp.description,
+			sp.cabinet_notes, sp.features, sp.is_active, sp.disabled_at, sp.sort_order,
 			sp.created_by, sp.created_at, sp.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
 			sc.name                             AS category_name
@@ -228,10 +228,10 @@ func (r *serviceRepo) GetPlanByID(ctx context.Context, id uuid.UUID) (*models.Se
 		WHERE sp.id = $1`, id,
 	).Scan(
 		&p.ID, &p.CategoryID, &p.Name, &p.Price, &p.DurationDays,
-		&p.SpeedDownload, &p.SpeedUpload, &p.DataCap,
+		&p.Speed, &p.DataCap,
 		&p.ConnectionType, &p.InstallationFee,
-		&p.RouterIncluded, &p.IPType, &p.Description,
-		&p.CabinetNotes, &p.Features, &p.IsActive, &p.SortOrder,
+		&p.RouterIncluded, &p.Description,
+		&p.CabinetNotes, &p.Features, &p.IsActive, &p.DisabledAt, &p.SortOrder,
 		&p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
 		&p.CreatorName, &p.CategoryName,
 	)
@@ -248,17 +248,17 @@ func (r *serviceRepo) UpdatePlan(ctx context.Context, plan *models.ServicePlan) 
 	_, err := r.db.Exec(ctx,
 		`UPDATE service_plans SET
 			name=$1, price=$2, duration_days=$3,
-			speed_download=$4, speed_upload=$5, data_cap=$6,
-			connection_type=$7, installation_fee=$8,
-			router_included=$9, ip_type=$10, description=$11,
-			cabinet_notes=$12, features=$13::jsonb, is_active=$14, sort_order=$15,
+			speed=$4, data_cap=$5,
+			connection_type=$6, installation_fee=$7,
+			router_included=$8, description=$9,
+			cabinet_notes=$10, features=$11::jsonb, is_active=$12, disabled_at=$13, sort_order=$14,
 			updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$16`,
+		 WHERE id=$15`,
 		plan.Name, plan.Price, plan.DurationDays,
-		plan.SpeedDownload, plan.SpeedUpload, plan.DataCap,
+		plan.Speed, plan.DataCap,
 		plan.ConnectionType, plan.InstallationFee,
-		plan.RouterIncluded, plan.IPType, plan.Description,
-		plan.CabinetNotes, plan.Features, plan.IsActive, plan.SortOrder,
+		plan.RouterIncluded, plan.Description,
+		plan.CabinetNotes, plan.Features, plan.IsActive, plan.DisabledAt, plan.SortOrder,
 		plan.ID)
 	return err
 }

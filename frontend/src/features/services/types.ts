@@ -8,6 +8,7 @@ export interface ServiceCategory {
   created_by: string;
   created_at: string;
   updated_at: string;
+  disabled_at?: string;
   creator_name?: string;
   province_name?: string;
   plan_count: number;
@@ -19,17 +20,16 @@ export interface ServicePlan {
   name: string;
   price: number;
   duration_days: number;
-  speed_download?: string;
-  speed_upload?: string;
+  speed?: string;
   data_cap?: string;
   connection_type: string;
   installation_fee: number;
   router_included: boolean;
-  ip_type: string;
   description?: string;
   cabinet_notes?: string;
   features?: string;
   is_active: boolean;
+  disabled_at?: string;
   sort_order: number;
   created_by: string;
   created_at: string;

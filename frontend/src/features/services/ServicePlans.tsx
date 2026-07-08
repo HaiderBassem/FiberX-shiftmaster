@@ -35,9 +35,7 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
             {[
               { icon: DollarSign, label: t('services.monthly_price'), value: `${plan.price.toLocaleString()} ${t('services.iqd_per_plan').split('/')[0]}`, color: 'text-emerald-400' },
               { icon: Clock, label: t('services.plan_duration'), value: `${plan.duration_days} ${t('services.days')}`, color: 'text-blue-400' },
-              { icon: Zap, label: t('services.speed_down'), value: plan.speed_download ?? '—', color: 'text-primary' },
-              { icon: Zap, label: t('services.speed_up'), value: plan.speed_upload ?? '—', color: 'text-primary' },
-              { icon: Server, label: t('services.ip_type'), value: plan.ip_type, color: 'text-purple-400' },
+              { icon: Zap, label: t('services.speed_label'), value: plan.speed ?? '—', color: 'text-primary' },
             ].map(item => (
               <div key={item.label} className="bg-background rounded-xl p-3 border border-border">
                 <item.icon className={`w-4 h-4 mb-1.5 ${item.color}`} />
@@ -107,13 +105,11 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
     duration_days: initial?.duration_days?.toString() ?? '30',
-    speed_download: initial?.speed_download ?? '',
-    speed_upload: initial?.speed_upload ?? '',
+    speed: initial?.speed ?? '',
     data_cap: initial?.data_cap ?? 'Unlimited',
     connection_type: initial?.connection_type ?? 'FTTH',
     installation_fee: initial?.installation_fee?.toString() ?? '0',
     router_included: initial?.router_included ?? false,
-    ip_type: initial?.ip_type ?? 'Dynamic',
     description: initial?.description ?? '',
     cabinet_notes: initial?.cabinet_notes ?? '',
   });
@@ -133,8 +129,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
         price: parseFloat(f.price),
         duration_days: parseInt(f.duration_days),
         installation_fee: parseFloat(f.installation_fee),
-        speed_download: f.speed_download || undefined,
-        speed_upload: f.speed_upload || undefined,
+        speed: f.speed || undefined,
         description: f.description || undefined,
         cabinet_notes: f.cabinet_notes || undefined,
       };
@@ -172,23 +167,14 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
             {field(t('services.plan_name'), 'name', 'text', t('services.plan_name_ph'))}
             {field(t('services.price'), 'price', 'number', t('services.price_ph'))}
             {field(t('services.duration'), 'duration_days', 'number', t('services.duration_ph'))}
-            {field(t('services.speed_down'), 'speed_download', 'text', t('services.speed_down_ph'))}
-            {field(t('services.speed_up'), 'speed_upload', 'text', t('services.speed_up_ph'))}
+            {field(t('services.speed_label'), 'speed', 'text', t('services.speed_down_ph'))}
             {field(t('services.data_cap'), 'data_cap', 'text', t('services.data_cap_ph'))}
             {field(t('services.install_fee'), 'installation_fee', 'number', t('services.install_fee_ph'))}
           </div>
 
 
           <div className="grid grid-cols-2 gap-4">
-            {/* IP Type */}
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.ip_type')}</label>
-              <select value={f.ip_type} onChange={e => set('ip_type', e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
-                <option value="Dynamic">Dynamic</option>
-                <option value="Static">Static</option>
-              </select>
-            </div>
+
             {/* Router included */}
             <div className="flex items-center gap-3 pt-5">
               <input type="checkbox" id="router" checked={f.router_included}
@@ -320,7 +306,11 @@ export function ServicePlans({ category, manager, onBack }: {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPlans.map(plan => (
             <div key={plan.id}
-              className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer flex flex-col"
+              className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer flex flex-col ${
+                plan.is_active 
+                  ? 'bg-card border-border hover:border-primary/40' 
+                  : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              }`}
               onClick={() => setDetailPlan(plan)}>
 
               {/* Badges Row */}
@@ -336,9 +326,16 @@ export function ServicePlans({ category, manager, onBack }: {
                     </span>
                   )}
                   {!plan.is_active && (
-                    <span className="text-xs px-2.5 py-1 rounded-full bg-destructive/10 text-destructive font-medium">
-                      {t('services.disabled')}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-destructive/10 text-destructive font-medium">
+                        {t('services.disabled')}
+                      </span>
+                      {plan.disabled_at && (
+                        <span className="text-[10px] text-muted-foreground/70">
+                          Stopped: {new Date(plan.disabled_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -372,15 +369,26 @@ export function ServicePlans({ category, manager, onBack }: {
                 </div>
 
                 {/* Speed (Single Speed) */}
-                {plan.speed_download && (
+                {plan.speed && (
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5 text-muted-foreground">
                       <Zap className="w-3.5 h-3.5 text-primary" />
                       {t('services.speed_label')}
                     </span>
-                    <span className="text-foreground font-semibold">{plan.speed_download}</span>
+                    <span className="text-foreground font-semibold">{plan.speed}</span>
                   </div>
                 )}
+
+                {/* Router Info */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Server className="w-3.5 h-3.5 text-primary" />
+                    {t('services.router_label')}
+                  </span>
+                  <span className="text-foreground font-semibold">
+                    {plan.router_included ? t('services.yes') : t('services.no')}
+                  </span>
+                </div>
               </div>
 
               {/* Cabinet notes indicator */}

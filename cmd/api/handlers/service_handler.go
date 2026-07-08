@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -155,6 +156,12 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 	existing.Name = req.Name
 	existing.Description = req.Description
 	if req.IsActive != nil {
+		if *req.IsActive && !existing.IsActive {
+			existing.DisabledAt = nil
+		} else if !*req.IsActive && existing.IsActive {
+			now := time.Now()
+			existing.DisabledAt = &now
+		}
 		existing.IsActive = *req.IsActive
 	}
 	if req.SortOrder != nil {
@@ -257,13 +264,11 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 		Name            string  `json:"name" binding:"required"`
 		Price           float64 `json:"price" binding:"required"`
 		DurationDays    int     `json:"duration_days" binding:"required"`
-		SpeedDownload   *string `json:"speed_download"`
-		SpeedUpload     *string `json:"speed_upload"`
+		Speed           *string `json:"speed"`
 		DataCap         *string `json:"data_cap"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
-		IPType          string  `json:"ip_type"`
 		Description     *string `json:"description"`
 		CabinetNotes    *string `json:"cabinet_notes"`
 		Features        *string `json:"features"`
@@ -280,23 +285,17 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 	if connType == "" {
 		connType = "FTTH"
 	}
-	ipType := req.IPType
-	if ipType == "" {
-		ipType = "Dynamic"
-	}
 
 	plan := &models.ServicePlan{
 		CategoryID:      catID,
 		Name:            req.Name,
 		Price:           req.Price,
 		DurationDays:    req.DurationDays,
-		SpeedDownload:   req.SpeedDownload,
-		SpeedUpload:     req.SpeedUpload,
+		Speed:           req.Speed,
 		DataCap:         req.DataCap,
 		ConnectionType:  connType,
 		InstallationFee: req.InstallationFee,
 		RouterIncluded:  req.RouterIncluded,
-		IPType:          ipType,
 		Description:     req.Description,
 		CabinetNotes:    req.CabinetNotes,
 		Features:        req.Features,
@@ -330,13 +329,11 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 		Name            string  `json:"name" binding:"required"`
 		Price           float64 `json:"price" binding:"required"`
 		DurationDays    int     `json:"duration_days" binding:"required"`
-		SpeedDownload   *string `json:"speed_download"`
-		SpeedUpload     *string `json:"speed_upload"`
+		Speed           *string `json:"speed"`
 		DataCap         *string `json:"data_cap"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
-		IPType          string  `json:"ip_type"`
 		Description     *string `json:"description"`
 		CabinetNotes    *string `json:"cabinet_notes"`
 		Features        *string `json:"features"`
@@ -357,25 +354,25 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 	if connType == "" {
 		connType = "FTTH"
 	}
-	ipType := req.IPType
-	if ipType == "" {
-		ipType = "Dynamic"
-	}
 
 	existing.Name = req.Name
 	existing.Price = req.Price
 	existing.DurationDays = req.DurationDays
-	existing.SpeedDownload = req.SpeedDownload
-	existing.SpeedUpload = req.SpeedUpload
+	existing.Speed = req.Speed
 	existing.DataCap = req.DataCap
 	existing.ConnectionType = connType
 	existing.InstallationFee = req.InstallationFee
 	existing.RouterIncluded = req.RouterIncluded
-	existing.IPType = ipType
 	existing.Description = req.Description
 	existing.CabinetNotes = req.CabinetNotes
 	existing.Features = req.Features
 	if req.IsActive != nil {
+		if *req.IsActive && !existing.IsActive {
+			existing.DisabledAt = nil
+		} else if !*req.IsActive && existing.IsActive {
+			now := time.Now()
+			existing.DisabledAt = &now
+		}
 		existing.IsActive = *req.IsActive
 	}
 

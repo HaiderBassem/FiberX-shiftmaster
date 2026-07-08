@@ -206,7 +206,11 @@ function CategoriesView({
           {filteredCategories.map(cat => (
             <div
               key={cat.id}
-              className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
+              className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer ${
+                cat.is_active 
+                  ? 'bg-card border-border hover:border-primary/40' 
+                  : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              }`}
               onClick={() => onSelectCategory(cat)}
             >
               {/* Icon */}
@@ -221,13 +225,20 @@ function CategoriesView({
               )}
 
               {/* Plan count badge */}
-              <div className="flex items-center gap-1.5 mt-auto">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                  {t('services.plan_count', { count: cat.plan_count || 0 })}
-                </span>
-                {!cat.is_active && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
-                    {t('services.disabled')}
+              <div className="flex flex-col gap-2 mt-auto">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                    {t('services.plan_count', { count: cat.plan_count || 0 })}
+                  </span>
+                  {!cat.is_active && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                      {t('services.disabled')}
+                    </span>
+                  )}
+                </div>
+                {!cat.is_active && cat.disabled_at && (
+                  <span className="text-[10px] text-muted-foreground/70">
+                    Stopped: {new Date(cat.disabled_at).toLocaleDateString()}
                   </span>
                 )}
               </div>

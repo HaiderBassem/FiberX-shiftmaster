@@ -12,8 +12,9 @@ type ServiceCategory struct {
 	ProvinceID  uuid.UUID `json:"province_id"`
 	Name        string    `json:"name"`
 	Description *string   `json:"description,omitempty"`
-	IsActive     bool      `json:"is_active"`
-	SortOrder   int       `json:"sort_order"`
+	IsActive    bool       `json:"is_active"`
+	DisabledAt  *time.Time `json:"disabled_at,omitempty"`
+	SortOrder   int        `json:"sort_order"`
 	CreatedBy   uuid.UUID `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -31,17 +32,16 @@ type ServicePlan struct {
 	Name            string    `json:"name"`
 	Price           float64   `json:"price"`
 	DurationDays    int       `json:"duration_days"`
-	SpeedDownload   *string   `json:"speed_download,omitempty"`
-	SpeedUpload     *string   `json:"speed_upload,omitempty"`
+	Speed           *string   `json:"speed,omitempty"`
 	DataCap         *string   `json:"data_cap,omitempty"`
 	ConnectionType  string    `json:"connection_type"`
 	InstallationFee float64   `json:"installation_fee"`
 	RouterIncluded  bool      `json:"router_included"`
-	IPType          string    `json:"ip_type"`
 	Description     *string   `json:"description,omitempty"`
 	CabinetNotes    *string   `json:"cabinet_notes,omitempty"`
 	Features        *string   `json:"features,omitempty"` // JSONB as string
 	IsActive        bool      `json:"is_active"`
+	DisabledAt      *time.Time `json:"disabled_at,omitempty"`
 	SortOrder       int       `json:"sort_order"`
 	CreatedBy       uuid.UUID `json:"created_by"`
 	CreatedAt       time.Time `json:"created_at"`
