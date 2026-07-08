@@ -62,7 +62,18 @@ func (h *ServiceHandler) canManageServices(c *gin.Context) bool {
 
 // ListCategories returns all service categories.
 func (h *ServiceHandler) ListCategories(c *gin.Context) {
-	cats, err := h.repo.GetAllCategories(c.Request.Context())
+	deptIDStr, ok := c.Get("department_id")
+	if !ok || deptIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "Department ID not found"})
+		return
+	}
+	deptID, err := uuid.Parse(deptIDStr.(string))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
+
+	cats, err := h.repo.GetAllCategories(c.Request.Context(), deptID)
 	if err != nil {
 		log.Printf("ListCategories error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to load categories"})
@@ -92,8 +103,11 @@ func (h *ServiceHandler) CreateCategory(c *gin.Context) {
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
+	deptIDStr, _ := c.Get("department_id")
+	deptID, _ := uuid.Parse(deptIDStr.(string))
 
 	cat := &models.ServiceCategory{
+		DepartmentID: deptID,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    true,
@@ -133,9 +147,17 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID)
+	deptIDStr, _ := c.Get("department_id")
+	deptID, _ := uuid.Parse(deptIDStr.(string))
+
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
+		return
+	}
+
+	if existing.IsShared {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot edit shared categories"})
 		return
 	}
 
@@ -170,9 +192,118 @@ func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 		return
 	}
 
+	deptIDStr, _ := c.Get("department_id")
+	deptID, _ := uuid.Parse(deptIDStr.(string))
+
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
+		return
+	}
+	if existing.IsShared {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot delete shared categories"})
+		return
+	}
+
 	if err := h.repo.DeleteCategory(c.Request.Context(), catID); err != nil {
 		log.Printf("DeleteCategory error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to delete category"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sharing Endpoints
+// ═══════════════════════════════════════════════════════════
+
+func (h *ServiceHandler) GetShares(c *gin.Context) {
+	catID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
+		return
+	}
+	shares, err := h.repo.GetCategoryShares(c.Request.Context(), catID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to get shares"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": shares})
+}
+
+func (h *ServiceHandler) ShareCategory(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+	catID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
+		return
+	}
+
+	var req struct {
+		DepartmentID uuid.UUID `json:"department_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	deptIDStr, _ := c.Get("department_id")
+	deptID, _ := uuid.Parse(deptIDStr.(string))
+
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
+	if err != nil || existing.IsShared {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot share this category"})
+		return
+	}
+
+	empIDStr, _ := c.Get("employee_id")
+	empID, _ := uuid.Parse(empIDStr.(string))
+
+	share := &models.ServiceCategoryShare{
+		CategoryID:   catID,
+		DepartmentID: req.DepartmentID,
+		GrantedBy:    empID,
+	}
+
+	if err := h.repo.ShareCategory(c.Request.Context(), share); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to share category"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": share})
+}
+
+func (h *ServiceHandler) UnshareCategory(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+	catID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
+		return
+	}
+	targetDeptID, err := uuid.Parse(c.Param("department_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid department ID"})
+		return
+	}
+
+	deptIDStr, _ := c.Get("department_id")
+	deptID, _ := uuid.Parse(deptIDStr.(string))
+
+	existing, err := h.repo.GetCategoryByID(c.Request.Context(), catID, deptID)
+	if err != nil || existing.IsShared {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "Cannot unshare this category"})
+		return
+	}
+
+	if err := h.repo.UnshareCategory(c.Request.Context(), catID, targetDeptID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to unshare category"})
 		return
 	}
 

@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
 import api from '@/lib/api';
-import type { ServiceCategory, ServicePlan } from './types';
-import { IRAQ_PROVINCES } from './types';
+import type { ServiceCategory, ServicePlan, Province } from './types';
 import { ServicePlans } from './ServicePlans';
+import { ProvinceManager } from './ProvinceManager';
+import { CategoryShareModal } from './CategoryShareModal';
 import { useTranslation } from 'react-i18next';
 import {
-  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight,
+  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2
 } from 'lucide-react';
 
 /* ─── helpers ─────────────────────────────────────────── */
@@ -107,6 +108,13 @@ export function ServiceHub() {
   const [modalCat, setModalCat] = useState<ServiceCategory | null | undefined>(undefined); // undefined=closed
   const [delConfirm, setDelConfirm] = useState<ServiceCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showProvManager, setShowProvManager] = useState(false);
+  const [shareCat, setShareCat] = useState<ServiceCategory | null>(null);
+
+  const { data: provincesData, isLoading: isProvLoading } = useQuery<Province[]>({
+    queryKey: ['provinces'],
+    queryFn: async () => (await api.get('/provinces')).data.data ?? [],
+  });
 
   const { data, isLoading } = useQuery<ServiceCategory[]>({
     queryKey: ['service-categories'],
@@ -154,12 +162,15 @@ export function ServiceHub() {
 
   // Step 1: Select Province
   if (!selectedProvince) {
-    const filteredProvinces = IRAQ_PROVINCES.filter(p =>
-      p.toLowerCase().includes(provinceSearchQuery.toLowerCase())
+    const activeProvinces = provincesData?.filter(p => p.is_active) ?? [];
+    const filteredProvinces = activeProvinces.filter(p =>
+      p.name.toLowerCase().includes(provinceSearchQuery.toLowerCase())
     );
 
     return (
       <div className="space-y-8">
+        {showProvManager && <ProvinceManager onClose={() => setShowProvManager(false)} />}
+        {shareCat && <CategoryShareModal category={shareCat} onClose={() => setShareCat(null)} />}
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -174,12 +185,20 @@ export function ServiceHub() {
             </p>
           </div>
           {manager && (
-            <button
-              onClick={() => setModalCat(null)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-            >
-              <Plus className="w-4 h-4" /> {t('services.new_category')}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowProvManager(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-card text-foreground text-sm font-medium hover:bg-muted transition-all"
+              >
+                <MapPin className="w-4 h-4" /> {t('services.manage_provinces')}
+              </button>
+              <button
+                onClick={() => setModalCat(null)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+              >
+                <Plus className="w-4 h-4" /> {t('services.new_category')}
+              </button>
+            </div>
           )}
         </div>
 
@@ -196,20 +215,31 @@ export function ServiceHub() {
         </div>
 
         {/* Provinces Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {filteredProvinces.map(p => (
-            <button
-              key={p}
-              onClick={() => setSelectedProvince(p)}
-              className="group flex flex-col items-center justify-center p-6 bg-card border border-border rounded-2xl hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 transform hover:-translate-y-1 text-center"
-            >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3 group-hover:from-primary/30 transition-colors">
-                <MapPin className="w-6 h-6 text-primary group-hover:scale-110 transition-transform" />
+        {isProvLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {filteredProvinces.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setSelectedProvince(p.name)}
+                className="group flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 group-hover:bg-primary/20">
+                  <MapPin className="w-6 h-6 text-primary" />
+                </div>
+                <span className="font-semibold text-foreground">{p.name}</span>
+              </button>
+            ))}
+            {filteredProvinces.length === 0 && (
+              <div className="col-span-full py-12 text-center text-muted-foreground">
+                {t('services.no_provinces_found')}
               </div>
-              <span className="font-bold text-foreground group-hover:text-primary transition-colors">{p}</span>
-            </button>
-          ))}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Category Modal */}
         {modalCat !== undefined && (
@@ -359,12 +389,17 @@ export function ServiceHub() {
                       {t('services.disabled')}
                     </span>
                   )}
+                  {cat.is_shared && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 font-medium flex items-center gap-1">
+                      <Share2 className="w-3 h-3" /> {t('services.shared')}
+                    </span>
+                  )}
                 </div>
 
                 <ChevronRight className="absolute bottom-5 left-5 w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
 
                 {/* Actions — stop propagation */}
-                {manager && (
+                {manager && !cat.is_shared && (
                   <div
                     className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={e => e.stopPropagation()}
@@ -377,6 +412,13 @@ export function ServiceHub() {
                       {cat.is_active
                         ? <ToggleRight className="w-3.5 h-3.5 text-primary" />
                         : <ToggleLeft className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => setShareCat(cat)}
+                      className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-blue-500 transition-colors"
+                      title={t('services.share_category')}
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => setModalCat(cat)}

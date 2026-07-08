@@ -36,6 +36,7 @@ func SetupRouter(
 	itemReqH *handlers.ItemRequestHandler,
 	ticketH *handlers.TicketHandler,
 	serviceH *handlers.ServiceHandler,
+	provinceH *handlers.ProvinceHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -441,6 +442,20 @@ func SetupRouter(
 			services.POST("/categories/:id/plans", serviceH.CreatePlan)
 			services.PUT("/plans/:id", serviceH.UpdatePlan)
 			services.DELETE("/plans/:id", serviceH.DeletePlan)
+
+			// Sharing
+			services.GET("/categories/:id/shares", serviceH.GetShares)
+			services.POST("/categories/:id/shares", serviceH.ShareCategory)
+			services.DELETE("/categories/:id/shares/:department_id", serviceH.UnshareCategory)
+		}
+
+		// --- Provinces ---
+		provinces := protected.Group("/provinces")
+		{
+			provinces.GET("", provinceH.GetAll)
+			provinces.POST("", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Create)
+			provinces.PUT("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Update)
+			provinces.DELETE("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Delete)
 		}
 
 	}

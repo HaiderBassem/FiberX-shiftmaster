@@ -8,18 +8,33 @@ import (
 
 // ServiceCategory is a top-level grouping card for FTTH service plans.
 type ServiceCategory struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	IsActive    bool      `json:"is_active"`
+	ID           uuid.UUID `json:"id"`
+	DepartmentID uuid.UUID `json:"department_id"`
+	Name         string    `json:"name"`
+	Description  *string   `json:"description,omitempty"`
+	IsActive     bool      `json:"is_active"`
 	SortOrder   int       `json:"sort_order"`
 	CreatedBy   uuid.UUID `json:"created_by"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Joined / computed fields
-	CreatorName *string `json:"creator_name,omitempty" db:"-"`
-	PlanCount   int     `json:"plan_count" db:"-"`
+	CreatorName    *string `json:"creator_name,omitempty" db:"-"`
+	DepartmentName string  `json:"department_name" db:"-"`
+	PlanCount      int     `json:"plan_count" db:"-"`
+	IsShared       bool    `json:"is_shared" db:"-"`
+}
+
+// ServiceCategoryShare represents a cross-department sharing relationship
+type ServiceCategoryShare struct {
+	ID             uuid.UUID `json:"id" db:"id"`
+	CategoryID     uuid.UUID `json:"category_id" db:"category_id"`
+	DepartmentID   uuid.UUID `json:"department_id" db:"department_id"`
+	GrantedBy      uuid.UUID `json:"granted_by" db:"granted_by"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+
+	// Virtual field
+	DepartmentName string    `json:"department_name" db:"-"`
 }
 
 // ServicePlan is an FTTH internet package within a category.

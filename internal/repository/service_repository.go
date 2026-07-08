@@ -15,10 +15,15 @@ import (
 type ServiceRepository interface {
 	// Categories
 	CreateCategory(ctx context.Context, cat *models.ServiceCategory) error
-	GetAllCategories(ctx context.Context) ([]models.ServiceCategory, error)
-	GetCategoryByID(ctx context.Context, id uuid.UUID) (*models.ServiceCategory, error)
+	GetAllCategories(ctx context.Context, departmentID uuid.UUID) ([]models.ServiceCategory, error)
+	GetCategoryByID(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) (*models.ServiceCategory, error)
 	UpdateCategory(ctx context.Context, cat *models.ServiceCategory) error
 	DeleteCategory(ctx context.Context, id uuid.UUID) error
+
+	// Sharing
+	ShareCategory(ctx context.Context, share *models.ServiceCategoryShare) error
+	UnshareCategory(ctx context.Context, categoryID, departmentID uuid.UUID) error
+	GetCategoryShares(ctx context.Context, categoryID uuid.UUID) ([]models.ServiceCategoryShare, error)
 
 	// Plans
 	CreatePlan(ctx context.Context, plan *models.ServicePlan) error
@@ -43,31 +48,36 @@ func NewServiceRepository(db *database.DB) ServiceRepository {
 
 func (r *serviceRepo) CreateCategory(ctx context.Context, cat *models.ServiceCategory) error {
 	return r.db.QueryRow(ctx,
-		`INSERT INTO service_categories (name, description, is_active, sort_order, created_by)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO service_categories (department_id, name, description, is_active, sort_order, created_by)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, created_at, updated_at`,
-		cat.Name, cat.Description, cat.IsActive, cat.SortOrder, cat.CreatedBy,
+		cat.DepartmentID, cat.Name, cat.Description, cat.IsActive, cat.SortOrder, cat.CreatedBy,
 	).Scan(&cat.ID, &cat.CreatedAt, &cat.UpdatedAt)
 }
 
-func (r *serviceRepo) GetAllCategories(ctx context.Context) ([]models.ServiceCategory, error) {
+func (r *serviceRepo) GetAllCategories(ctx context.Context, departmentID uuid.UUID) ([]models.ServiceCategory, error) {
 	query := `
-		SELECT
-			sc.id, sc.name, sc.description, sc.is_active, sc.sort_order,
+		SELECT DISTINCT
+			sc.id, sc.department_id, sc.name, sc.description, sc.is_active, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
-			COALESCE(pc.plan_count, 0)          AS plan_count
+			dep.name AS department_name,
+			COALESCE(pc.plan_count, 0) AS plan_count,
+			CASE WHEN sc.department_id = $1 THEN false ELSE true END AS is_shared
 		FROM service_categories sc
 		JOIN employees e ON sc.created_by = e.id
+		JOIN departments dep ON sc.department_id = dep.id
+		LEFT JOIN service_category_department_shares scs ON sc.id = scs.category_id AND scs.department_id = $1
 		LEFT JOIN (
 			SELECT category_id, COUNT(*) AS plan_count
 			FROM service_plans
 			GROUP BY category_id
 		) pc ON pc.category_id = sc.id
+		WHERE sc.department_id = $1 OR scs.id IS NOT NULL
 		ORDER BY sc.sort_order, sc.created_at DESC
 	`
 
-	rows, err := r.db.Query(ctx, query)
+	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get categories: %w", err)
 	}
@@ -77,9 +87,9 @@ func (r *serviceRepo) GetAllCategories(ctx context.Context) ([]models.ServiceCat
 	for rows.Next() {
 		var c models.ServiceCategory
 		if err := rows.Scan(
-			&c.ID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+			&c.ID, &c.DepartmentID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
 			&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
-			&c.CreatorName, &c.PlanCount,
+			&c.CreatorName, &c.DepartmentName, &c.PlanCount, &c.IsShared,
 		); err != nil {
 			return nil, fmt.Errorf("scan category: %w", err)
 		}
@@ -91,26 +101,30 @@ func (r *serviceRepo) GetAllCategories(ctx context.Context) ([]models.ServiceCat
 	return cats, nil
 }
 
-func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID) (*models.ServiceCategory, error) {
+func (r *serviceRepo) GetCategoryByID(ctx context.Context, id uuid.UUID, departmentID uuid.UUID) (*models.ServiceCategory, error) {
 	var c models.ServiceCategory
 	err := r.db.QueryRow(ctx,
-		`SELECT
-			sc.id, sc.name, sc.description, sc.is_active, sc.sort_order,
+		`SELECT DISTINCT
+			sc.id, sc.department_id, sc.name, sc.description, sc.is_active, sc.sort_order,
 			sc.created_by, sc.created_at, sc.updated_at,
 			e.first_name || ' ' || e.last_name AS creator_name,
-			COALESCE(pc.plan_count, 0)          AS plan_count
+			dep.name AS department_name,
+			COALESCE(pc.plan_count, 0) AS plan_count,
+			CASE WHEN sc.department_id = $2 THEN false ELSE true END AS is_shared
 		FROM service_categories sc
 		JOIN employees e ON sc.created_by = e.id
+		JOIN departments dep ON sc.department_id = dep.id
+		LEFT JOIN service_category_department_shares scs ON sc.id = scs.category_id AND scs.department_id = $2
 		LEFT JOIN (
 			SELECT category_id, COUNT(*) AS plan_count
 			FROM service_plans
 			GROUP BY category_id
 		) pc ON pc.category_id = sc.id
-		WHERE sc.id = $1`, id,
+		WHERE sc.id = $1 AND (sc.department_id = $2 OR scs.id IS NOT NULL)`, id, departmentID,
 	).Scan(
-		&c.ID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
+		&c.ID, &c.DepartmentID, &c.Name, &c.Description, &c.IsActive, &c.SortOrder,
 		&c.CreatedBy, &c.CreatedAt, &c.UpdatedAt,
-		&c.CreatorName, &c.PlanCount,
+		&c.CreatorName, &c.DepartmentName, &c.PlanCount, &c.IsShared,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -133,6 +147,52 @@ func (r *serviceRepo) UpdateCategory(ctx context.Context, cat *models.ServiceCat
 func (r *serviceRepo) DeleteCategory(ctx context.Context, id uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM service_categories WHERE id=$1`, id)
 	return err
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sharing
+// ═══════════════════════════════════════════════════════════
+
+func (r *serviceRepo) ShareCategory(ctx context.Context, share *models.ServiceCategoryShare) error {
+	return r.db.QueryRow(ctx,
+		`INSERT INTO service_category_department_shares (category_id, department_id, granted_by)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (category_id, department_id) DO NOTHING
+		 RETURNING id, created_at`,
+		share.CategoryID, share.DepartmentID, share.GrantedBy,
+	).Scan(&share.ID, &share.CreatedAt)
+}
+
+func (r *serviceRepo) UnshareCategory(ctx context.Context, categoryID, departmentID uuid.UUID) error {
+	_, err := r.db.Exec(ctx,
+		`DELETE FROM service_category_department_shares WHERE category_id = $1 AND department_id = $2`,
+		categoryID, departmentID)
+	return err
+}
+
+func (r *serviceRepo) GetCategoryShares(ctx context.Context, categoryID uuid.UUID) ([]models.ServiceCategoryShare, error) {
+	query := `
+		SELECT s.id, s.category_id, s.department_id, s.granted_by, s.created_at, d.name AS department_name
+		FROM service_category_department_shares s
+		JOIN departments d ON s.department_id = d.id
+		WHERE s.category_id = $1
+		ORDER BY d.name
+	`
+	rows, err := r.db.Query(ctx, query, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("get category shares: %w", err)
+	}
+	defer rows.Close()
+
+	var shares []models.ServiceCategoryShare
+	for rows.Next() {
+		var s models.ServiceCategoryShare
+		if err := rows.Scan(&s.ID, &s.CategoryID, &s.DepartmentID, &s.GrantedBy, &s.CreatedAt, &s.DepartmentName); err != nil {
+			return nil, fmt.Errorf("scan share: %w", err)
+		}
+		shares = append(shares, s)
+	}
+	return shares, nil
 }
 
 // ═══════════════════════════════════════════════════════════

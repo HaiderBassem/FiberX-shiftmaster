@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import type { ServiceCategory, ServicePlan } from './types';
-import { IRAQ_PROVINCES } from './types';
+import type { ServiceCategory, ServicePlan, Province } from './types';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
@@ -123,6 +122,12 @@ function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  const { data: provincesData } = useQuery<Province[]>({
+    queryKey: ['provinces'],
+    queryFn: async () => (await api.get('/provinces')).data.data ?? [],
+  });
+  const activeProvinces = provincesData?.filter(p => p.is_active) ?? [];
+
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
 
   const submit = async (e: React.FormEvent) => {
@@ -186,7 +191,7 @@ function PlanModal({ categoryId, initial, defaultProvince, onClose, onSaved }: {
             <select value={f.province} onChange={e => set('province', e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
               <option value="">{t('services.select_province')}</option>
-              {IRAQ_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+              {activeProvinces.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
             </select>
           </div>
 
@@ -281,11 +286,7 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <button onClick={onBack}
-          className="p-2 rounded-xl border border-border hover:bg-white/5 transition-colors">
-          <ArrowRight className="w-5 h-5 text-muted-foreground" />
-        </button>
+      <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Wifi className="w-5 h-5 text-primary" /> {category.name}
@@ -297,12 +298,19 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
             <p className="text-muted-foreground text-sm">{category.description}</p>
           )}
         </div>
-        {manager && (
-          <button onClick={() => setEditPlan(null)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" /> {t('services.new_plan')}
+        <div className="flex items-center gap-2">
+          {manager && !category.is_shared && (
+            <button onClick={() => setEditPlan(null)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+              <Plus className="w-4 h-4" /> {t('services.new_plan')}
+            </button>
+          )}
+          <button onClick={onBack}
+            className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
+            title="Back">
+            <ArrowRight className="w-5 h-5 text-muted-foreground rtl:-scale-x-100" />
           </button>
-        )}
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -411,7 +419,7 @@ export function ServicePlans({ category, manager, selectedProvince, onBack }: {
               )}
 
               {/* Manager actions */}
-              {manager && (
+              {manager && !category.is_shared && (
                 <div className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => e.stopPropagation()}>
                   <button onClick={() => setEditPlan(plan)}
