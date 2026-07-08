@@ -363,8 +363,7 @@ export function ServiceHub() {
   }
 
   // Step 1: Select Province
-  const activeProvinces = provincesData?.filter(p => p.is_active) ?? [];
-  const filteredProvinces = activeProvinces.filter(p =>
+  const filteredProvinces = (provincesData ?? []).filter(p =>
     p.name.toLowerCase().includes(provinceSearchQuery.toLowerCase())
   );
 
@@ -421,12 +420,23 @@ export function ServiceHub() {
             <button
               key={p.id}
               onClick={() => setSelectedProvince(p)}
-              className="group relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-border bg-card hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200"
+              className={`group relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border transition-all duration-200 ${
+                p.is_active 
+                  ? 'bg-card border-border hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5' 
+                  : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0 hover:shadow-lg'
+              }`}
             >
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 group-hover:bg-primary/20">
                 <MapPin className="w-6 h-6 text-primary" />
               </div>
-              <span className="font-semibold text-foreground">{p.name}</span>
+              <div className="flex flex-col items-center gap-1">
+                <span className="font-semibold text-foreground">{p.name}</span>
+                {!p.is_active && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+                    {t('services.disabled')}
+                  </span>
+                )}
+              </div>
               {p.is_shared && (
                 <div className="absolute top-2 right-2 text-blue-500">
                   <Share2 className="w-4 h-4" />

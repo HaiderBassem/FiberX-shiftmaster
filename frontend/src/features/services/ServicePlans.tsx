@@ -107,12 +107,15 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
     duration_days: initial?.duration_days?.toString() ?? '30',
     speed: initial?.speed ?? '',
     data_cap: initial?.data_cap ?? 'Unlimited',
-    connection_type: initial?.connection_type ?? 'FTTH',
+    connection_type: initial?.connection_type ?? 'ONU',
     installation_fee: initial?.installation_fee?.toString() ?? '0',
     router_included: initial?.router_included ?? false,
     description: initial?.description ?? '',
     cabinet_notes: initial?.cabinet_notes ?? '',
   });
+
+  const isCustomDevice = !['ONU', 'ONT'].includes(f.connection_type);
+  const [deviceSelect, setDeviceSelect] = useState(isCustomDevice && f.connection_type ? 'Other' : (f.connection_type || 'ONU'));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -174,9 +177,40 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
 
 
           <div className="grid grid-cols-2 gap-4">
+            {/* Device Type */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.device_type_label') || 'Device Type'}</label>
+              <div className="flex gap-2">
+                <select
+                  value={deviceSelect}
+                  onChange={e => {
+                    setDeviceSelect(e.target.value);
+                    if (e.target.value !== 'Other') {
+                      set('connection_type', e.target.value);
+                    } else {
+                      set('connection_type', ''); // Clear for custom input
+                    }
+                  }}
+                  className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60 flex-1"
+                >
+                  <option value="ONU">ONU</option>
+                  <option value="ONT">ONT</option>
+                  <option value="Other">Other</option>
+                </select>
+                {deviceSelect === 'Other' && (
+                  <input
+                    type="text"
+                    value={f.connection_type}
+                    onChange={e => set('connection_type', e.target.value)}
+                    placeholder="Custom Device"
+                    className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 flex-1"
+                  />
+                )}
+              </div>
+            </div>
 
             {/* Router included */}
-            <div className="flex items-center gap-3 pt-5">
+            <div className="flex items-center gap-3 pt-5 col-span-2 sm:col-span-1">
               <input type="checkbox" id="router" checked={f.router_included}
                 onChange={e => set('router_included', e.target.checked)}
                 className="w-4 h-4 accent-primary" />
