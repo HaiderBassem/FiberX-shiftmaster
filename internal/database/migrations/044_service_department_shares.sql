@@ -1,14 +1,15 @@
 -- Migration 044: Add department_id to service_categories and create shares table
 -- =========================================================================
 
--- 1. Since we are adding a NOT NULL constraint and the user instructed to ignore existing data,
--- we truncate the services tables to avoid constraint violations.
-TRUNCATE TABLE service_plans CASCADE;
-TRUNCATE TABLE service_categories CASCADE;
+-- 1. No longer truncating existing data to prevent data loss.
 
 -- 2. Add department_id to service_categories
 ALTER TABLE service_categories 
-ADD COLUMN department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE;
+ADD COLUMN department_id UUID REFERENCES departments(id) ON DELETE CASCADE;
+
+-- Assign a fallback department to existing categories so we can apply NOT NULL
+UPDATE service_categories SET department_id = (SELECT id FROM departments ORDER BY created_at ASC LIMIT 1) WHERE department_id IS NULL;
+ALTER TABLE service_categories ALTER COLUMN department_id SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_service_categories_dept ON service_categories(department_id);
 
