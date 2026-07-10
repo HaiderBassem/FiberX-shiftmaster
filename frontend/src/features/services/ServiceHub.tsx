@@ -8,7 +8,7 @@ import { ProvinceManager } from './ProvinceManager';
 import { ProvinceShareModal } from './ProvinceShareModal';
 import { useTranslation } from 'react-i18next';
 import {
-  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2, ArrowUp, ArrowDown, GripVertical
+  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2, GripVertical
 } from 'lucide-react';
 import {
   DndContext,
@@ -17,8 +17,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import {
   arrayMove,
   SortableContext,
