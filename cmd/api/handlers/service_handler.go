@@ -177,6 +177,30 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": existing})
 }
 
+// ReorderCategories updates the sort_order of multiple categories at once.
+func (h *ServiceHandler) ReorderCategories(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+
+	var req struct {
+		CategoryIDs []uuid.UUID `json:"category_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if err := h.repo.UpdateCategoryOrder(c.Request.Context(), req.CategoryIDs); err != nil {
+		log.Printf("ReorderCategories error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to reorder categories"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 // DeleteCategory deletes a service category and all its plans.
 func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 	if !h.canManageServices(c) {
@@ -383,6 +407,30 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": existing})
+}
+
+// ReorderPlans updates the sort_order of multiple plans at once.
+func (h *ServiceHandler) ReorderPlans(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+
+	var req struct {
+		PlanIDs []uuid.UUID `json:"plan_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if err := h.repo.UpdatePlanOrder(c.Request.Context(), req.PlanIDs); err != nil {
+		log.Printf("ReorderPlans error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to reorder plans"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // DeletePlan deletes a service plan.

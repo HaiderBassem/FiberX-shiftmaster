@@ -18,6 +18,7 @@ type ServiceRepository interface {
 	GetCategoriesByProvince(ctx context.Context, provinceID uuid.UUID) ([]models.ServiceCategory, error)
 	GetCategoryByID(ctx context.Context, id uuid.UUID) (*models.ServiceCategory, error)
 	UpdateCategory(ctx context.Context, cat *models.ServiceCategory) error
+	UpdateCategoryOrder(ctx context.Context, categoryIDs []uuid.UUID) error
 	DeleteCategory(ctx context.Context, id uuid.UUID) error
 
 	// Plans
@@ -25,6 +26,7 @@ type ServiceRepository interface {
 	GetPlansByCategory(ctx context.Context, categoryID uuid.UUID) ([]models.ServicePlan, error)
 	GetPlanByID(ctx context.Context, id uuid.UUID) (*models.ServicePlan, error)
 	UpdatePlan(ctx context.Context, plan *models.ServicePlan) error
+	UpdatePlanOrder(ctx context.Context, planIDs []uuid.UUID) error
 	DeletePlan(ctx context.Context, id uuid.UUID) error
 }
 
@@ -133,6 +135,16 @@ func (r *serviceRepo) UpdateCategory(ctx context.Context, cat *models.ServiceCat
 		 WHERE id=$6`,
 		cat.Name, cat.Description, cat.IsActive, cat.DisabledAt, cat.SortOrder, cat.ID)
 	return err
+}
+
+func (r *serviceRepo) UpdateCategoryOrder(ctx context.Context, categoryIDs []uuid.UUID) error {
+	for i, id := range categoryIDs {
+		_, err := r.db.Exec(ctx, "UPDATE service_categories SET sort_order=$1 WHERE id=$2", i*10, id)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *serviceRepo) DeleteCategory(ctx context.Context, id uuid.UUID) error {
@@ -251,16 +263,26 @@ func (r *serviceRepo) UpdatePlan(ctx context.Context, plan *models.ServicePlan) 
 			speed=$4, data_cap=$5,
 			connection_type=$6, installation_fee=$7,
 			router_included=$8, description=$9,
-			cabinet_notes=$10, features=$11::jsonb, is_active=$12, disabled_at=$13, sort_order=$14,
-			updated_at=CURRENT_TIMESTAMP
-		 WHERE id=$15`,
+			cabinet_notes=$10, features=$11::jsonb, is_active=$12, disabled_at=$13, sort_order=$14, updated_at=CURRENT_TIMESTAMP
+		WHERE id=$15`,
 		plan.Name, plan.Price, plan.DurationDays,
 		plan.Speed, plan.DataCap,
 		plan.ConnectionType, plan.InstallationFee,
 		plan.RouterIncluded, plan.Description,
 		plan.CabinetNotes, plan.Features, plan.IsActive, plan.DisabledAt, plan.SortOrder,
-		plan.ID)
+		plan.ID,
+	)
 	return err
+}
+
+func (r *serviceRepo) UpdatePlanOrder(ctx context.Context, planIDs []uuid.UUID) error {
+	for i, id := range planIDs {
+		_, err := r.db.Exec(ctx, "UPDATE service_plans SET sort_order=$1 WHERE id=$2", i*10, id)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *serviceRepo) DeletePlan(ctx context.Context, id uuid.UUID) error {

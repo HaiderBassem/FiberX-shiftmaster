@@ -437,9 +437,11 @@ func SetupRouter(
 
 			// Write – permission checked inside handler
 			services.POST("/categories", serviceH.CreateCategory)
+			services.PUT("/categories/reorder", serviceH.ReorderCategories)
 			services.PUT("/categories/:id", serviceH.UpdateCategory)
 			services.DELETE("/categories/:id", serviceH.DeleteCategory)
 			services.POST("/categories/:id/plans", serviceH.CreatePlan)
+			services.PUT("/plans/reorder", serviceH.ReorderPlans)
 			services.PUT("/plans/:id", serviceH.UpdatePlan)
 			services.DELETE("/plans/:id", serviceH.DeletePlan)
 		}

@@ -8,7 +8,7 @@ import { ProvinceManager } from './ProvinceManager';
 import { ProvinceShareModal } from './ProvinceShareModal';
 import { useTranslation } from 'react-i18next';
 import {
-  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2
+  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 /* ─── helpers ─────────────────────────────────────────── */
@@ -114,19 +114,43 @@ function CategoriesView({
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/services/categories/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['service-categories', province.id] }); setDelConfirm(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelConfirm(null); },
   });
 
   const toggleMut = useMutation({
-    mutationFn: (cat: ServiceCategory) =>
-      api.put(`/services/categories/${cat.id}`, { name: cat.name, description: cat.description, is_active: !cat.is_active }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['service-categories', province.id] }),
+    mutationFn: async (cat: ServiceCategory) => {
+      return api.put(`/services/categories/${cat.id}`, {
+        name: cat.name,
+        description: cat.description,
+        is_active: !cat.is_active
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+  });
+
+  const reorderMut = useMutation({
+    mutationFn: async (categoryIds: string[]) => {
+      return api.put('/services/categories/reorder', { category_ids: categoryIds });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
   });
 
   const filteredCategories = (categories ?? []).filter(cat => 
     cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const handleReorder = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === filteredCategories.length - 1) return;
+
+    const newCats = [...filteredCategories];
+    const otherIndex = direction === 'up' ? index - 1 : index + 1;
+    [newCats[index], newCats[otherIndex]] = [newCats[otherIndex], newCats[index]];
+    
+    reorderMut.mutate(newCats.map(c => c.id));
+  };
 
   return (
     <div className="space-y-8">
@@ -203,7 +227,7 @@ function CategoriesView({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredCategories.map(cat => (
+          {filteredCategories.map((cat, index) => (
             <div
               key={cat.id}
               className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer ${
@@ -272,6 +296,17 @@ function CategoriesView({
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  <div className="flex flex-col ml-1 bg-background/80 border border-border/50 rounded-lg overflow-hidden">
+                    <button onClick={(e) => handleReorder(e, index, 'up')} disabled={index === 0 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                    <div className="h-[1px] bg-border/50" />
+                    <button onClick={(e) => handleReorder(e, index, 'down')} disabled={index === filteredCategories.length - 1 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

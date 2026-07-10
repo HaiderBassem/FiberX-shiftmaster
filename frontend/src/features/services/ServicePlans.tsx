@@ -5,7 +5,7 @@ import type { ServiceCategory, ServicePlan } from './types';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
-  Clock, DollarSign, Zap, Server, Router, Cpu, StickyNote, Search,
+  Clock, DollarSign, Zap, Server, Router, Cpu, StickyNote, Search, ToggleLeft, ToggleRight, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 /* ─── Plan Detail Modal ────────────────────────────────── */
@@ -273,14 +273,47 @@ export function ServicePlans({ category, manager, onBack }: {
     queryFn: async () => (await api.get(`/services/categories/${category.id}/plans`)).data.data ?? [],
   });
 
-  const deleteMut = useMutation({
-    mutationFn: (id: string) => api.delete(`/services/plans/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelPlan(null); },
+  const toggleMut = useMutation({
+    mutationFn: async (plan: ServicePlan) => {
+      return api.put(`/services/plans/${plan.id}`, {
+        name: plan.name,
+        price: plan.price,
+        duration_days: plan.duration_days,
+        is_active: !plan.is_active
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+  });
+
+  const reorderMut = useMutation({
+    mutationFn: async (planIds: string[]) => {
+      return api.put('/services/plans/reorder', { plan_ids: planIds });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
   });
 
   const filteredPlans = (plans ?? []).filter(plan => 
     plan.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleReorder = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === filteredPlans.length - 1) return;
+
+    const newPlans = [...filteredPlans];
+    const otherIndex = direction === 'up' ? index - 1 : index + 1;
+    [newPlans[index], newPlans[otherIndex]] = [newPlans[otherIndex], newPlans[index]];
+    
+    // Optimistic UI update could go here, but for simplicity we rely on React Query refetch
+    // or we just send the new IDs to the server
+    reorderMut.mutate(newPlans.map(p => p.id));
+  };
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/services/plans/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelPlan(null); },
+  });
 
   return (
     <div className="space-y-6">
@@ -338,7 +371,7 @@ export function ServicePlans({ category, manager, onBack }: {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredPlans.map(plan => (
+          {filteredPlans.map((plan, index) => (
             <div key={plan.id}
               className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer flex flex-col ${
                 plan.is_active 
@@ -437,14 +470,32 @@ export function ServicePlans({ category, manager, onBack }: {
               {manager && (
                 <div className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => e.stopPropagation()}>
+                  <button onClick={() => toggleMut.mutate(plan)}
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+                    title={plan.is_active ? t('services.disable') : t('services.enable')}>
+                    {plan.is_active ? <ToggleRight className="w-3.5 h-3.5 text-primary" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                  </button>
                   <button onClick={() => setEditPlan(plan)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors">
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+                    title={t('services.edit_plan')}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => setDelPlan(plan)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors">
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors"
+                    title={t('services.delete')}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  <div className="flex flex-col ml-1 bg-background/80 border border-border/50 rounded-lg overflow-hidden">
+                    <button onClick={(e) => handleReorder(e, index, 'up')} disabled={index === 0 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                    <div className="h-[1px] bg-border/50" />
+                    <button onClick={(e) => handleReorder(e, index, 'down')} disabled={index === filteredPlans.length - 1 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
