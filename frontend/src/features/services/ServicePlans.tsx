@@ -293,7 +293,8 @@ export function ServicePlans({ category, manager, onBack }: {
   });
 
   const filteredPlans = (plans ?? []).filter(plan => 
-    plan.name.toLowerCase().includes(searchQuery.toLowerCase())
+    plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (plan.description && plan.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleReorder = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
