@@ -107,14 +107,16 @@ function CategoriesView({
   const [modalCat, setModalCat] = useState<ServiceCategory | null | undefined>(undefined);
   const [delConfirm, setDelConfirm] = useState<ServiceCategory | null>(null);
 
+  const queryKey = ['service-categories', province.id];
+
   const { data: categories, isLoading } = useQuery<ServiceCategory[]>({
-    queryKey: ['service-categories', province.id],
+    queryKey,
     queryFn: async () => (await api.get(`/services/categories?province_id=${province.id}`)).data.data ?? [],
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/services/categories/${id}`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelConfirm(null); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey }); setDelConfirm(null); },
   });
 
   const toggleMut = useMutation({
@@ -125,14 +127,14 @@ function CategoriesView({
         is_active: !cat.is_active
       });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+    onSuccess: () => qc.invalidateQueries({ queryKey })
   });
 
   const reorderMut = useMutation({
     mutationFn: async (categoryIds: string[]) => {
       return api.put('/services/categories/reorder', { category_ids: categoryIds });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+    onSuccess: () => qc.invalidateQueries({ queryKey })
   });
 
   const filteredCategories = (categories ?? []).filter(cat => 
