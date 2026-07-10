@@ -8,8 +8,25 @@ import { ProvinceManager } from './ProvinceManager';
 import { ProvinceShareModal } from './ProvinceShareModal';
 import { useTranslation } from 'react-i18next';
 import {
-  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2, ArrowUp, ArrowDown
+  Plus, Pencil, Trash2, Wifi, FolderOpen, ChevronRight, X, Loader2, ToggleLeft, ToggleRight, Search, MapPin, ArrowRight, Share2, ArrowUp, ArrowDown, GripVertical
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 /* ─── helpers ─────────────────────────────────────────── */
 const canManage = (user: any) =>
@@ -95,6 +112,114 @@ function CategoryModal({
   );
 }
 
+/* ─── Sortable Category Card ─────────────────────────────── */
+function SortableCategoryCard({
+  cat, manager, province, t, onSelectCategory, setDelConfirm, setModalCat, toggleMut, isDragEnabled
+}: {
+  cat: ServiceCategory; manager: boolean; province: Province; t: any;
+  onSelectCategory: (cat: ServiceCategory) => void;
+  setDelConfirm: (cat: ServiceCategory) => void;
+  setModalCat: (cat: ServiceCategory) => void;
+  toggleMut: any;
+  isDragEnabled: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: cat.id, disabled: !isDragEnabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative border rounded-2xl p-5 transition-all duration-200 cursor-pointer ${
+        cat.is_active 
+          ? 'bg-card border-border hover:border-primary/40' 
+          : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+      } ${isDragging ? 'opacity-50 shadow-2xl scale-105' : 'hover:shadow-lg hover:shadow-primary/5'}`}
+      onClick={() => onSelectCategory(cat)}
+    >
+      {/* Icon */}
+      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 group-hover:from-primary/30 transition-colors">
+        <Wifi className="w-6 h-6 text-primary" />
+      </div>
+
+      {/* Name & desc */}
+      <h3 className="font-bold text-foreground text-base leading-snug mb-1">{cat.name}</h3>
+      {cat.description && (
+        <p className="text-muted-foreground text-xs line-clamp-2 mb-3">{cat.description}</p>
+      )}
+
+      {/* Plan count badge */}
+      <div className="flex flex-col gap-2 mt-auto">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+            {t('services.plan_count', { count: cat.plan_count || 0 })}
+          </span>
+          {!cat.is_active && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
+              {t('services.disabled')}
+            </span>
+          )}
+        </div>
+        {!cat.is_active && cat.disabled_at && (
+          <span className="text-[10px] text-muted-foreground/70">
+            Stopped: {new Date(cat.disabled_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+
+      <ChevronRight className="absolute bottom-5 left-5 w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+
+      {/* Actions */}
+      {manager && !province.is_shared && (
+        <div
+          className={`absolute top-4 left-4 flex gap-1 transition-opacity ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Drag Handle */}
+          {isDragEnabled && (
+            <div {...listeners} {...attributes} className="p-1.5 cursor-grab active:cursor-grabbing hover:bg-background border border-transparent hover:border-border/50 rounded-lg text-muted-foreground transition-colors mr-1">
+              <GripVertical className="w-4 h-4" />
+            </div>
+          )}
+          <button
+            onClick={() => toggleMut.mutate(cat)}
+            className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+            title={cat.is_active ? t('services.disable') : t('services.enable')}
+          >
+            {cat.is_active
+              ? <ToggleRight className="w-3.5 h-3.5 text-primary" />
+              : <ToggleLeft className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            onClick={() => setModalCat(cat)}
+            className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setDelConfirm(cat)}
+            className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Categories View ──────────────────────────────────── */
 function CategoriesView({
   province, manager, onBack, onSelectCategory
@@ -142,16 +267,23 @@ function CategoriesView({
     (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleReorder = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
-    e.stopPropagation();
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === filteredCategories.length - 1) return;
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
-    const newCats = [...filteredCategories];
-    const otherIndex = direction === 'up' ? index - 1 : index + 1;
-    [newCats[index], newCats[otherIndex]] = [newCats[otherIndex], newCats[index]];
-    
-    reorderMut.mutate(newCats.map(c => c.id));
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = filteredCategories.findIndex(c => c.id === active.id);
+      const newIndex = filteredCategories.findIndex(c => c.id === over.id);
+      const newCats = arrayMove(filteredCategories, oldIndex, newIndex);
+      reorderMut.mutate(newCats.map(c => c.id));
+    }
   };
 
   return (
@@ -228,93 +360,28 @@ function CategoriesView({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredCategories.map((cat, index) => (
-            <div
-              key={cat.id}
-              className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer ${
-                cat.is_active 
-                  ? 'bg-card border-border hover:border-primary/40' 
-                  : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
-              }`}
-              onClick={() => onSelectCategory(cat)}
-            >
-              {/* Icon */}
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4 group-hover:from-primary/30 transition-colors">
-                <Wifi className="w-6 h-6 text-primary" />
-              </div>
-
-              {/* Name & desc */}
-              <h3 className="font-bold text-foreground text-base leading-snug mb-1">{cat.name}</h3>
-              {cat.description && (
-                <p className="text-muted-foreground text-xs line-clamp-2 mb-3">{cat.description}</p>
-              )}
-
-              {/* Plan count badge */}
-              <div className="flex flex-col gap-2 mt-auto">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                    {t('services.plan_count', { count: cat.plan_count || 0 })}
-                  </span>
-                  {!cat.is_active && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">
-                      {t('services.disabled')}
-                    </span>
-                  )}
-                </div>
-                {!cat.is_active && cat.disabled_at && (
-                  <span className="text-[10px] text-muted-foreground/70">
-                    Stopped: {new Date(cat.disabled_at).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-
-              <ChevronRight className="absolute bottom-5 left-5 w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-
-              {/* Actions */}
-              {manager && !province.is_shared && (
-                <div
-                  className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => toggleMut.mutate(cat)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
-                    title={cat.is_active ? t('services.disable') : t('services.enable')}
-                  >
-                    {cat.is_active
-                      ? <ToggleRight className="w-3.5 h-3.5 text-primary" />
-                      : <ToggleLeft className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => setModalCat(cat)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDelConfirm(cat)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="flex flex-col ml-1 bg-background/80 border border-border/50 rounded-lg overflow-hidden">
-                    <button onClick={(e) => handleReorder(e, index, 'up')} disabled={index === 0 || reorderMut.isPending}
-                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
-                      <ArrowUp className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                    <div className="h-[1px] bg-border/50" />
-                    <button onClick={(e) => handleReorder(e, index, 'down')} disabled={index === filteredCategories.length - 1 || reorderMut.isPending}
-                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
-                      <ArrowDown className="w-3 h-3 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-              )}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={filteredCategories.map(c => c.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {filteredCategories.map((cat) => (
+                <SortableCategoryCard
+                  key={cat.id}
+                  cat={cat}
+                  manager={manager}
+                  province={province}
+                  t={t}
+                  onSelectCategory={onSelectCategory}
+                  setDelConfirm={setDelConfirm}
+                  setModalCat={setModalCat}
+                  toggleMut={toggleMut}
+                  isDragEnabled={!searchQuery}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
+
 
       {/* Category Modal */}
       {modalCat !== undefined && (
