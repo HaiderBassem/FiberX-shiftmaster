@@ -233,7 +233,7 @@ const EmployeeDashboard = () => {
   // Resolve today's shift for the logged-in employee
   const myTodayRow = (todayScheduleRows || []).find((r: any) => String(r.employee_id) === String(user?.id));
   const myTodayShift = (() => {
-    const shiftId = myTodayRow?.shift_id || user?.default_shift_id;
+    const shiftId = myTodayRow?.shift_id;
     if (!shiftId) return null;
     return (allShifts || []).find((s: any) => s.id === shiftId) || null;
   })();
