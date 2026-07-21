@@ -36,6 +36,7 @@ func SetupRouter(
 	itemReqH *handlers.ItemRequestHandler,
 	ticketH *handlers.TicketHandler,
 	serviceH *handlers.ServiceHandler,
+	provinceH *handlers.ProvinceHandler,
 ) {
 	api := r.Group("/api")
 	
@@ -430,17 +431,33 @@ func SetupRouter(
 		services := protected.Group("/services")
 		{
 			// Read – all authenticated users
-			services.GET("/categories", serviceH.ListCategories)
+			services.GET("/categories", serviceH.ListCategoriesByProvince)
 			services.GET("/categories/:id/plans", serviceH.ListPlans)
 			services.GET("/plans/:id", serviceH.GetPlan)
 
 			// Write – permission checked inside handler
 			services.POST("/categories", serviceH.CreateCategory)
+			services.PUT("/categories/reorder", serviceH.ReorderCategories)
 			services.PUT("/categories/:id", serviceH.UpdateCategory)
 			services.DELETE("/categories/:id", serviceH.DeleteCategory)
 			services.POST("/categories/:id/plans", serviceH.CreatePlan)
+			services.PUT("/plans/reorder", serviceH.ReorderPlans)
 			services.PUT("/plans/:id", serviceH.UpdatePlan)
 			services.DELETE("/plans/:id", serviceH.DeletePlan)
+		}
+
+		// --- Provinces ---
+		provinces := protected.Group("/provinces")
+		{
+			provinces.GET("", provinceH.GetAll)
+			provinces.POST("", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Create)
+			provinces.PUT("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Update)
+			provinces.DELETE("/:id", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Delete)
+
+			// Sharing
+			provinces.GET("/:id/shares", provinceH.GetShares)
+			provinces.POST("/:id/shares", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Share)
+			provinces.DELETE("/:id/shares/:departmentId", middleware.RequireRole("admin", "manager", "team_leader"), provinceH.Unshare)
 		}
 
 	}

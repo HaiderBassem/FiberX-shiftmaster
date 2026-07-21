@@ -58,6 +58,7 @@ func main() {
 	itemReqRepo := repository.NewItemRequestRepository(db)
 	ticketRepo := repository.NewTicketRepository(db)
 	serviceRepo := repository.NewServiceRepository(db)
+	provinceRepo := repository.NewProvinceRepository(db)
 
 	// --- Initialize Services ---
 	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
@@ -80,6 +81,7 @@ func main() {
 	moduleAccessService := service.NewModuleAccessService(moduleAccessRepo, employeeRepo)
 	fiberxDataService := service.NewFiberxDataService(fiberxDataRepo, employeeRepo)
 	itemReqService := service.NewItemRequestService(itemReqRepo, employeeRepo, departmentRepo, emailService)
+	provinceService := service.NewProvinceService(provinceRepo)
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
@@ -105,6 +107,7 @@ func main() {
 	itemReqHandler := handlers.NewItemRequestHandler(itemReqService)
 	ticketHandler := handlers.NewTicketHandler(ticketRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceRepo, db)
+	provinceHandler := handlers.NewProvinceHandler(provinceService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -139,7 +142,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler, provinceHandler,
 	)
 
 	// --- Start HTTP Server ---

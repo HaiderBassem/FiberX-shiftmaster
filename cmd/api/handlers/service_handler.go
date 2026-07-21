@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -60,11 +61,22 @@ func (h *ServiceHandler) canManageServices(c *gin.Context) bool {
 // Category Endpoints
 // ═══════════════════════════════════════════════════════════
 
-// ListCategories returns all service categories.
-func (h *ServiceHandler) ListCategories(c *gin.Context) {
-	cats, err := h.repo.GetAllCategories(c.Request.Context())
+// ListCategoriesByProvince returns all service categories for a province.
+func (h *ServiceHandler) ListCategoriesByProvince(c *gin.Context) {
+	provinceIDStr := c.Query("province_id")
+	if provinceIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "province_id is required"})
+		return
+	}
+	provinceID, err := uuid.Parse(provinceIDStr)
 	if err != nil {
-		log.Printf("ListCategories error: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid province ID"})
+		return
+	}
+
+	cats, err := h.repo.GetCategoriesByProvince(c.Request.Context(), provinceID)
+	if err != nil {
+		log.Printf("ListCategoriesByProvince error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to load categories"})
 		return
 	}
@@ -82,8 +94,9 @@ func (h *ServiceHandler) CreateCategory(c *gin.Context) {
 	}
 
 	var req struct {
-		Name        string  `json:"name" binding:"required"`
-		Description *string `json:"description"`
+		ProvinceID  uuid.UUID `json:"province_id" binding:"required"`
+		Name        string    `json:"name" binding:"required"`
+		Description *string   `json:"description"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
@@ -94,6 +107,7 @@ func (h *ServiceHandler) CreateCategory(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 
 	cat := &models.ServiceCategory{
+		ProvinceID:  req.ProvinceID,
 		Name:        req.Name,
 		Description: req.Description,
 		IsActive:    true,
@@ -142,6 +156,12 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 	existing.Name = req.Name
 	existing.Description = req.Description
 	if req.IsActive != nil {
+		if *req.IsActive && !existing.IsActive {
+			existing.DisabledAt = nil
+		} else if !*req.IsActive && existing.IsActive {
+			now := time.Now()
+			existing.DisabledAt = &now
+		}
 		existing.IsActive = *req.IsActive
 	}
 	if req.SortOrder != nil {
@@ -157,6 +177,30 @@ func (h *ServiceHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": existing})
 }
 
+// ReorderCategories updates the sort_order of multiple categories at once.
+func (h *ServiceHandler) ReorderCategories(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+
+	var req struct {
+		CategoryIDs []uuid.UUID `json:"category_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if err := h.repo.UpdateCategoryOrder(c.Request.Context(), req.CategoryIDs); err != nil {
+		log.Printf("ReorderCategories error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to reorder categories"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 // DeleteCategory deletes a service category and all its plans.
 func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 	if !h.canManageServices(c) {
@@ -167,6 +211,12 @@ func (h *ServiceHandler) DeleteCategory(c *gin.Context) {
 	catID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid category ID"})
+		return
+	}
+
+	_, err = h.repo.GetCategoryByID(c.Request.Context(), catID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
 		return
 	}
 
@@ -238,14 +288,11 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 		Name            string  `json:"name" binding:"required"`
 		Price           float64 `json:"price" binding:"required"`
 		DurationDays    int     `json:"duration_days" binding:"required"`
-		SpeedDownload   *string `json:"speed_download"`
-		SpeedUpload     *string `json:"speed_upload"`
+		Speed           *string `json:"speed"`
 		DataCap         *string `json:"data_cap"`
-		Province        string  `json:"province" binding:"required"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
-		IPType          string  `json:"ip_type"`
 		Description     *string `json:"description"`
 		CabinetNotes    *string `json:"cabinet_notes"`
 		Features        *string `json:"features"`
@@ -262,24 +309,17 @@ func (h *ServiceHandler) CreatePlan(c *gin.Context) {
 	if connType == "" {
 		connType = "FTTH"
 	}
-	ipType := req.IPType
-	if ipType == "" {
-		ipType = "Dynamic"
-	}
 
 	plan := &models.ServicePlan{
 		CategoryID:      catID,
 		Name:            req.Name,
 		Price:           req.Price,
 		DurationDays:    req.DurationDays,
-		SpeedDownload:   req.SpeedDownload,
-		SpeedUpload:     req.SpeedUpload,
+		Speed:           req.Speed,
 		DataCap:         req.DataCap,
-		Province:        req.Province,
 		ConnectionType:  connType,
 		InstallationFee: req.InstallationFee,
 		RouterIncluded:  req.RouterIncluded,
-		IPType:          ipType,
 		Description:     req.Description,
 		CabinetNotes:    req.CabinetNotes,
 		Features:        req.Features,
@@ -313,14 +353,11 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 		Name            string  `json:"name" binding:"required"`
 		Price           float64 `json:"price" binding:"required"`
 		DurationDays    int     `json:"duration_days" binding:"required"`
-		SpeedDownload   *string `json:"speed_download"`
-		SpeedUpload     *string `json:"speed_upload"`
+		Speed           *string `json:"speed"`
 		DataCap         *string `json:"data_cap"`
-		Province        string  `json:"province" binding:"required"`
 		ConnectionType  string  `json:"connection_type"`
 		InstallationFee float64 `json:"installation_fee"`
 		RouterIncluded  bool    `json:"router_included"`
-		IPType          string  `json:"ip_type"`
 		Description     *string `json:"description"`
 		CabinetNotes    *string `json:"cabinet_notes"`
 		Features        *string `json:"features"`
@@ -341,26 +378,25 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 	if connType == "" {
 		connType = "FTTH"
 	}
-	ipType := req.IPType
-	if ipType == "" {
-		ipType = "Dynamic"
-	}
 
 	existing.Name = req.Name
 	existing.Price = req.Price
 	existing.DurationDays = req.DurationDays
-	existing.SpeedDownload = req.SpeedDownload
-	existing.SpeedUpload = req.SpeedUpload
+	existing.Speed = req.Speed
 	existing.DataCap = req.DataCap
-	existing.Province = req.Province
 	existing.ConnectionType = connType
 	existing.InstallationFee = req.InstallationFee
 	existing.RouterIncluded = req.RouterIncluded
-	existing.IPType = ipType
 	existing.Description = req.Description
 	existing.CabinetNotes = req.CabinetNotes
 	existing.Features = req.Features
 	if req.IsActive != nil {
+		if *req.IsActive && !existing.IsActive {
+			existing.DisabledAt = nil
+		} else if !*req.IsActive && existing.IsActive {
+			now := time.Now()
+			existing.DisabledAt = &now
+		}
 		existing.IsActive = *req.IsActive
 	}
 
@@ -371,6 +407,30 @@ func (h *ServiceHandler) UpdatePlan(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": existing})
+}
+
+// ReorderPlans updates the sort_order of multiple plans at once.
+func (h *ServiceHandler) ReorderPlans(c *gin.Context) {
+	if !h.canManageServices(c) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "You don't have permission to manage services"})
+		return
+	}
+
+	var req struct {
+		PlanIDs []uuid.UUID `json:"plan_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid request: " + err.Error()})
+		return
+	}
+
+	if err := h.repo.UpdatePlanOrder(c.Request.Context(), req.PlanIDs); err != nil {
+		log.Printf("ReorderPlans error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "Failed to reorder plans"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // DeletePlan deletes a service plan.

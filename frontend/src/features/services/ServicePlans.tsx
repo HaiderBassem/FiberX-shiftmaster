@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import type { ServiceCategory, ServicePlan } from './types';
-import { IRAQ_PROVINCES } from './types';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
-  Clock, DollarSign, Zap, MapPin, Server, Router, Cpu, StickyNote, Search,
+  Clock, DollarSign, Zap, Server, Router, Cpu, StickyNote, Search, ToggleLeft, ToggleRight, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 /* ─── Plan Detail Modal ────────────────────────────────── */
@@ -36,10 +35,7 @@ function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => 
             {[
               { icon: DollarSign, label: t('services.monthly_price'), value: `${plan.price.toLocaleString()} ${t('services.iqd_per_plan').split('/')[0]}`, color: 'text-emerald-400' },
               { icon: Clock, label: t('services.plan_duration'), value: `${plan.duration_days} ${t('services.days')}`, color: 'text-blue-400' },
-              { icon: MapPin, label: t('services.province'), value: plan.province, color: 'text-amber-400' },
-              { icon: Zap, label: t('services.speed_down'), value: plan.speed_download ?? '—', color: 'text-primary' },
-              { icon: Zap, label: t('services.speed_up'), value: plan.speed_upload ?? '—', color: 'text-primary' },
-              { icon: Server, label: t('services.ip_type'), value: plan.ip_type, color: 'text-purple-400' },
+              { icon: Zap, label: t('services.speed_label'), value: plan.speed ?? '—', color: 'text-primary' },
             ].map(item => (
               <div key={item.label} className="bg-background rounded-xl p-3 border border-border">
                 <item.icon className={`w-4 h-4 mb-1.5 ${item.color}`} />
@@ -109,25 +105,26 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
     duration_days: initial?.duration_days?.toString() ?? '30',
-    province: initial?.province ?? '',
-    speed_download: initial?.speed_download ?? '',
-    speed_upload: initial?.speed_upload ?? '',
+    speed: initial?.speed ?? '',
     data_cap: initial?.data_cap ?? 'Unlimited',
-    connection_type: initial?.connection_type ?? 'FTTH',
+    connection_type: initial?.connection_type ?? 'ONU',
     installation_fee: initial?.installation_fee?.toString() ?? '0',
     router_included: initial?.router_included ?? false,
-    ip_type: initial?.ip_type ?? 'Dynamic',
     description: initial?.description ?? '',
     cabinet_notes: initial?.cabinet_notes ?? '',
   });
+
+  const isCustomDevice = !['ONU', 'ONT'].includes(f.connection_type);
+  const [deviceSelect, setDeviceSelect] = useState(isCustomDevice && f.connection_type ? 'Other' : (f.connection_type || 'ONU'));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
 
   const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!f.name.trim() || !f.price || !f.province) return setErr(t('services.req_fields'));
+    if (!f.name.trim() || !f.price) return setErr(t('services.req_fields'));
     setBusy(true); setErr('');
     try {
       const payload = {
@@ -135,8 +132,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
         price: parseFloat(f.price),
         duration_days: parseInt(f.duration_days),
         installation_fee: parseFloat(f.installation_fee),
-        speed_download: f.speed_download || undefined,
-        speed_upload: f.speed_upload || undefined,
+        speed: f.speed || undefined,
         description: f.description || undefined,
         cabinet_notes: f.cabinet_notes || undefined,
       };
@@ -174,34 +170,47 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
             {field(t('services.plan_name'), 'name', 'text', t('services.plan_name_ph'))}
             {field(t('services.price'), 'price', 'number', t('services.price_ph'))}
             {field(t('services.duration'), 'duration_days', 'number', t('services.duration_ph'))}
-            {field(t('services.speed_down'), 'speed_download', 'text', t('services.speed_down_ph'))}
-            {field(t('services.speed_up'), 'speed_upload', 'text', t('services.speed_up_ph'))}
+            {field(t('services.speed_label'), 'speed', 'text', t('services.speed_down_ph'))}
             {field(t('services.data_cap'), 'data_cap', 'text', t('services.data_cap_ph'))}
             {field(t('services.install_fee'), 'installation_fee', 'number', t('services.install_fee_ph'))}
           </div>
 
-          {/* Province */}
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.province')}</label>
-            <select value={f.province} onChange={e => set('province', e.target.value)}
-              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
-              <option value="">{t('services.select_province')}</option>
-              {IRAQ_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {/* IP Type */}
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.ip_type')}</label>
-              <select value={f.ip_type} onChange={e => set('ip_type', e.target.value)}
-                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60">
-                <option value="Dynamic">Dynamic</option>
-                <option value="Static">Static</option>
-              </select>
+            {/* Device Type */}
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">{t('services.device_type_label') || 'Device Type'}</label>
+              <div className="flex gap-2">
+                <select
+                  value={deviceSelect}
+                  onChange={e => {
+                    setDeviceSelect(e.target.value);
+                    if (e.target.value !== 'Other') {
+                      set('connection_type', e.target.value);
+                    } else {
+                      set('connection_type', ''); // Clear for custom input
+                    }
+                  }}
+                  className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary/60 flex-1"
+                >
+                  <option value="ONU">ONU</option>
+                  <option value="ONT">ONT</option>
+                  <option value="Other">Other</option>
+                </select>
+                {deviceSelect === 'Other' && (
+                  <input
+                    type="text"
+                    value={f.connection_type}
+                    onChange={e => set('connection_type', e.target.value)}
+                    placeholder="Custom Device"
+                    className="bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 flex-1"
+                  />
+                )}
+              </div>
             </div>
+
             {/* Router included */}
-            <div className="flex items-center gap-3 pt-5">
+            <div className="flex items-center gap-3 pt-5 col-span-2 sm:col-span-1">
               <input type="checkbox" id="router" checked={f.router_included}
                 onChange={e => set('router_included', e.target.checked)}
                 className="w-4 h-4 accent-primary" />
@@ -264,6 +273,45 @@ export function ServicePlans({ category, manager, onBack }: {
     queryFn: async () => (await api.get(`/services/categories/${category.id}/plans`)).data.data ?? [],
   });
 
+  const toggleMut = useMutation({
+    mutationFn: async (plan: ServicePlan) => {
+      return api.put(`/services/plans/${plan.id}`, {
+        name: plan.name,
+        price: plan.price,
+        duration_days: plan.duration_days,
+        is_active: !plan.is_active
+      });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+  });
+
+  const reorderMut = useMutation({
+    mutationFn: async (planIds: string[]) => {
+      return api.put('/services/plans/reorder', { plan_ids: planIds });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: key })
+  });
+
+  const filteredPlans = (plans ?? []).filter(plan => 
+    plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (plan.description && plan.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (plan.cabinet_notes && plan.cabinet_notes.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const handleReorder = (e: React.MouseEvent, index: number, direction: 'up' | 'down') => {
+    e.stopPropagation();
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === filteredPlans.length - 1) return;
+
+    const newPlans = [...filteredPlans];
+    const otherIndex = direction === 'up' ? index - 1 : index + 1;
+    [newPlans[index], newPlans[otherIndex]] = [newPlans[otherIndex], newPlans[index]];
+    
+    // Optimistic UI update could go here, but for simplicity we rely on React Query refetch
+    // or we just send the new IDs to the server
+    reorderMut.mutate(newPlans.map(p => p.id));
+  };
+
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/services/plans/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: key }); setDelPlan(null); },
@@ -272,11 +320,7 @@ export function ServicePlans({ category, manager, onBack }: {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <button onClick={onBack}
-          className="p-2 rounded-xl border border-border hover:bg-white/5 transition-colors">
-          <ArrowRight className="w-5 h-5 text-muted-foreground" />
-        </button>
+      <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
             <Wifi className="w-5 h-5 text-primary" /> {category.name}
@@ -285,12 +329,19 @@ export function ServicePlans({ category, manager, onBack }: {
             <p className="text-muted-foreground text-sm">{category.description}</p>
           )}
         </div>
-        {manager && (
-          <button onClick={() => setEditPlan(null)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
-            <Plus className="w-4 h-4" /> {t('services.new_plan')}
+        <div className="flex items-center gap-2">
+          {manager && (
+            <button onClick={() => setEditPlan(null)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-lg shadow-primary/20">
+              <Plus className="w-4 h-4" /> {t('services.new_plan')}
+            </button>
+          )}
+          <button onClick={onBack}
+            className="p-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
+            title="Back">
+            <ArrowRight className="w-5 h-5 text-muted-foreground rtl:-scale-x-100" />
           </button>
-        )}
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -310,7 +361,7 @@ export function ServicePlans({ category, manager, onBack }: {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
         </div>
-      ) : !plans?.length ? (
+      ) : !filteredPlans.length ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
             <Wifi className="w-8 h-8 text-muted-foreground" />
@@ -322,48 +373,96 @@ export function ServicePlans({ category, manager, onBack }: {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {plans.filter(plan => plan.name.toLowerCase().includes(searchQuery.toLowerCase()) || (plan.province && plan.province.toLowerCase().includes(searchQuery.toLowerCase()))).map(plan => (
+          {filteredPlans.map((plan, index) => (
             <div key={plan.id}
-              className="group relative bg-card border border-border rounded-2xl p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer"
+              className={`group relative border rounded-2xl p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-200 cursor-pointer flex flex-col ${
+                plan.is_active 
+                  ? 'bg-card border-border hover:border-primary/40' 
+                  : 'bg-muted/10 border-border/50 opacity-60 hover:opacity-100 grayscale-[30%] hover:grayscale-0'
+              }`}
               onClick={() => setDetailPlan(plan)}>
 
-              {/* Province badge */}
+              {/* Badges Row */}
               <div className="flex items-center justify-between mb-4">
-                <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 font-medium">
-                  <MapPin className="w-3 h-3" /> {plan.province}
-                </span>
-                {!plan.is_active && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-destructive/10 text-destructive">{t('services.disabled')}</span>
-                )}
+                <div className="flex gap-1.5">
+                  {plan.price === 0 ? (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold">
+                      {t('services.free')}
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 font-semibold">
+                      {t('services.paid')}
+                    </span>
+                  )}
+                  {!plan.is_active && (
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-xs px-2.5 py-1 rounded-full bg-destructive/10 text-destructive font-medium">
+                        {t('services.disabled')}
+                      </span>
+                      {plan.disabled_at && (
+                        <span className="text-[10px] text-muted-foreground/70">
+                          Stopped: {new Date(plan.disabled_at).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Name */}
-              <h3 className="font-bold text-foreground text-base mb-3">{plan.name}</h3>
+              <h3 className="font-bold text-foreground text-base mb-3 leading-snug">{plan.name}</h3>
 
               {/* Stats row */}
               <div className="grid grid-cols-2 gap-2 mb-4">
-                <div className="bg-background rounded-xl p-2.5 text-center">
-                  <p className="text-emerald-400 font-bold text-sm">{plan.price.toLocaleString()}</p>
-                  <p className="text-muted-foreground text-xs">{t('services.iqd_per_plan')}</p>
+                <div className="bg-background rounded-xl p-2.5 text-center flex flex-col justify-center min-h-[60px]">
+                  <p className="text-emerald-400 font-bold text-sm">
+                    {plan.price === 0 ? t('services.free') : `${plan.price.toLocaleString()} د.ع`}
+                  </p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{t('services.price_label')}</p>
                 </div>
-                <div className="bg-background rounded-xl p-2.5 text-center">
+                <div className="bg-background rounded-xl p-2.5 text-center flex flex-col justify-center min-h-[60px]">
                   <p className="text-blue-400 font-bold text-sm">{plan.duration_days}</p>
-                  <p className="text-muted-foreground text-xs">{t('services.days')}</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">{t('services.days')}</p>
                 </div>
               </div>
 
-              {/* Speed */}
-              {(plan.speed_download || plan.speed_upload) && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Zap className="w-3.5 h-3.5 text-primary" />
-                  {plan.speed_download && <span>{plan.speed_download}↓</span>}
-                  {plan.speed_upload && <span>{plan.speed_upload}↑</span>}
+              {/* Speed & Connection details */}
+              <div className="space-y-2.5 mt-auto pt-3 border-t border-border/50">
+                {/* Connection/Device Type */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Router className="w-3.5 h-3.5 text-primary" />
+                    {t('services.device_type_label')}
+                  </span>
+                  <span className="text-foreground font-semibold">{plan.connection_type || 'FTTH'}</span>
                 </div>
-              )}
+
+                {/* Speed (Single Speed) */}
+                {plan.speed && (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Zap className="w-3.5 h-3.5 text-primary" />
+                      {t('services.speed_label')}
+                    </span>
+                    <span className="text-foreground font-semibold">{plan.speed}</span>
+                  </div>
+                )}
+
+                {/* Router Info */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Server className="w-3.5 h-3.5 text-primary" />
+                    {t('services.router_label')}
+                  </span>
+                  <span className="text-foreground font-semibold">
+                    {plan.router_included ? t('services.yes') : t('services.no')}
+                  </span>
+                </div>
+              </div>
 
               {/* Cabinet notes indicator */}
               {plan.cabinet_notes && (
-                <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-2">
+                <div className="flex items-center gap-1.5 text-xs text-amber-400 mt-3 bg-amber-500/5 p-1.5 rounded-lg border border-amber-500/10 justify-center w-full">
                   <StickyNote className="w-3.5 h-3.5" />
                   <span>{t('services.has_cabinet_notes')}</span>
                 </div>
@@ -373,14 +472,32 @@ export function ServicePlans({ category, manager, onBack }: {
               {manager && (
                 <div className="absolute top-4 left-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => e.stopPropagation()}>
+                  <button onClick={() => toggleMut.mutate(plan)}
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+                    title={plan.is_active ? t('services.disable') : t('services.enable')}>
+                    {plan.is_active ? <ToggleRight className="w-3.5 h-3.5 text-primary" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                  </button>
                   <button onClick={() => setEditPlan(plan)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors">
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-primary transition-colors"
+                    title={t('services.edit_plan')}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => setDelPlan(plan)}
-                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors">
+                    className="p-1.5 rounded-lg bg-background/80 hover:bg-background border border-border/50 text-muted-foreground hover:text-destructive transition-colors"
+                    title={t('services.delete')}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  <div className="flex flex-col ml-1 bg-background/80 border border-border/50 rounded-lg overflow-hidden">
+                    <button onClick={(e) => handleReorder(e, index, 'up')} disabled={index === 0 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                    <div className="h-[1px] bg-border/50" />
+                    <button onClick={(e) => handleReorder(e, index, 'down')} disabled={index === filteredPlans.length - 1 || reorderMut.isPending}
+                      className="p-1 hover:bg-muted disabled:opacity-30 transition-colors">
+                      <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -125,14 +125,16 @@ export const Dashboard = () => {
 // ═══════════════════════════════════════════════════════════
 
 // ─────────────────────────────────────────────────────────────────
-// Helper: parse time string (HH:mm or ISO T-format) → "HH:mm"
+// Helpers: parse time string (HH:mm or ISO T-format) → "HH:mm"
 // ─────────────────────────────────────────────────────────────────
 function parseShiftTime(raw: string | undefined | null): string {
   if (!raw) return '--:--';
+  // ISO format: "0001-01-01T07:00:00Z" → take the time part
   if (raw.includes('T')) {
     const parts = raw.split('T')[1]?.split(':');
     if (parts && parts.length >= 2) return `${parts[0]}:${parts[1]}`;
   }
+  // Plain "HH:mm" or "HH:mm:ss"
   const parts = raw.split(':');
   if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
   return raw;
@@ -155,7 +157,7 @@ const EmployeeDashboard = () => {
     },
   });
 
-  // Fetch today's schedule rows to resolve this employee's actual shift
+  // Fetch today's schedule row for this employee
   const { data: todayScheduleRows } = useQuery({
     queryKey: ['my-today-schedule', today],
     queryFn: async () => {
@@ -164,7 +166,7 @@ const EmployeeDashboard = () => {
     },
   });
 
-  // Fetch all shifts for name/time lookup
+  // Fetch all shifts for lookup
   const { data: allShifts } = useQuery({
     queryKey: ['shifts'],
     queryFn: async () => {
@@ -228,18 +230,18 @@ const EmployeeDashboard = () => {
 
   const todayTasks = (weeklyTasks || []).filter((t: any) => t.assigned_date?.startsWith(today));
 
-  // Resolve today's shift from the daily schedule API (never from user object)
+  // Resolve today's shift for the logged-in employee
   const myTodayRow = (todayScheduleRows || []).find((r: any) => String(r.employee_id) === String(user?.id));
-  const myTodayShift: any = (() => {
+  const myTodayShift = (() => {
     const shiftId = myTodayRow?.shift_id;
     if (!shiftId) return null;
     return (allShifts || []).find((s: any) => s.id === shiftId) || null;
   })();
-  const myTodayStatus: string = myTodayRow?.shift_status || 'working';
+  const myTodayStatus = myTodayRow?.shift_status || 'working';
 
-  // Is my shift currently active right now?
-  const nowForShift = new Date();
-  const nowMins = nowForShift.getHours() * 60 + nowForShift.getMinutes();
+  // Is shift currently active?
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
   let isMyShiftActive = false;
   if (myTodayShift?.start_time && myTodayShift?.end_time) {
     const st = parseShiftTime(myTodayShift.start_time);
@@ -248,9 +250,11 @@ const EmployeeDashboard = () => {
     const [eH, eM] = et.split(':').map(Number);
     const startMins = sH * 60 + sM;
     const endMins = eH * 60 + eM;
-    isMyShiftActive = endMins < startMins
-      ? nowMins >= startMins || nowMins <= endMins   // overnight shift
-      : nowMins >= startMins && nowMins <= endMins;   // regular shift
+    if (endMins < startMins) {
+      isMyShiftActive = nowMins >= startMins || nowMins <= endMins;
+    } else {
+      isMyShiftActive = nowMins >= startMins && nowMins <= endMins;
+    }
   }
 
   // Chart Data
@@ -300,7 +304,7 @@ const EmployeeDashboard = () => {
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
       </motion.div>
 
-      {/* ── Today's Shift Card ── */}
+      {/* Today's Shift Card — always visible for employee */}
       <motion.div variants={itemVariants}>
         <div
           className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 flex items-center gap-4 sm:gap-5 transition-all ${
@@ -313,12 +317,11 @@ const EmployeeDashboard = () => {
               : 'border-border/50 bg-card'
           }`}
         >
-          {/* Ambient glow when active */}
+          {/* Glow blob */}
           {isMyShiftActive && (
             <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
           )}
 
-          {/* Icon */}
           <div
             className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center ${
               myTodayStatus === 'off'
@@ -337,7 +340,6 @@ const EmployeeDashboard = () => {
             )}
           </div>
 
-          {/* Text */}
           <div className="flex-1 min-w-0">
             <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
               {t('dashboard.todays_shift')}
@@ -351,9 +353,9 @@ const EmployeeDashboard = () => {
                 <p className="text-lg sm:text-xl font-bold text-foreground truncate">{myTodayShift.name}</p>
                 <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5" />
-                  <span className="font-mono">{parseShiftTime(myTodayShift.start_time)}</span>
+                  {parseShiftTime(myTodayShift.start_time)}
                   <span className="text-muted-foreground/40">—</span>
-                  <span className="font-mono">{parseShiftTime(myTodayShift.end_time)}</span>
+                  {parseShiftTime(myTodayShift.end_time)}
                 </p>
               </>
             ) : (
@@ -361,7 +363,6 @@ const EmployeeDashboard = () => {
             )}
           </div>
 
-          {/* Active pulse */}
           {isMyShiftActive && myTodayShift && (
             <div className="flex-shrink-0 flex flex-col items-center gap-1">
               <span className="relative flex h-2.5 w-2.5">
@@ -878,11 +879,12 @@ const LeaderDashboard = () => {
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</p>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
                             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
-                            <span className="truncate">{shift?.name || t('dashboard.no_shift')}</span>
-                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded flex-shrink-0">{t('dashboard.swapped_in')}</span>}
+                            {shift?.name || t('dashboard.no_shift')}
+                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">{t('dashboard.swapped_in')}</span>}
                           </p>
+                          {/* Shift hours row */}
                           {shiftStart && shiftEnd && (
                             <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1 mt-0.5">
                               <Clock className="w-3 h-3 flex-shrink-0" />
@@ -890,7 +892,7 @@ const LeaderDashboard = () => {
                               <span className="text-muted-foreground/40">—</span>
                               <span className="font-mono">{shiftEnd}</span>
                               {!isActiveNow && (
-                                <span className="ml-1 text-[9px] text-muted-foreground/50 px-1 rounded border border-border/50 uppercase tracking-widest flex-shrink-0">
+                                <span className="ml-1 text-[9px] text-muted-foreground/50 px-1 rounded border border-border/50 uppercase tracking-widest">
                                   {t('dashboard.inactive')}
                                 </span>
                               )}
