@@ -45,12 +45,22 @@
 }
 
 @keyframes marquee {
-  0% { transform: translateX(100vw); }
+  0%   { transform: translateX(100vw); }
   100% { transform: translateX(-100%); }
+}
+
+/* RTL marquee: Arabic text scrolls left→right */
+@keyframes marquee-rtl {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100vw); }
 }
 
 @utility animate-marquee {
   animation: marquee 30s linear infinite;
+}
+
+@utility animate-marquee-rtl {
+  animation: marquee-rtl 30s linear infinite;
 }
 
 @utility container {

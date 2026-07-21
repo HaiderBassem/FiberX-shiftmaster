@@ -74,7 +74,16 @@
     "no_staff_found_for_shift": "No staff found for this shift.",
     "swapped_in": "Swapped In",
     "no_shift": "No Shift",
-    "loading_staff": "Loading staff..."
+    "loading_staff": "Loading staff...",
+    "todays_shift": "Today's Shift",
+    "shift_hours": "Shift Hours",
+    "off_day": "Off Day",
+    "on_leave": "On Leave",
+    "no_shift_assigned": "No shift assigned",
+    "inactive": "Inactive",
+    "currently_active": "Currently Active",
+    "shift_starts_at": "Starts",
+    "shift_ends_at": "Ends"
   },
   "leaves": {
     "remaining": "remaining",

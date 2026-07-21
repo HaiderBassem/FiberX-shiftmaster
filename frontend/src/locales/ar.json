@@ -74,7 +74,16 @@
     "no_staff_found_for_shift": "لم يتم العثور على موظفين في هذه المناوبة.",
     "swapped_in": "تمت المبادلة",
     "no_shift": "بدون مناوبة",
-    "loading_staff": "جاري تحميل الموظفين..."
+    "loading_staff": "جاري تحميل الموظفين...",
+    "todays_shift": "مناوبة اليوم",
+    "shift_hours": "ساعات المناوبة",
+    "off_day": "يوم إجازة",
+    "on_leave": "في إجازة",
+    "no_shift_assigned": "لا توجد مناوبة محددة",
+    "inactive": "غير نشط",
+    "currently_active": "نشط الآن",
+    "shift_starts_at": "يبدأ",
+    "shift_ends_at": "ينتهي"
   },
   "leaves": {
     "remaining": "متبقي",
