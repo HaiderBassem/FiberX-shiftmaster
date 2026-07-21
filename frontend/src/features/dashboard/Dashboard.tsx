@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import {
   Users, CheckCircle2, Clock, Play, CalendarDays, Shield, BarChart3,
-  CheckSquare, TrendingUp, Briefcase, AlertCircle, X, AlertTriangle
+  CheckSquare, TrendingUp, Briefcase, AlertCircle, X, AlertTriangle, Sun
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
 import { fmtDateTime } from '@/lib/dateUtils';
@@ -124,6 +124,20 @@ export const Dashboard = () => {
 // Employee Dashboard
 // ═══════════════════════════════════════════════════════════
 
+// ─────────────────────────────────────────────────────────────────
+// Helper: parse time string (HH:mm or ISO T-format) → "HH:mm"
+// ─────────────────────────────────────────────────────────────────
+function parseShiftTime(raw: string | undefined | null): string {
+  if (!raw) return '--:--';
+  if (raw.includes('T')) {
+    const parts = raw.split('T')[1]?.split(':');
+    if (parts && parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  }
+  const parts = raw.split(':');
+  if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+  return raw;
+}
+
 const EmployeeDashboard = () => {
   const { user } = useAuthStore();
   const { t } = useTranslation();
@@ -137,6 +151,24 @@ const EmployeeDashboard = () => {
     queryKey: ['my-weekly-tasks', weekStart],
     queryFn: async () => {
       const res = await api.get(`/tasks/my-week?week_start=${weekStart}`);
+      return (res.data?.data || []) as any[];
+    },
+  });
+
+  // Fetch today's schedule rows to resolve this employee's actual shift
+  const { data: todayScheduleRows } = useQuery({
+    queryKey: ['my-today-schedule', today],
+    queryFn: async () => {
+      const res = await api.get(`/schedules/daily?date=${today}`);
+      return (res.data?.data || []) as any[];
+    },
+  });
+
+  // Fetch all shifts for name/time lookup
+  const { data: allShifts } = useQuery({
+    queryKey: ['shifts'],
+    queryFn: async () => {
+      const res = await api.get('/shifts');
       return (res.data?.data || []) as any[];
     },
   });
@@ -196,6 +228,31 @@ const EmployeeDashboard = () => {
 
   const todayTasks = (weeklyTasks || []).filter((t: any) => t.assigned_date?.startsWith(today));
 
+  // Resolve today's shift from the daily schedule API (never from user object)
+  const myTodayRow = (todayScheduleRows || []).find((r: any) => String(r.employee_id) === String(user?.id));
+  const myTodayShift: any = (() => {
+    const shiftId = myTodayRow?.shift_id;
+    if (!shiftId) return null;
+    return (allShifts || []).find((s: any) => s.id === shiftId) || null;
+  })();
+  const myTodayStatus: string = myTodayRow?.shift_status || 'working';
+
+  // Is my shift currently active right now?
+  const nowForShift = new Date();
+  const nowMins = nowForShift.getHours() * 60 + nowForShift.getMinutes();
+  let isMyShiftActive = false;
+  if (myTodayShift?.start_time && myTodayShift?.end_time) {
+    const st = parseShiftTime(myTodayShift.start_time);
+    const et = parseShiftTime(myTodayShift.end_time);
+    const [sH, sM] = st.split(':').map(Number);
+    const [eH, eM] = et.split(':').map(Number);
+    const startMins = sH * 60 + sM;
+    const endMins = eH * 60 + eM;
+    isMyShiftActive = endMins < startMins
+      ? nowMins >= startMins || nowMins <= endMins   // overnight shift
+      : nowMins >= startMins && nowMins <= endMins;   // regular shift
+  }
+
   // Chart Data
   const pieData = [
     { name: t('dashboard.completed'), value: completedTasks, color: '#10b981' }, // emerald-500
@@ -241,6 +298,82 @@ const EmployeeDashboard = () => {
           {t('dashboard.welcome_back')}, {user?.first_name?.split(' ')[0]} 👋
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      </motion.div>
+
+      {/* ── Today's Shift Card ── */}
+      <motion.div variants={itemVariants}>
+        <div
+          className={`relative overflow-hidden rounded-2xl border p-4 sm:p-5 flex items-center gap-4 sm:gap-5 transition-all ${
+            myTodayStatus === 'off'
+              ? 'border-amber-500/30 bg-amber-500/5'
+              : myTodayStatus === 'leave' || myTodayStatus === 'vacation'
+              ? 'border-rose-500/30 bg-rose-500/5'
+              : isMyShiftActive
+              ? 'border-primary/40 bg-primary/5 shadow-lg shadow-primary/10'
+              : 'border-border/50 bg-card'
+          }`}
+        >
+          {/* Ambient glow when active */}
+          {isMyShiftActive && (
+            <div className="absolute -top-6 -right-6 w-32 h-32 rounded-full bg-primary/20 blur-3xl pointer-events-none" />
+          )}
+
+          {/* Icon */}
+          <div
+            className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center ${
+              myTodayStatus === 'off'
+                ? 'bg-amber-500/15 text-amber-500'
+                : myTodayStatus === 'leave' || myTodayStatus === 'vacation'
+                ? 'bg-rose-500/15 text-rose-500'
+                : isMyShiftActive
+                ? 'bg-primary/15 text-primary'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {myTodayStatus === 'off' ? (
+              <Sun className="w-6 h-6 sm:w-7 sm:h-7" />
+            ) : (
+              <Clock className="w-6 h-6 sm:w-7 sm:h-7" />
+            )}
+          </div>
+
+          {/* Text */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground mb-0.5">
+              {t('dashboard.todays_shift')}
+            </p>
+            {myTodayStatus === 'off' ? (
+              <p className="text-lg sm:text-xl font-bold text-amber-500">{t('dashboard.off_day')}</p>
+            ) : myTodayStatus === 'leave' || myTodayStatus === 'vacation' ? (
+              <p className="text-lg sm:text-xl font-bold text-rose-500">{t('dashboard.on_leave')}</p>
+            ) : myTodayShift ? (
+              <>
+                <p className="text-lg sm:text-xl font-bold text-foreground truncate">{myTodayShift.name}</p>
+                <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span className="font-mono">{parseShiftTime(myTodayShift.start_time)}</span>
+                  <span className="text-muted-foreground/40">—</span>
+                  <span className="font-mono">{parseShiftTime(myTodayShift.end_time)}</span>
+                </p>
+              </>
+            ) : (
+              <p className="text-lg sm:text-xl font-bold text-muted-foreground">{t('dashboard.no_shift_assigned')}</p>
+            )}
+          </div>
+
+          {/* Active pulse */}
+          {isMyShiftActive && myTodayShift && (
+            <div className="flex-shrink-0 flex flex-col items-center gap-1">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+              </span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-primary whitespace-nowrap">
+                {t('dashboard.currently_active')}
+              </span>
+            </div>
+          )}
+        </div>
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -726,8 +859,16 @@ const LeaderDashboard = () => {
                        }
                     }
                     
+                    // Format shift times for display
+                    const shiftStart = shift ? parseShiftTime(shift.start_time) : null;
+                    const shiftEnd = shift ? parseShiftTime(shift.end_time) : null;
+
                     return (
-                      <div key={emp.id} className={`flex items-center gap-3 p-3 rounded-xl bg-card border border-border/60 shadow-sm transition-colors ${isActiveNow ? 'hover:border-primary/40' : 'opacity-40 hover:opacity-70 grayscale'}`}>
+                      <div key={emp.id} className={`flex items-center gap-3 p-3 rounded-xl bg-card border shadow-sm transition-all ${
+                        isActiveNow
+                          ? 'border-primary/30 hover:border-primary/50 hover:shadow-md hover:shadow-primary/5'
+                          : 'border-border/60 opacity-40 hover:opacity-70 grayscale'
+                      }`}>
                         {emp.profile_image ? (
                           <img src={emp.profile_image} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
                         ) : (
@@ -737,12 +878,24 @@ const LeaderDashboard = () => {
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-foreground truncate">{emp.first_name} {emp.last_name}</p>
-                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1.5 mt-0.5">
-                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
-                            {shift?.name || t('dashboard.no_shift')}
-                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded">{t('dashboard.swapped_in')}</span>}
-                            {!isActiveNow && <span className="ml-1 text-[9px] text-muted-foreground px-1 rounded border border-border/50 uppercase tracking-widest">{t('dashboard.inactive') || 'INACTIVE'}</span>}
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: shift?.color_code || '#ccc' }} />
+                            <span className="truncate">{shift?.name || t('dashboard.no_shift')}</span>
+                            {todaysSwap && <span className="ml-1 text-[9px] bg-indigo-500/20 text-indigo-500 px-1 rounded flex-shrink-0">{t('dashboard.swapped_in')}</span>}
                           </p>
+                          {shiftStart && shiftEnd && (
+                            <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 flex-shrink-0" />
+                              <span className="font-mono">{shiftStart}</span>
+                              <span className="text-muted-foreground/40">—</span>
+                              <span className="font-mono">{shiftEnd}</span>
+                              {!isActiveNow && (
+                                <span className="ml-1 text-[9px] text-muted-foreground/50 px-1 rounded border border-border/50 uppercase tracking-widest flex-shrink-0">
+                                  {t('dashboard.inactive')}
+                                </span>
+                              )}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
