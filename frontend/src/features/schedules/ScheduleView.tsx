@@ -11,8 +11,15 @@ import {
   ChevronLeft, ChevronRight, Repeat, Pin, X,
 } from 'lucide-react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
+import { toast } from 'sonner';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Pull the server's own message out of an axios error, so failures say what broke. */
+function describeError(err: any, fallback: string): string {
+  const detail = err?.response?.data?.error || err?.message;
+  return detail ? `${fallback}: ${detail}` : fallback;
+}
 
 /** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
 function resolveDisplayStatus(row: any): string {
@@ -58,16 +65,15 @@ export const ScheduleView = () => {
 
   const selectClass = "w-full h-10 px-3 py-2 rounded-lg bg-background border border-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
 
-  // Query for fetching daily schedule
-  const { data: activeSchedule, isLoading: isLoadingSchedule } = useQuery({
+  // Query for fetching daily schedule.
+  // Failures are deliberately NOT swallowed: falling back to an empty array renders
+  // every employee's default shift as though it were the real roster, so a broken
+  // request looks identical to "nothing is scheduled" and edits appear to do nothing.
+  const { data: activeSchedule, isLoading: isLoadingSchedule, error: scheduleError } = useQuery({
     queryKey: ['schedules', viewDate, deptId],
     queryFn: async () => {
-      try {
-        const response = await api.get(`/schedules/daily?date=${viewDate}`);
-        return response.data?.data || [];
-      } catch {
-        return []; // Gracefully degrade — show defaults from employee list
-      }
+      const response = await api.get(`/schedules/daily?date=${viewDate}`);
+      return response.data?.data || [];
     },
   });
 
@@ -112,15 +118,17 @@ export const ScheduleView = () => {
   const [applyPermanently, setApplyPermanently] = useState(true);
   const [patternEmployee, setPatternEmployee] = useState<any | null>(null);
 
-  const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({
+  const { data: weeklyRows, isLoading: weeklyLoading, error: weeklyError } = useQuery({
     queryKey: ['schedules', 'weekly-matrix', weekStartKey, deptId, shifts?.length ?? 0],
     queryFn: async () => {
       const shiftLookup: Record<string, any> = {};
       (shifts || []).forEach((s: any) => { shiftLookup[s.id] = s; });
 
       const dates = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
+      // A rejected day used to become an empty array, so a failing API silently
+      // rendered the whole week as defaults. Let it fail loudly instead.
       const dayResponses = await Promise.all(
-        dates.map((d) => api.get(`/schedules/daily?date=${d}`).catch(() => ({ data: { data: [] } }))),
+        dates.map((d) => api.get(`/schedules/daily?date=${d}`)),
       );
       const dayMap: Record<string, any[]> = {};
       dates.forEach((d, idx) => {
@@ -262,6 +270,9 @@ export const ScheduleView = () => {
     },
   });
 
+  // These three had no onError, so a rejected save produced no toast, no console
+  // trace and no cache invalidation — the cell simply snapped back and the change
+  // looked like it had been ignored.
   const setOffQuick = useMutation({
     mutationFn: async ({ employeeId, date }: { employeeId: string; date: string }) => {
       await api.post('/schedules/shifts/set', {
@@ -269,7 +280,11 @@ export const ScheduleView = () => {
         permanent: applyPermanently,
       });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
+    onSuccess: () => {
+      toast.success(applyPermanently ? 'Off day saved — repeats every week' : 'Off day saved for this date');
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => toast.error(describeError(err, 'Could not set the off day')),
   });
 
   const setWorkingQuick = useMutation({
@@ -279,17 +294,22 @@ export const ScheduleView = () => {
         permanent: applyPermanently,
       });
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
+    onSuccess: () => {
+      toast.success(applyPermanently ? 'Shift saved — repeats every week' : 'Shift saved for this date');
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => toast.error(describeError(err, 'Could not assign the shift')),
   });
 
   const deleteShift = useMutation({
     mutationFn: async (shiftId: string) => {
       await api.delete(`/schedules/shifts/${shiftId}`);
     },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
-    onError: (err: any) => {
-      alert("Error deleting shift: " + (err?.response?.data?.error || err.message));
-    }
+    onSuccess: () => {
+      toast.success('Assignment cleared');
+      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    },
+    onError: (err: any) => toast.error(describeError(err, 'Could not clear the assignment')),
   });
 
   return (
@@ -396,6 +416,12 @@ export const ScheduleView = () => {
           {isLoadingSchedule ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : scheduleError ? (
+            <div className="py-12 text-center">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-destructive" />
+              <p className="text-destructive font-medium">Could not load the schedule for this day.</p>
+              <p className="text-sm text-muted-foreground mt-1">{describeError(scheduleError, 'Server error')}</p>
             </div>
           ) : !activeSchedule || activeSchedule.length === 0 ? (
             <div className="py-16 text-center text-muted-foreground">
@@ -551,6 +577,15 @@ export const ScheduleView = () => {
           {weeklyLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-7 h-7 animate-spin text-muted-foreground" />
+            </div>
+          ) : weeklyError ? (
+            <div className="py-12 text-center">
+              <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-destructive" />
+              <p className="text-destructive font-medium">Could not load the weekly roster.</p>
+              <p className="text-sm text-muted-foreground mt-1">{describeError(weeklyError, 'Server error')}</p>
+              <p className="text-xs text-muted-foreground mt-3">
+                Nothing below is shown rather than displaying default shifts that are not the real roster.
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
