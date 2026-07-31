@@ -8,8 +8,22 @@ CREATE TABLE IF NOT EXISTS provinces (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Initial seed data
-INSERT INTO provinces (name, sort_order) VALUES
+-- Initial seed data.
+--
+-- Only seeded once at least one department exists. Migration 045 makes provinces
+-- department-scoped and NOT NULL, attaching any pre-existing province to the oldest
+-- department; on a brand-new database there are no departments yet, so seeding here
+-- would produce ownerless rows that 045 then cannot attach to anything, and the
+-- migration run fails with:
+--   column "department_id" of relation "provinces" contains null values
+-- Skipping the seed on an empty install leaves provinces to be created per department
+-- through the provinces UI, which is what the province-scoped model expects anyway.
+--
+-- Matched on name rather than ON CONFLICT because 045 drops the unique constraint on
+-- provinces.name, which would make an ON CONFLICT (name) clause invalid afterwards.
+INSERT INTO provinces (name, sort_order)
+SELECT v.name, v.sort_order
+  FROM (VALUES
     ('بغداد', 1),
     ('البصرة', 2),
     ('نينوى', 3),
@@ -28,4 +42,6 @@ INSERT INTO provinces (name, sort_order) VALUES
     ('صلاح الدين', 16),
     ('دهوك', 17),
     ('السليمانية', 18)
-ON CONFLICT (name) DO NOTHING;
+  ) AS v(name, sort_order)
+ WHERE EXISTS (SELECT 1 FROM departments)
+   AND NOT EXISTS (SELECT 1 FROM provinces p WHERE p.name = v.name);

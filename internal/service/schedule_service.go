@@ -45,6 +45,10 @@ func NewScheduleService(
 	}
 }
 
+// maxEnsureWeeks bounds how many weeks a single range request will materialise,
+// so a wide from/to cannot turn one HTTP call into unbounded work.
+const maxEnsureWeeks = 14
+
 func normalizeWeekStart(d time.Time) time.Time {
 	d = d.UTC().Truncate(24 * time.Hour)
 	for d.Weekday() != time.Sunday {
@@ -53,10 +57,62 @@ func normalizeWeekStart(d time.Time) time.Time {
 	return d
 }
 
-// EnsureWeekSchedule fills missing off/working rows for the week (from previous week or templates),
-// then overlays fully approved leaves. Safe to call repeatedly — never overwrites existing rows
-// during base fill; leave overlay upserts approved leave days.
-func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.Time) error {
+func today() time.Time {
+	return time.Now().UTC().Truncate(24 * time.Hour)
+}
+
+// baselineForDay resolves what an employee's day looks like according to their fixed
+// weekly pattern. The pattern (schedule_templates) is authoritative; the employee's
+// default_shift_id / weekly_off_days are only a fallback for employees who have no
+// pattern row yet. Deliberately does NOT look at last week's actual rows: those carry
+// one-off noise (swaps, replacements, cover) that must not become the recurring pattern.
+func baselineForDay(emp models.Employee, day int, tmpl *models.ScheduleTemplate) (string, *uuid.UUID) {
+	if tmpl != nil {
+		if tmpl.IsOff {
+			return "off", nil
+		}
+		shiftID := tmpl.ShiftID
+		if shiftID == nil {
+			shiftID = emp.DefaultShiftID
+		}
+		if shiftID == nil {
+			return "off", nil
+		}
+		return "working", shiftID
+	}
+
+	if emp.WeeklyOffDays >= 0 && emp.WeeklyOffDays == day {
+		return "off", nil
+	}
+	if emp.DefaultShiftID != nil {
+		return "working", emp.DefaultShiftID
+	}
+	return "off", nil
+}
+
+func sameAssignment(es models.EmployeeShift, status string, shiftID *uuid.UUID) bool {
+	if !strings.EqualFold(es.ShiftStatus, status) {
+		return false
+	}
+	if (es.ShiftID == nil) != (shiftID == nil) {
+		return false
+	}
+	return es.ShiftID == nil || *es.ShiftID == *shiftID
+}
+
+func dayKey(d time.Time) string { return d.UTC().Format("2006-01-02") }
+
+// EnsureWeekSchedule materialises one week from each employee's fixed weekly pattern,
+// then overlays fully approved leaves.
+//
+// Rows are only ever created or corrected when they are pattern-derived
+// (source='generated') and dated today or later. A manual edit, an approved leave, a
+// swap, and every past day are left untouched. That makes the call idempotent and
+// self-healing: a week that was materialised early — e.g. by opening a month view —
+// is re-derived on the next read instead of freezing whatever was seeded at the time.
+//
+// departmentID scopes the work to one department (nil = every active employee).
+func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.Time, departmentID *uuid.UUID) error {
 	weekStart := normalizeWeekStart(refDate)
 	weekEnd := weekStart.AddDate(0, 0, 6)
 
@@ -65,65 +121,69 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 		return err
 	}
 
-	prevWeekStart := weekStart.AddDate(0, 0, -7)
-	prevWeekEnd := prevWeekStart.AddDate(0, 0, 6)
-	prevShifts, _ := s.scheduleRepo.GetEmployeeShiftsInRange(ctx, prevWeekStart, prevWeekEnd)
-	prevByEmployeeDay := map[uuid.UUID]map[int]models.EmployeeShift{}
-	for _, ps := range prevShifts {
-		st := strings.ToLower(ps.ShiftStatus)
-		if st != "working" && st != "off" {
+	var employees []models.Employee
+	if departmentID != nil {
+		employees, err = s.employeeRepo.GetByDepartment(ctx, *departmentID)
+		if err != nil {
+			return fmt.Errorf("get department employees: %w", err)
+		}
+	} else {
+		employees, err = s.employeeRepo.GetActive(ctx)
+		if err != nil {
+			return fmt.Errorf("get active employees: %w", err)
+		}
+	}
+
+	active := make([]models.Employee, 0, len(employees))
+	ids := make([]uuid.UUID, 0, len(employees))
+	for _, emp := range employees {
+		if !strings.EqualFold(emp.Status, "active") {
 			continue
 		}
-		dow := int(ps.ShiftDate.UTC().Weekday())
-		if prevByEmployeeDay[ps.EmployeeID] == nil {
-			prevByEmployeeDay[ps.EmployeeID] = make(map[int]models.EmployeeShift)
-		}
-		prevByEmployeeDay[ps.EmployeeID][dow] = ps
+		active = append(active, emp)
+		ids = append(ids, emp.ID)
+	}
+	if len(active) == 0 {
+		return nil
 	}
 
-	employees, err := s.employeeRepo.GetActive(ctx)
+	// Two batch reads replace the previous query-per-employee-per-day.
+	patterns, err := s.scheduleRepo.GetTemplatesForEmployees(ctx, ids)
 	if err != nil {
-		return fmt.Errorf("get active employees: %w", err)
+		return fmt.Errorf("get weekly patterns: %w", err)
+	}
+	existingRows, err := s.scheduleRepo.GetEmployeeShiftsInRangeForDept(ctx, weekStart, weekEnd, departmentID)
+	if err != nil {
+		return fmt.Errorf("get existing week rows: %w", err)
+	}
+	existing := map[uuid.UUID]map[string]models.EmployeeShift{}
+	for _, row := range existingRows {
+		if existing[row.EmployeeID] == nil {
+			existing[row.EmployeeID] = map[string]models.EmployeeShift{}
+		}
+		existing[row.EmployeeID][dayKey(row.ShiftDate)] = row
 	}
 
-	for _, emp := range employees {
-		templates, tmplErr := s.scheduleRepo.GetTemplatesByEmployee(ctx, emp.ID)
-		tmplByDay := map[int]*models.ScheduleTemplate{}
-		if tmplErr == nil {
-			for i := range templates {
-				tmplByDay[templates[i].DayOfWeek] = &templates[i]
-			}
-		}
+	cutoff := today()
 
+	for _, emp := range active {
 		for day := 0; day < 7; day++ {
 			shiftDate := weekStart.AddDate(0, 0, day)
-			if _, existErr := s.scheduleRepo.GetEmployeeShift(ctx, emp.ID, shiftDate); existErr == nil {
-				continue
+
+			var tmpl *models.ScheduleTemplate
+			if t, ok := patterns[emp.ID][day]; ok {
+				tmpl = &t
 			}
+			status, shiftID := baselineForDay(emp, day, tmpl)
 
-			status := "off"
-			var shiftID *uuid.UUID
-
-			if prevDay, ok := prevByEmployeeDay[emp.ID][day]; ok {
-				status = strings.ToLower(prevDay.ShiftStatus)
-				shiftID = prevDay.ShiftID
-			} else if tmpl, ok := tmplByDay[day]; ok {
-				if tmpl.IsOff {
-					status = "off"
-					shiftID = nil
-				} else {
-					status = "working"
-					shiftID = tmpl.ShiftID
+			if cur, ok := existing[emp.ID][dayKey(shiftDate)]; ok {
+				// Never touch a human decision, an approved leave, or a past day.
+				if cur.Source != models.ShiftSourceGenerated || shiftDate.Before(cutoff) {
+					continue
 				}
-			} else if emp.WeeklyOffDays >= 0 && emp.WeeklyOffDays == day {
-				status = "off"
-			} else if emp.DefaultShiftID != nil {
-				status = "working"
-				shiftID = emp.DefaultShiftID
-			}
-
-			if status == "working" && shiftID == nil {
-				status = "off"
+				if sameAssignment(cur, status, shiftID) {
+					continue
+				}
 			}
 
 			es := &models.EmployeeShift{
@@ -132,14 +192,35 @@ func (s *ScheduleService) EnsureWeekSchedule(ctx context.Context, refDate time.T
 				ShiftID:     shiftID,
 				ShiftDate:   shiftDate,
 				ShiftStatus: status,
+				Source:      models.ShiftSourceGenerated,
 			}
-			if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
-				return fmt.Errorf("seed shift for %s on %s: %w", emp.EmployeeCode, shiftDate.Format("2006-01-02"), upsertErr)
+			if upsertErr := s.scheduleRepo.UpsertGeneratedShift(ctx, es); upsertErr != nil {
+				return fmt.Errorf("materialise shift for %s on %s: %w", emp.EmployeeCode, shiftDate.Format("2006-01-02"), upsertErr)
 			}
 		}
 	}
 
 	return s.applyApprovedLeavesForRange(ctx, ws, weekStart, weekEnd)
+}
+
+// ensureRange materialises every week the requested range touches. The previous code
+// only ensured the first and last week, which left the middle weeks of a month view
+// with no rows at all.
+func (s *ScheduleService) ensureRange(ctx context.Context, from, to time.Time, departmentID *uuid.UUID) error {
+	first := normalizeWeekStart(from)
+	last := normalizeWeekStart(to)
+	if last.Before(first) {
+		first, last = last, first
+	}
+
+	weeks := 0
+	for w := first; !w.After(last) && weeks < maxEnsureWeeks; w = w.AddDate(0, 0, 7) {
+		if err := s.EnsureWeekSchedule(ctx, w, departmentID); err != nil {
+			return fmt.Errorf("ensure week %s: %w", w.Format("2006-01-02"), err)
+		}
+		weeks++
+	}
+	return nil
 }
 
 func (s *ScheduleService) getOrCreateWeeklySchedule(ctx context.Context, weekStart, weekEnd time.Time) (*models.WeeklySchedule, error) {
@@ -205,6 +286,7 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 				ShiftDate:   d,
 				ShiftStatus: shiftStatus,
 				LeaveReason: leaveReasonPtr,
+				Source:      models.ShiftSourceLeave,
 			}
 			if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
 				return fmt.Errorf("apply leave shift for %s on %s: %w", leave.EmployeeID, d.Format("2006-01-02"), upsertErr)
@@ -268,6 +350,8 @@ func (s *ScheduleService) GenerateWeeklySchedule(ctx context.Context, weekStart 
 					ShiftDate:   shiftDate,
 					ShiftStatus: status,
 					CreatedBy:   &createdBy,
+					// Pattern-derived, so a later pattern change still reaches these days.
+					Source: models.ShiftSourceGenerated,
 				}
 				if err := s.scheduleRepo.CreateEmployeeShift(txCtx, es); err != nil {
 					return fmt.Errorf("create shift for %s on %s: %w",
@@ -407,7 +491,7 @@ func (s *ScheduleService) CheckOut(ctx context.Context, shiftID uuid.UUID) error
 
 // GetDailyShifts returns all shifts for a specific date.
 func (s *ScheduleService) GetDailyShifts(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error) {
-	if err := s.EnsureWeekSchedule(ctx, date); err != nil {
+	if err := s.EnsureWeekSchedule(ctx, date, departmentID); err != nil {
 		return nil, fmt.Errorf("ensure week schedule: %w", err)
 	}
 	return s.scheduleRepo.GetEmployeeShiftsByDate(ctx, date, departmentID)
@@ -415,38 +499,49 @@ func (s *ScheduleService) GetDailyShifts(ctx context.Context, date time.Time, de
 
 // GetEmployeeShifts returns an employee's shifts for a date range.
 func (s *ScheduleService) GetEmployeeShifts(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error) {
-	if err := s.EnsureWeekSchedule(ctx, from); err != nil {
-		return nil, fmt.Errorf("ensure week schedule: %w", err)
+	// Scope the materialisation to this employee's department rather than every
+	// employee in the company.
+	var departmentID *uuid.UUID
+	if emp, err := s.employeeRepo.GetByID(ctx, employeeID); err == nil && emp != nil {
+		departmentID = emp.DepartmentID
 	}
-	// If range spans a second week, ensure that week too.
-	secondWeekStart := normalizeWeekStart(to)
-	firstWeekStart := normalizeWeekStart(from)
-	if !secondWeekStart.Equal(firstWeekStart) {
-		if err := s.EnsureWeekSchedule(ctx, to); err != nil {
-			return nil, fmt.Errorf("ensure week schedule: %w", err)
-		}
+	if err := s.ensureRange(ctx, from, to, departmentID); err != nil {
+		return nil, fmt.Errorf("ensure week schedule: %w", err)
 	}
 	return s.scheduleRepo.GetEmployeeShiftsByEmployee(ctx, employeeID, from, to)
 }
 
 // GetDepartmentShiftsInRange gets shifts for a whole department in a date range.
 func (s *ScheduleService) GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error) {
-	if err := s.EnsureWeekSchedule(ctx, from); err != nil {
+	if err := s.ensureRange(ctx, from, to, &departmentID); err != nil {
 		return nil, fmt.Errorf("ensure week schedule: %w", err)
-	}
-	secondWeekStart := normalizeWeekStart(to)
-	firstWeekStart := normalizeWeekStart(from)
-	if !secondWeekStart.Equal(firstWeekStart) {
-		if err := s.EnsureWeekSchedule(ctx, to); err != nil {
-			return nil, fmt.Errorf("ensure week schedule: %w", err)
-		}
 	}
 	return s.scheduleRepo.GetDepartmentShiftsInRange(ctx, from, to, departmentID)
 }
 
+// assertCanManage enforces the role hierarchy: TLs cannot touch managers/admins,
+// managers cannot touch admins.
+func assertCanManage(actorRole string, target *models.Employee) error {
+	if actorRole == "team_leader" && (target.Role == "manager" || target.Role == "admin") {
+		return fmt.Errorf("team leaders cannot modify schedules for managers or admins")
+	}
+	if actorRole == "manager" && target.Role == "admin" {
+		return fmt.Errorf("managers cannot modify schedules for admins")
+	}
+	return nil
+}
+
 // SetEmployeeShift upserts a single employee shift for a day.
 // If the weekly schedule record for that week doesn't exist, it will be created as a draft.
-func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID, creatorRole string) (*models.EmployeeShift, error) {
+//
+// permanent controls whether this becomes part of the employee's fixed weekly pattern:
+//   - true  → also written to schedule_templates and pushed onto every future
+//     pattern-derived day for that weekday, so it repeats every week.
+//   - false → this date only. Useful for one-off cover, so a temporary change does
+//     not silently become the recurring schedule.
+//
+// Either way the day itself is pinned as a manual row and will never be re-derived.
+func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.UUID, shiftDate time.Time, shiftID *uuid.UUID, shiftStatus string, leaveReason *string, createdBy uuid.UUID, creatorRole string, permanent bool) (*models.EmployeeShift, error) {
 	valid := map[string]bool{"working": true, "off": true, "leave": true, "vacation": true, "hourly": true}
 	if !valid[shiftStatus] {
 		return nil, fmt.Errorf("invalid shift_status: %s", shiftStatus)
@@ -460,12 +555,8 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 		return nil, fmt.Errorf("employee is not active")
 	}
 
-	// Enforce role hierarchy: TLs cannot set schedule for Managers/Admins, Managers cannot set for Admins.
-	if creatorRole == "team_leader" && (emp.Role == "manager" || emp.Role == "admin") {
-		return nil, fmt.Errorf("team leaders cannot modify schedules for managers or admins")
-	}
-	if creatorRole == "manager" && emp.Role == "admin" {
-		return nil, fmt.Errorf("managers cannot modify schedules for admins")
+	if err := assertCanManage(creatorRole, emp); err != nil {
+		return nil, err
 	}
 
 	// For working shifts, shift_id is required.
@@ -498,30 +589,125 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 		ShiftStatus: shiftStatus,
 		LeaveReason: leaveReason,
 		CreatedBy:   &createdBy,
+		Source:      models.ShiftSourceManual,
 	}
 
 	if err := s.scheduleRepo.UpsertEmployeeShift(ctx, es); err != nil {
 		return nil, err
 	}
 
-	// ── Persist off/working into the schedule template so the setting
-	// survives future GenerateWeeklySchedule calls automatically.
-	// "leave" and "vacation" are intentionally excluded — they are
-	// one-off temporary states, not permanent schedule patterns.
-	if shiftStatus == "off" || shiftStatus == "working" {
-		dayOfWeek := int(shiftDate.Weekday()) // 0=Sunday … 6=Saturday
+	// Write the change into the fixed weekly pattern so it repeats every week.
+	// "leave"/"vacation"/"hourly" are always one-off states, never a pattern.
+	if permanent && (shiftStatus == "off" || shiftStatus == "working") {
+		dayOfWeek := int(shiftDate.UTC().Weekday()) // 0=Sunday … 6=Saturday
 		isOff := shiftStatus == "off"
 		if tmplErr := s.scheduleRepo.UpsertTemplateForDay(ctx, employeeID, dayOfWeek, isOff, shiftID); tmplErr != nil {
-			// Template save failed — return the error so the caller knows
-			// the shift was saved but will NOT persist to future weeks.
-			return nil, fmt.Errorf("shift saved but template update failed (shift will not carry forward): %w", tmplErr)
+			// Pattern save failed — surface it, because the day was saved but will
+			// NOT repeat next week, which is exactly what the caller asked for.
+			return nil, fmt.Errorf("shift saved but weekly pattern update failed (change will not repeat next week): %w", tmplErr)
+		}
+		// Push it onto future weeks that were already materialised from the old pattern.
+		if err := s.scheduleRepo.ResyncGeneratedForWeekday(ctx, employeeID, dayOfWeek, shiftDate, shiftStatus, shiftID); err != nil {
+			return nil, fmt.Errorf("shift saved but future weeks were not updated: %w", err)
 		}
 	}
 
 	return es, nil
 }
 
+// GetEmployeePattern returns the employee's fixed weekly pattern, always as 7 days.
+// Days with no stored pattern fall back to default_shift_id / weekly_off_days so the
+// caller sees the schedule that will actually be materialised.
+func (s *ScheduleService) GetEmployeePattern(ctx context.Context, employeeID uuid.UUID) ([]models.PatternDay, error) {
+	emp, err := s.employeeRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("employee not found: %w", err)
+	}
+
+	templates, err := s.scheduleRepo.GetTemplatesByEmployee(ctx, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("get weekly pattern: %w", err)
+	}
+	byDay := map[int]models.ScheduleTemplate{}
+	for _, t := range templates {
+		byDay[t.DayOfWeek] = t
+	}
+
+	out := make([]models.PatternDay, 0, 7)
+	for day := 0; day < 7; day++ {
+		var tmpl *models.ScheduleTemplate
+		if t, ok := byDay[day]; ok {
+			tmpl = &t
+		}
+		status, shiftID := baselineForDay(*emp, day, tmpl)
+		out = append(out, models.PatternDay{
+			DayOfWeek: day,
+			IsOff:     status == "off",
+			ShiftID:   shiftID,
+		})
+	}
+	return out, nil
+}
+
+// SetEmployeePattern replaces the employee's whole fixed weekly pattern and pushes it
+// onto every future pattern-derived day. Past days and manual/leave days are untouched.
+func (s *ScheduleService) SetEmployeePattern(ctx context.Context, employeeID uuid.UUID, days []models.PatternDay, actorRole string) ([]models.PatternDay, error) {
+	if len(days) != 7 {
+		return nil, fmt.Errorf("weekly pattern must contain exactly 7 days, got %d", len(days))
+	}
+
+	emp, err := s.employeeRepo.GetByID(ctx, employeeID)
+	if err != nil {
+		return nil, fmt.Errorf("employee not found: %w", err)
+	}
+	if err := assertCanManage(actorRole, emp); err != nil {
+		return nil, err
+	}
+
+	seen := map[int]bool{}
+	for i := range days {
+		d := &days[i]
+		if d.DayOfWeek < 0 || d.DayOfWeek > 6 {
+			return nil, fmt.Errorf("invalid day_of_week: %d", d.DayOfWeek)
+		}
+		if seen[d.DayOfWeek] {
+			return nil, fmt.Errorf("duplicate day_of_week: %d", d.DayOfWeek)
+		}
+		seen[d.DayOfWeek] = true
+
+		if d.IsOff {
+			d.ShiftID = nil
+			continue
+		}
+		if d.ShiftID == nil {
+			return nil, fmt.Errorf("shift_id is required for working day %d", d.DayOfWeek)
+		}
+		if _, err := s.shiftRepo.GetByID(ctx, *d.ShiftID); err != nil {
+			return nil, fmt.Errorf("shift not found for day %d: %w", d.DayOfWeek, err)
+		}
+	}
+
+	if err := s.scheduleRepo.ReplaceEmployeePattern(ctx, employeeID, days); err != nil {
+		return nil, fmt.Errorf("save weekly pattern: %w", err)
+	}
+
+	// Apply from tomorrow onward: today's roster is already in use by the floor.
+	from := today()
+	for _, d := range days {
+		status := "working"
+		if d.IsOff {
+			status = "off"
+		}
+		if err := s.scheduleRepo.ResyncGeneratedForWeekday(ctx, employeeID, d.DayOfWeek, from, status, d.ShiftID); err != nil {
+			return nil, fmt.Errorf("apply pattern to future weeks: %w", err)
+		}
+	}
+
+	return s.GetEmployeePattern(ctx, employeeID)
+}
+
 // DeleteEmployeeShift removes an employee shift record (e.g. removing an off-day assignment).
+// The day reverts to the employee's fixed weekly pattern on the next read.
 func (s *ScheduleService) DeleteEmployeeShift(ctx context.Context, shiftID uuid.UUID) error {
 	return s.scheduleRepo.DeleteEmployeeShift(ctx, shiftID)
 }

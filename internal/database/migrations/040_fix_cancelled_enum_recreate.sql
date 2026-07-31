@@ -1,33 +1,20 @@
 -- 040_fix_cancelled_enum_recreate.sql
--- Safely recreate the leave_status enum to include 'cancelled'
--- This avoids transaction block restrictions of ALTER TYPE ADD VALUE
+-- Add 'cancelled' to the leave_status enum.
+--
+-- The original version of this file never ran on a fresh database: it dropped and
+-- recreated the type against a table called `leave_requests`, which does not exist in
+-- this schema -- the table is `leaves` (003_tables.sql). Every fresh install failed here
+-- with: relation "leave_requests" does not exist.
+--
+-- The rename-and-recreate dance existed to dodge the old restriction that
+-- ALTER TYPE ... ADD VALUE could not run inside a transaction block. That restriction
+-- was lifted in PostgreSQL 12, and this project requires 14+, so the value can simply be
+-- added. This is also strictly safer: nothing is dropped, so column defaults, views and
+-- any other dependency on the type stay intact.
+--
+-- Must stay a bare top-level statement: ALTER TYPE ... ADD VALUE cannot be wrapped in a
+-- DO block or an explicit BEGIN/COMMIT.
+--
+-- Idempotent via IF NOT EXISTS.
 
-DO $$ 
-BEGIN
-    -- Only proceed if 'cancelled' is not already in the enum
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum e 
-        JOIN pg_type t ON e.enumtypid = t.oid 
-        WHERE t.typname = 'leave_status' AND e.enumlabel = 'cancelled'
-    ) THEN
-        
-        -- 1. Drop default from leave_requests
-        ALTER TABLE leave_requests ALTER COLUMN status DROP DEFAULT;
-        
-        -- 2. Rename old type
-        ALTER TYPE leave_status RENAME TO leave_status_old;
-        
-        -- 3. Create new type with the new value
-        CREATE TYPE leave_status AS ENUM ('pending', 'approved_by_team_leader', 'approved_by_manager', 'rejected', 'cancelled');
-        
-        -- 4. Alter table to use new type
-        ALTER TABLE leave_requests ALTER COLUMN status TYPE leave_status USING status::text::leave_status;
-        
-        -- 5. Restore default
-        ALTER TABLE leave_requests ALTER COLUMN status SET DEFAULT 'pending';
-        
-        -- 6. Drop old type
-        DROP TYPE leave_status_old;
-        
-    END IF;
-END $$;
+ALTER TYPE leave_status ADD VALUE IF NOT EXISTS 'cancelled';

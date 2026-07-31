@@ -111,6 +111,25 @@ type EmployeeShift struct {
 	CreatedAt             time.Time  `json:"created_at"`
 	UpdatedAt             time.Time  `json:"updated_at"`
 	CreatedBy             *uuid.UUID `json:"created_by"`
+	// Source records who authored this row:
+	//   ShiftSourceGenerated — derived from the employee's weekly pattern; re-derived freely.
+	//   ShiftSourceManual    — a human decision (one-off edit, swap, replacement); never rewritten.
+	//   ShiftSourceLeave     — owned by the approved-leave overlay.
+	Source string `json:"source"`
+}
+
+// Provenance values for EmployeeShift.Source.
+const (
+	ShiftSourceGenerated = "generated"
+	ShiftSourceManual    = "manual"
+	ShiftSourceLeave     = "leave"
+)
+
+// PatternDay is one weekday of an employee's fixed weekly pattern.
+type PatternDay struct {
+	DayOfWeek int        `json:"day_of_week"` // 0=Sunday … 6=Saturday
+	IsOff     bool       `json:"is_off"`
+	ShiftID   *uuid.UUID `json:"shift_id"`
 }
 
 type EmployeeShiftExtended struct {
