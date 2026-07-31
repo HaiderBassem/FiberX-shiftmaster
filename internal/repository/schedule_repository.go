@@ -14,15 +14,19 @@ import (
 
 // ScheduleRepository handles schedule templates, weekly schedules, and employee shifts.
 type ScheduleRepository interface {
-	// Schedule Templates
+	// Schedule Templates — the employee's fixed weekly pattern.
 	GetTemplatesByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.ScheduleTemplate, error)
+	// GetTemplatesForEmployees loads the pattern for many employees in one query,
+	// keyed by employee then day-of-week. Used by the per-week materialisation.
+	GetTemplatesForEmployees(ctx context.Context, employeeIDs []uuid.UUID) (map[uuid.UUID]map[int]models.ScheduleTemplate, error)
 	CreateTemplate(ctx context.Context, t *models.ScheduleTemplate) error
 	UpdateTemplate(ctx context.Context, t *models.ScheduleTemplate) error
 	DeleteTemplate(ctx context.Context, id uuid.UUID) error
-	// UpsertTemplateForDay ensures a permanent off/working template exists for the
-	// given employee + day-of-week. Used by SetEmployeeShift so manual changes
-	// carry forward into every future generated weekly schedule automatically.
+	// UpsertTemplateForDay ensures a permanent off/working pattern entry exists for
+	// the given employee + day-of-week, so the setting repeats every week.
 	UpsertTemplateForDay(ctx context.Context, employeeID uuid.UUID, dayOfWeek int, isOff bool, shiftID *uuid.UUID) error
+	// ReplaceEmployeePattern atomically replaces the employee's whole weekly pattern.
+	ReplaceEmployeePattern(ctx context.Context, employeeID uuid.UUID, days []models.PatternDay) error
 
 	// Weekly Schedules
 	GetWeeklySchedule(ctx context.Context, weekStart time.Time) (*models.WeeklySchedule, error)
@@ -34,6 +38,9 @@ type ScheduleRepository interface {
 	GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsByEmployee(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.EmployeeShift, error)
 	GetEmployeeShiftsInRange(ctx context.Context, from, to time.Time) ([]models.EmployeeShift, error)
+	// GetEmployeeShiftsInRangeForDept is GetEmployeeShiftsInRange scoped to one department
+	// (nil = all). Used by the per-week materialisation to avoid a query per employee-day.
+	GetEmployeeShiftsInRangeForDept(ctx context.Context, from, to time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error)
 	GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error)
 	GetEmployeeShift(ctx context.Context, employeeID uuid.UUID, date time.Time) (*models.EmployeeShift, error)
 	GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (*models.EmployeeShift, error)
@@ -44,6 +51,11 @@ type ScheduleRepository interface {
 	CheckIn(ctx context.Context, id uuid.UUID) error
 	CheckOut(ctx context.Context, id uuid.UUID) error
 	UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
+	// UpsertGeneratedShift writes a pattern-derived day, leaving manual and leave days alone.
+	UpsertGeneratedShift(ctx context.Context, es *models.EmployeeShift) error
+	// ResyncGeneratedForWeekday pushes a pattern change onto the already-materialised
+	// pattern-derived days for that weekday after `after`.
+	ResyncGeneratedForWeekday(ctx context.Context, employeeID uuid.UUID, dayOfWeek int, after time.Time, status string, shiftID *uuid.UUID) error
 	DeleteEmployeeShift(ctx context.Context, id uuid.UUID) error
 
 	// Smart Replacement: employees who were off/on-leave the previous day
@@ -67,10 +79,20 @@ func NewScheduleRepository(db *database.DB) ScheduleRepository {
 
 // --- Schedule Templates ---
 
+// templateWinnerOrder decides which row wins when a weekday has more than one
+// pattern entry — which the historical UNIQUE(employee, day, valid_from) allowed.
+// Still-valid entries beat expired ones, then the newest valid_from, then the newest
+// edit. Resolving it here rather than deleting rows keeps every historical entry on
+// disk while making the answer deterministic.
+const templateWinnerOrder = `(valid_to IS NULL) DESC, COALESCE(valid_from, DATE '0001-01-01') DESC, updated_at DESC, id DESC`
+
 func (r *scheduleRepo) GetTemplatesByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.ScheduleTemplate, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, employee_id, day_of_week, shift_id, is_off, valid_from, valid_to, created_at, updated_at
-		 FROM schedule_templates WHERE employee_id = $1 ORDER BY day_of_week`, employeeID)
+		`SELECT DISTINCT ON (day_of_week)
+		        id, employee_id, day_of_week, shift_id, is_off, valid_from, valid_to, created_at, updated_at
+		 FROM schedule_templates
+		 WHERE employee_id = $1 AND day_of_week IS NOT NULL
+		 ORDER BY day_of_week, `+templateWinnerOrder, employeeID)
 	if err != nil {
 		return nil, fmt.Errorf("get templates by employee: %w", err)
 	}
@@ -86,6 +108,37 @@ func (r *scheduleRepo) GetTemplatesByEmployee(ctx context.Context, employeeID uu
 		templates = append(templates, t)
 	}
 	return templates, rows.Err()
+}
+
+func (r *scheduleRepo) GetTemplatesForEmployees(ctx context.Context, employeeIDs []uuid.UUID) (map[uuid.UUID]map[int]models.ScheduleTemplate, error) {
+	out := map[uuid.UUID]map[int]models.ScheduleTemplate{}
+	if len(employeeIDs) == 0 {
+		return out, nil
+	}
+
+	rows, err := r.db.Query(ctx,
+		`SELECT DISTINCT ON (employee_id, day_of_week)
+		        id, employee_id, day_of_week, shift_id, is_off, valid_from, valid_to, created_at, updated_at
+		 FROM schedule_templates
+		 WHERE employee_id = ANY($1) AND day_of_week IS NOT NULL
+		 ORDER BY employee_id, day_of_week, `+templateWinnerOrder, employeeIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get templates for employees: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var t models.ScheduleTemplate
+		if err := rows.Scan(&t.ID, &t.EmployeeID, &t.DayOfWeek, &t.ShiftID, &t.IsOff,
+			&t.ValidFrom, &t.ValidTo, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan template: %w", err)
+		}
+		if out[t.EmployeeID] == nil {
+			out[t.EmployeeID] = make(map[int]models.ScheduleTemplate, 7)
+		}
+		out[t.EmployeeID][t.DayOfWeek] = t
+	}
+	return out, rows.Err()
 }
 
 func (r *scheduleRepo) CreateTemplate(ctx context.Context, t *models.ScheduleTemplate) error {
@@ -109,10 +162,10 @@ func (r *scheduleRepo) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-// UpsertTemplateForDay sets a permanent off/working template for an employee day.
-// Guarantees exactly ONE row per (employee_id, day_of_week) by deleting any
-// stale rows first and then inserting fresh. This prevents the multiple-valid_from
-// rows problem that caused shifts to not persist across week boundaries.
+// Updates the still-valid entries in place rather than deleting and re-inserting, so
+// no historical row is ever removed. A weekday carrying several still-valid entries
+// gets them all updated to the same value, which converges on the right answer
+// whichever one templateWinnerOrder later picks.
 func (r *scheduleRepo) UpsertTemplateForDay(
 	ctx context.Context,
 	employeeID uuid.UUID,
@@ -120,34 +173,72 @@ func (r *scheduleRepo) UpsertTemplateForDay(
 	isOff bool,
 	shiftID *uuid.UUID,
 ) error {
-	// Delete all existing templates for this employee+day (there should be at most one,
-	// but clean up duplicates defensively).
-	_, err := r.db.Exec(ctx,
-		`DELETE FROM schedule_templates WHERE employee_id=$1 AND day_of_week=$2`,
-		employeeID, dayOfWeek)
+	tag, err := r.db.Exec(ctx,
+		`UPDATE schedule_templates
+		    SET shift_id   = $1,
+		        is_off     = $2,
+		        valid_from = CURRENT_DATE,
+		        updated_at = CURRENT_TIMESTAMP
+		  WHERE employee_id = $3 AND day_of_week = $4 AND valid_to IS NULL`,
+		shiftID, isOff, employeeID, dayOfWeek)
 	if err != nil {
-		return fmt.Errorf("upsert template (delete old): %w", err)
+		return fmt.Errorf("upsert template for day (update): %w", err)
+	}
+	if tag.RowsAffected() > 0 {
+		return nil
 	}
 
-	// Insert the single authoritative row.
+	// No valid entry for this weekday yet. The ON CONFLICT targets the table's
+	// existing UNIQUE(employee_id, day_of_week, valid_from), which an expired entry
+	// created earlier today could otherwise collide with.
 	_, err = r.db.Exec(ctx,
 		`INSERT INTO schedule_templates (employee_id, day_of_week, shift_id, is_off, valid_from, valid_to)
-		 VALUES ($1, $2, $3, $4, CURRENT_DATE, NULL)`,
+		 VALUES ($1, $2, $3, $4, CURRENT_DATE, NULL)
+		 ON CONFLICT (employee_id, day_of_week, valid_from) DO UPDATE SET
+		     shift_id   = EXCLUDED.shift_id,
+		     is_off     = EXCLUDED.is_off,
+		     valid_to   = NULL,
+		     updated_at = CURRENT_TIMESTAMP`,
 		employeeID, dayOfWeek, shiftID, isOff)
 	if err != nil {
-		return fmt.Errorf("upsert template (insert): %w", err)
+		return fmt.Errorf("upsert template for day (insert): %w", err)
 	}
 	return nil
+}
+
+// ReplaceEmployeePattern rewrites the employee's whole weekly pattern in one transaction.
+func (r *scheduleRepo) ReplaceEmployeePattern(ctx context.Context, employeeID uuid.UUID, days []models.PatternDay) error {
+	return r.db.ExecTx(ctx, func(txCtx context.Context, _ pgx.Tx) error {
+		for _, d := range days {
+			if d.DayOfWeek < 0 || d.DayOfWeek > 6 {
+				return fmt.Errorf("invalid day_of_week: %d", d.DayOfWeek)
+			}
+			shiftID := d.ShiftID
+			if d.IsOff {
+				shiftID = nil
+			}
+			if err := r.UpsertTemplateForDay(txCtx, employeeID, d.DayOfWeek, d.IsOff, shiftID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // --- Weekly Schedules ---
 
 func (r *scheduleRepo) GetWeeklySchedule(ctx context.Context, weekStart time.Time) (*models.WeeklySchedule, error) {
 	var ws models.WeeklySchedule
+	// Oldest-first, not newest-first: migration 018 dropped UNIQUE(week_start_date) in
+	// favour of UNIQUE(department_id, week_start_date) while the application still
+	// writes a NULL department_id, and NULLs are distinct in a unique constraint — so a
+	// week can have several header rows. Always resolving to the first one ever created
+	// keeps the choice stable, which is all the header is used for, without having to
+	// delete the extra rows.
 	err := r.db.QueryRow(ctx,
 		`SELECT id, week_start_date, week_end_date, template_id, status, published_by, published_at, notes, created_at
 		 FROM weekly_schedule WHERE week_start_date = $1::date
-		 ORDER BY created_at DESC LIMIT 1`, weekStart,
+		 ORDER BY created_at ASC, id ASC LIMIT 1`, weekStart,
 	).Scan(&ws.ID, &ws.WeekStartDate, &ws.WeekEndDate, &ws.TemplateID, &ws.Status,
 		&ws.PublishedBy, &ws.PublishedAt, &ws.Notes, &ws.CreatedAt)
 	if err != nil {
@@ -201,6 +292,7 @@ func (r *scheduleRepo) scanEmployeeShifts(rows pgx.Rows) ([]models.EmployeeShift
 			&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
 			&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
 			&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+			&es.Source,
 		); err != nil {
 			return nil, fmt.Errorf("scan employee shift: %w", err)
 		}
@@ -212,13 +304,16 @@ func (r *scheduleRepo) scanEmployeeShifts(rows pgx.Rows) ([]models.EmployeeShift
 const employeeShiftColumns = `id, schedule_id, employee_id, shift_id, shift_date, shift_status,
 	leave_reason, is_replacement, replaced_employee_id, replacement_approved_by,
 	check_in_time, check_out_time, actual_worked_hours, overtime_hours,
-	created_at, updated_at, created_by`
+	created_at, updated_at, created_by, source`
+
+// employeeShiftColumnsAliased is employeeShiftColumns qualified with the `es` table alias.
+const employeeShiftColumnsAliased = `es.id, es.schedule_id, es.employee_id, es.shift_id, es.shift_date, es.shift_status,
+	es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
+	es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
+	es.created_at, es.updated_at, es.created_by, es.source`
 
 func (r *scheduleRepo) GetEmployeeShiftsByDate(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error) {
-	query := `SELECT es.id, es.schedule_id, es.employee_id, es.shift_id, es.shift_date, es.shift_status,
-		es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
-		es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
-		es.created_at, es.updated_at, es.created_by
+	query := `SELECT ` + employeeShiftColumnsAliased + `
 		FROM employee_shifts es
 		JOIN employees e ON e.id = es.employee_id
 		WHERE es.shift_date = $1`
@@ -260,11 +355,24 @@ func (r *scheduleRepo) GetEmployeeShiftsInRange(ctx context.Context, from, to ti
 	return r.scanEmployeeShifts(rows)
 }
 
+func (r *scheduleRepo) GetEmployeeShiftsInRangeForDept(ctx context.Context, from, to time.Time, departmentID *uuid.UUID) ([]models.EmployeeShift, error) {
+	if departmentID == nil {
+		return r.GetEmployeeShiftsInRange(ctx, from, to)
+	}
+	rows, err := r.db.Query(ctx,
+		`SELECT `+employeeShiftColumnsAliased+` FROM employee_shifts es
+		 JOIN employees e ON e.id = es.employee_id
+		 WHERE es.shift_date BETWEEN $1 AND $2 AND e.department_id = $3
+		 ORDER BY es.employee_id, es.shift_date`, from, to, *departmentID)
+	if err != nil {
+		return nil, fmt.Errorf("get shifts in range for dept: %w", err)
+	}
+	defer rows.Close()
+	return r.scanEmployeeShifts(rows)
+}
+
 func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to time.Time, departmentID uuid.UUID) ([]models.EmployeeShiftExtended, error) {
-	query := `SELECT es.id, es.schedule_id, es.employee_id, es.shift_id, es.shift_date, es.shift_status,
-		es.leave_reason, es.is_replacement, es.replaced_employee_id, es.replacement_approved_by,
-		es.check_in_time, es.check_out_time, es.actual_worked_hours, es.overtime_hours,
-		es.created_at, es.updated_at, es.created_by,
+	query := `SELECT ` + employeeShiftColumnsAliased + `,
 		e.first_name, e.last_name, e.role, e.default_shift_id
 		FROM employee_shifts es
 		JOIN employees e ON e.id = es.employee_id
@@ -286,6 +394,7 @@ func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to 
 			&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
 			&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
 			&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+			&es.Source,
 			&es.FirstName, &es.LastName, &es.EmployeeRole, &es.DefaultShiftID,
 		); err != nil {
 			return nil, fmt.Errorf("scan department shift: %w", err)
@@ -305,6 +414,7 @@ func (r *scheduleRepo) GetEmployeeShift(ctx context.Context, employeeID uuid.UUI
 		&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
 		&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
 		&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+		&es.Source,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -325,6 +435,7 @@ func (r *scheduleRepo) GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (
 		&es.ShiftStatus, &es.LeaveReason, &es.IsReplacement, &es.ReplacedEmployeeID,
 		&es.ReplacementApprovedBy, &es.CheckInTime, &es.CheckOutTime,
 		&es.ActualWorkedHours, &es.OvertimeHours, &es.CreatedAt, &es.UpdatedAt, &es.CreatedBy,
+		&es.Source,
 	)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -338,21 +449,36 @@ func (r *scheduleRepo) GetEmployeeShiftByID(ctx context.Context, id uuid.UUID) (
 func (r *scheduleRepo) CreateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO employee_shifts (schedule_id, employee_id, shift_id, shift_date, shift_status,
-			leave_reason, is_replacement, replaced_employee_id, replacement_approved_by, created_by)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, created_at, updated_at`,
+			leave_reason, is_replacement, replaced_employee_id, replacement_approved_by, created_by, source)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id, created_at, updated_at`,
 		es.ScheduleID, es.EmployeeID, es.ShiftID, es.ShiftDate, es.ShiftStatus,
 		es.LeaveReason, es.IsReplacement, es.ReplacedEmployeeID, es.ReplacementApprovedBy, es.CreatedBy,
+		normalizeSource(es.Source),
 	).Scan(&es.ID, &es.CreatedAt, &es.UpdatedAt)
 }
 
+// UpdateEmployeeShift edits an existing row. Any explicit edit (swap, replacement)
+// pins the row as manual so the pattern materialiser will not re-derive it.
 func (r *scheduleRepo) UpdateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error {
 	_, err := r.db.Exec(ctx,
 		`UPDATE employee_shifts SET shift_id=$1, shift_status=$2, leave_reason=$3,
 			is_replacement=$4, replaced_employee_id=$5, replacement_approved_by=$6,
-			updated_at=CURRENT_TIMESTAMP WHERE id=$7`,
+			source=$7, updated_at=CURRENT_TIMESTAMP WHERE id=$8`,
 		es.ShiftID, es.ShiftStatus, es.LeaveReason,
-		es.IsReplacement, es.ReplacedEmployeeID, es.ReplacementApprovedBy, es.ID)
+		es.IsReplacement, es.ReplacedEmployeeID, es.ReplacementApprovedBy,
+		normalizeSource(es.Source), es.ID)
 	return err
+}
+
+// normalizeSource defaults an unset provenance to "manual": callers that do not
+// state a source are making an explicit change, which must never be re-derived.
+func normalizeSource(s string) string {
+	switch s {
+	case models.ShiftSourceGenerated, models.ShiftSourceManual, models.ShiftSourceLeave:
+		return s
+	default:
+		return models.ShiftSourceManual
+	}
 }
 
 func (r *scheduleRepo) UpdateShiftStatus(ctx context.Context, id uuid.UUID, status string, reason *string) error {
@@ -388,19 +514,75 @@ func (r *scheduleRepo) UpsertEmployeeShift(ctx context.Context, es *models.Emplo
 	// Upsert by UNIQUE(employee_id, shift_date)
 	return r.db.QueryRow(ctx, `
 		INSERT INTO employee_shifts (
-			schedule_id, employee_id, shift_id, shift_date, shift_status, leave_reason, created_by
-		) VALUES ($1,$2,$3,$4,$5,$6,$7)
+			schedule_id, employee_id, shift_id, shift_date, shift_status, leave_reason, created_by, source
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 		ON CONFLICT (employee_id, shift_date)
 		DO UPDATE SET
 			schedule_id = EXCLUDED.schedule_id,
 			shift_id = EXCLUDED.shift_id,
 			shift_status = EXCLUDED.shift_status,
 			leave_reason = EXCLUDED.leave_reason,
+			source = EXCLUDED.source,
 			updated_at = CURRENT_TIMESTAMP
 		RETURNING id, created_at, updated_at
 	`,
 		es.ScheduleID, es.EmployeeID, es.ShiftID, es.ShiftDate, es.ShiftStatus, es.LeaveReason, es.CreatedBy,
+		normalizeSource(es.Source),
 	).Scan(&es.ID, &es.CreatedAt, &es.UpdatedAt)
+}
+
+// The `WHERE employee_shifts.source = 'generated'` on the conflict branch is the
+// safety rail of the whole design: a day a human touched, or that an approved leave
+// owns, is left exactly as it is even under a concurrent write. Everything else stays
+// free to be re-derived, which is what stops a week from freezing into whatever was
+// seeded into it first.
+func (r *scheduleRepo) UpsertGeneratedShift(ctx context.Context, es *models.EmployeeShift) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO employee_shifts (
+			schedule_id, employee_id, shift_id, shift_date, shift_status, leave_reason, created_by, source
+		) VALUES ($1,$2,$3,$4,$5,NULL,$6,'generated')
+		ON CONFLICT (employee_id, shift_date)
+		DO UPDATE SET
+			schedule_id  = EXCLUDED.schedule_id,
+			shift_id     = EXCLUDED.shift_id,
+			shift_status = EXCLUDED.shift_status,
+			leave_reason = NULL,
+			updated_at   = CURRENT_TIMESTAMP
+		WHERE employee_shifts.source = 'generated'
+	`,
+		es.ScheduleID, es.EmployeeID, es.ShiftID, es.ShiftDate, es.ShiftStatus, es.CreatedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert generated shift: %w", err)
+	}
+	return nil
+}
+
+// Without this, a permanent edit would only reach weeks nobody had opened yet: weeks
+// already materialised from the previous pattern would keep the stale value.
+func (r *scheduleRepo) ResyncGeneratedForWeekday(
+	ctx context.Context,
+	employeeID uuid.UUID,
+	dayOfWeek int,
+	after time.Time,
+	status string,
+	shiftID *uuid.UUID,
+) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE employee_shifts
+		   SET shift_id     = $1,
+		       shift_status = $2,
+		       leave_reason = NULL,
+		       updated_at   = CURRENT_TIMESTAMP
+		 WHERE employee_id = $3
+		   AND source = 'generated'
+		   AND shift_date > $4
+		   AND EXTRACT(DOW FROM shift_date)::int = $5
+	`, shiftID, status, employeeID, after, dayOfWeek)
+	if err != nil {
+		return fmt.Errorf("resync generated weekday: %w", err)
+	}
+	return nil
 }
 
 func (r *scheduleRepo) DeleteEmployeeShift(ctx context.Context, id uuid.UUID) error {
@@ -470,7 +652,7 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 		   AND e.status = 'active'
 		   AND e.role = 'employee'
 		   AND NOT EXISTS (
-		       SELECT 1 FROM leave_requests lr
+		       SELECT 1 FROM leaves lr
 		       WHERE lr.employee_id = e.id
 		         AND lr.status = 'approved'
 		         AND $2::date BETWEEN lr.start_date AND lr.end_date

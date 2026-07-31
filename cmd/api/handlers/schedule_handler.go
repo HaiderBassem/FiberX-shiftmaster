@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/service"
 )
 
@@ -220,11 +222,15 @@ type assignReplacementRequest struct {
 }
 
 type setEmployeeShiftRequest struct {
-	EmployeeID   string  `json:"employee_id" binding:"required"`
-	ShiftDate    string  `json:"shift_date" binding:"required"` // YYYY-MM-DD
-	ShiftStatus  string  `json:"shift_status" binding:"required"`
-	ShiftID      *string `json:"shift_id"`
-	LeaveReason  *string `json:"leave_reason"`
+	EmployeeID  string  `json:"employee_id" binding:"required"`
+	ShiftDate   string  `json:"shift_date" binding:"required"` // YYYY-MM-DD
+	ShiftStatus string  `json:"shift_status" binding:"required"`
+	ShiftID     *string `json:"shift_id"`
+	LeaveReason *string `json:"leave_reason"`
+	// Permanent makes the change part of the employee's fixed weekly pattern so it
+	// repeats every week. Pointer so an omitted field can default to true, which
+	// preserves the behaviour older clients rely on.
+	Permanent *bool `json:"permanent"`
 }
 
 // SetEmployeeShift upserts one employee shift row for the given date.
@@ -262,13 +268,83 @@ func (h *ScheduleHandler) SetEmployeeShift(c *gin.Context) {
 	roleVal, _ := c.Get("role")
 	roleStr, _ := roleVal.(string)
 
-	es, err := h.scheduleSvc.SetEmployeeShift(c.Request.Context(), employeeID, shiftDate, shiftID, req.ShiftStatus, req.LeaveReason, createdBy, roleStr)
+	permanent := true
+	if req.Permanent != nil {
+		permanent = *req.Permanent
+	}
+
+	es, err := h.scheduleSvc.SetEmployeeShift(c.Request.Context(), employeeID, shiftDate, shiftID, req.ShiftStatus, req.LeaveReason, createdBy, roleStr, permanent)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": es})
+}
+
+type setPatternRequest struct {
+	Days []struct {
+		DayOfWeek int     `json:"day_of_week"`
+		IsOff     bool    `json:"is_off"`
+		ShiftID   *string `json:"shift_id"`
+	} `json:"days" binding:"required"`
+}
+
+// GetPattern returns an employee's fixed weekly pattern (7 days).
+func (h *ScheduleHandler) GetPattern(c *gin.Context) {
+	employeeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	days, err := h.scheduleSvc.GetEmployeePattern(c.Request.Context(), employeeID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": days})
+}
+
+// SetPattern replaces an employee's fixed weekly pattern and applies it to future weeks.
+func (h *ScheduleHandler) SetPattern(c *gin.Context) {
+	employeeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
+		return
+	}
+
+	var req setPatternRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
+		return
+	}
+
+	days := make([]models.PatternDay, 0, len(req.Days))
+	for _, d := range req.Days {
+		day := models.PatternDay{DayOfWeek: d.DayOfWeek, IsOff: d.IsOff}
+		if !d.IsOff && d.ShiftID != nil && *d.ShiftID != "" {
+			parsed, err := uuid.Parse(*d.ShiftID)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid shift_id for day " + strconv.Itoa(d.DayOfWeek)})
+				return
+			}
+			day.ShiftID = &parsed
+		}
+		days = append(days, day)
+	}
+
+	roleVal, _ := c.Get("role")
+	roleStr, _ := roleVal.(string)
+
+	saved, err := h.scheduleSvc.SetEmployeePattern(c.Request.Context(), employeeID, days, roleStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": saved})
 }
 
 // AssignReplacement assigns a replacement employee for a shift.

@@ -106,6 +106,7 @@ func SetupRouter(
 			schedules.GET("/department", scheduleH.DepartmentShifts)
 			schedules.GET("/employee/:id", scheduleH.EmployeeShifts)
 			schedules.GET("/replacements", scheduleH.AvailableReplacements)
+			schedules.GET("/pattern/:id", scheduleH.GetPattern)
 
 			scheduleShifts := schedules.Group("/shifts")
 			{
@@ -325,6 +326,9 @@ func SetupRouter(
 			// Schedule editing (manual create/update for a day)
 			tlWrite.POST("/schedules/shifts/set", scheduleH.SetEmployeeShift)
 			tlWrite.DELETE("/schedules/shifts/:id", scheduleH.DeleteEmployeeShift)
+
+			// Fixed weekly pattern (the schedule that repeats every week)
+			tlWrite.PUT("/schedules/pattern/:id", scheduleH.SetPattern)
 
 			// Shift management
 			tlWrite.POST("/shifts", shiftH.Create)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
@@ -6,8 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calendar as CalendarIcon, Loader2, Users, Briefcase, Wand2, Filter, AlertTriangle } from 'lucide-react';
-import { addDays, format, startOfWeek } from 'date-fns';
+import {
+  Calendar as CalendarIcon, Loader2, Users, Briefcase, Wand2, Filter, AlertTriangle,
+  ChevronLeft, ChevronRight, Repeat, Pin, X,
+} from 'lucide-react';
+import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
 function resolveDisplayStatus(row: any): string {
@@ -90,18 +95,25 @@ export const ScheduleView = () => {
     },
   });
 
-  const weekStartKey = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
+  // Roster week, navigable. 0 = current week.
+  const [weekOffset, setWeekOffset] = useState(0);
   const weekStart = useMemo(
-    () => startOfWeek(new Date(), { weekStartsOn: 0 }),
-    [weekStartKey],
+    () => startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 0 }),
+    [weekOffset],
   );
+  const weekStartKey = format(weekStart, 'yyyy-MM-dd');
   const weekDays = useMemo(
     () => Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx)),
     [weekStartKey, weekStart],
   );
 
+  // Whether a roster edit updates the employee's fixed weekly pattern (repeats every
+  // week) or applies to that date only. Permanent matches the long-standing behaviour.
+  const [applyPermanently, setApplyPermanently] = useState(true);
+  const [patternEmployee, setPatternEmployee] = useState<any | null>(null);
+
   const { data: weeklyRows, isLoading: weeklyLoading } = useQuery({
-    queryKey: ['schedules', 'weekly-matrix', format(weekStart, 'yyyy-MM-dd'), deptId, shifts?.length ?? 0],
+    queryKey: ['schedules', 'weekly-matrix', weekStartKey, deptId, shifts?.length ?? 0],
     queryFn: async () => {
       const shiftLookup: Record<string, any> = {};
       (shifts || []).forEach((s: any) => { shiftLookup[s.id] = s; });
@@ -238,6 +250,7 @@ export const ScheduleView = () => {
         shift_status: setShiftStatus,
         shift_id: setShiftStatus === 'working' ? (setShiftId || null) : null,
         leave_reason: null,
+        permanent: applyPermanently,
       });
     },
     onSuccess: () => {
@@ -253,6 +266,7 @@ export const ScheduleView = () => {
     mutationFn: async ({ employeeId, date }: { employeeId: string; date: string }) => {
       await api.post('/schedules/shifts/set', {
         employee_id: employeeId, shift_date: date, shift_status: 'off', shift_id: null, leave_reason: null,
+        permanent: applyPermanently,
       });
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
@@ -262,6 +276,7 @@ export const ScheduleView = () => {
     mutationFn: async ({ employeeId, date, shiftId }: { employeeId: string; date: string; shiftId: string }) => {
       await api.post('/schedules/shifts/set', {
         employee_id: employeeId, shift_date: date, shift_status: 'working', shift_id: shiftId, leave_reason: null,
+        permanent: applyPermanently,
       });
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['schedules'] }); },
@@ -477,11 +492,60 @@ export const ScheduleView = () => {
 
       {/* Weekly roster table */}
       <Card>
-        <CardHeader className="pb-3 border-b border-border">
-          <CardTitle className="text-xl">Weekly Team Roster</CardTitle>
-          <CardDescription>
-            One row per employee with day-by-day status. Quick "Off" action included.
-          </CardDescription>
+        <CardHeader className="pb-3 border-b border-border space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-xl">Weekly Team Roster</CardTitle>
+              <CardDescription>
+                {format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}
+                {weekOffset === 0 && <span className="ml-2 text-primary">· current week</span>}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setWeekOffset((w) => w - 1)} aria-label="Previous week">
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setWeekOffset(0)} disabled={weekOffset === 0}>
+                Today
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setWeekOffset((w) => w + 1)} aria-label="Next week">
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {canEdit && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-xs text-muted-foreground">Edits apply:</span>
+              <div className="inline-flex rounded-lg border border-border overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setApplyPermanently(true)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                    applyPermanently ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Repeat className="w-3.5 h-3.5" />
+                  Every week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApplyPermanently(false)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs border-l border-border transition-colors ${
+                    !applyPermanently ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Pin className="w-3.5 h-3.5" />
+                  This day only
+                </button>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                {applyPermanently
+                  ? 'Becomes part of the fixed weekly schedule and repeats automatically.'
+                  : 'Applies to this date only — the fixed weekly schedule is unchanged.'}
+              </span>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {weeklyLoading ? (
@@ -509,6 +573,16 @@ export const ScheduleView = () => {
                           {row.employee.first_name} {row.employee.last_name}
                         </div>
                         <div className="text-xs text-muted-foreground">{row.employee.employee_code}</div>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            onClick={() => setPatternEmployee(row.employee)}
+                            className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                          >
+                            <Repeat className="w-3 h-3" />
+                            Fixed schedule
+                          </button>
+                        )}
                       </td>
                       {row.days.map((d: any) => {
                         const tone =
@@ -522,7 +596,12 @@ export const ScheduleView = () => {
                         return (
                           <td key={`${row.employee.id}-${d.date}`} className="p-3">
                             <div className={`rounded-lg border px-2 py-2 ${tone}`}>
-                              <div className="text-xs font-semibold uppercase tracking-wider">{d.status}</div>
+                              <div className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1">
+                                {d.status}
+                                {d.row?.source === 'manual' && (
+                                  <Pin className="w-3 h-3 opacity-60" aria-label="Set for this day only" />
+                                )}
+                              </div>
                               <div className="text-[11px] opacity-80 mt-1">{d.shiftName || '-'}</div>
                               {canEdit && (
                                 <div className="mt-2">
@@ -586,6 +665,18 @@ export const ScheduleView = () => {
         </CardContent>
       </Card>
 
+      {patternEmployee && (
+        <WeeklyPatternModal
+          employee={patternEmployee}
+          shifts={shifts || []}
+          onClose={() => setPatternEmployee(null)}
+          onSaved={() => {
+            setPatternEmployee(null);
+            queryClient.invalidateQueries({ queryKey: ['schedules'] });
+          }}
+        />
+      )}
+
       {/* Vacation request alarms */}
       {isSupervisor && (
         <Card>
@@ -618,6 +709,144 @@ export const ScheduleView = () => {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+};
+
+/**
+ * Editor for an employee's fixed weekly pattern — the schedule that repeats every
+ * week by itself. Saving applies it to every future week at once; today and the past
+ * are left alone, as are days a supervisor pinned or an approved leave owns.
+ */
+const WeeklyPatternModal = ({
+  employee,
+  shifts,
+  onClose,
+  onSaved,
+}: {
+  employee: any;
+  shifts: any[];
+  onClose: () => void;
+  onSaved: () => void;
+}) => {
+  const [days, setDays] = useState<{ day_of_week: number; is_off: boolean; shift_id: string | null }[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['schedules', 'pattern', employee.id],
+    queryFn: async () => {
+      const res = await api.get(`/schedules/pattern/${employee.id}`);
+      return res.data?.data || [];
+    },
+  });
+
+  useEffect(() => {
+    if (!data) return;
+    setDays(
+      data.map((d: any) => ({
+        day_of_week: d.day_of_week,
+        is_off: !!d.is_off,
+        shift_id: d.shift_id || null,
+      })),
+    );
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      setError(null);
+      await api.put(`/schedules/pattern/${employee.id}`, { days });
+    },
+    onSuccess: onSaved,
+    onError: (err: any) => {
+      setError(err?.response?.data?.error || err?.message || 'Failed to save the weekly pattern');
+    },
+  });
+
+  const selectClass =
+    'w-full h-9 px-2 rounded-md bg-background border border-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 p-5 border-b border-border">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <Repeat className="w-5 h-5 text-primary" />
+              Fixed weekly schedule
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {employee.first_name} {employee.last_name} — {employee.employee_code}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={onClose} aria-label="Close">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            This is the schedule that repeats every week on its own. Saving applies it to all future
+            weeks; today and past days stay as they are, and approved leaves are not affected.
+          </p>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            days.map((d) => (
+              <div key={d.day_of_week} className="flex items-center gap-3">
+                <div className="w-24 shrink-0 text-sm text-foreground">{DAY_NAMES[d.day_of_week]}</div>
+                <select
+                  className={selectClass}
+                  value={d.is_off ? 'off' : d.shift_id || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDays((prev) =>
+                      prev.map((p) =>
+                        p.day_of_week === d.day_of_week
+                          ? val === 'off'
+                            ? { ...p, is_off: true, shift_id: null }
+                            : { ...p, is_off: false, shift_id: val || null }
+                          : p,
+                      ),
+                    );
+                  }}
+                >
+                  <option value="">Select shift…</option>
+                  <option value="off">Off day</option>
+                  {shifts.map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.shift_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 p-5 border-t border-border">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={save.isPending || isLoading || days.some((d) => !d.is_off && !d.shift_id)}
+          >
+            {save.isPending ? 'Saving…' : 'Save pattern'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

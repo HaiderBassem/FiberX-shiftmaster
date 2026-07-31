@@ -544,36 +544,20 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 		return fmt.Errorf("failed to update leave status to cancelled: %w", err)
 	}
 
-	// Revert employee_shifts back to template defaults
+	// Release the days back to the employee's fixed weekly pattern. Deleting the
+	// leave-owned rows is enough: the next read re-materialises them from the
+	// pattern, so there is no second place that has to know what the pattern says.
 	start := leave.StartDate.UTC().Truncate(24 * time.Hour)
 	end := leave.EndDate.UTC().Truncate(24 * time.Hour)
 
-	templates, err := s.scheduleRepo.GetTemplatesByEmployee(ctx, leave.EmployeeID)
-	if err == nil {
-		tmplMap := make(map[int]*models.ScheduleTemplate)
-		for i := range templates {
-			tmplMap[templates[i].DayOfWeek] = &templates[i]
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		es, esErr := s.scheduleRepo.GetEmployeeShift(ctx, leave.EmployeeID, d)
+		if esErr != nil || es == nil {
+			continue
 		}
-
-		for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-			es, err := s.scheduleRepo.GetEmployeeShift(ctx, leave.EmployeeID, d)
-			if err == nil && es != nil {
-				// Revert to template
-				tmpl := tmplMap[int(d.Weekday())]
-				if tmpl != nil {
-					status := "working"
-					if tmpl.IsOff {
-						status = "off"
-					}
-					es.ShiftStatus = status
-					es.ShiftID = tmpl.ShiftID
-					es.LeaveReason = nil
-					_ = s.scheduleRepo.UpdateEmployeeShift(ctx, es)
-				} else {
-					// Fallback to delete if no template
-					_ = s.scheduleRepo.DeleteEmployeeShift(ctx, es.ID)
-				}
-			}
+		// Only reclaim days this leave owns; a manual edit made during the leave stands.
+		if es.Source == models.ShiftSourceLeave {
+			_ = s.scheduleRepo.DeleteEmployeeShift(ctx, es.ID)
 		}
 	}
 
@@ -714,6 +698,7 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			ShiftStatus: shiftStatus,
 			LeaveReason: leaveReasonPtr,
 			CreatedBy:   &approverID,
+			Source:      models.ShiftSourceLeave,
 		}
 		if upsertErr := s.scheduleRepo.UpsertEmployeeShift(ctx, es); upsertErr != nil {
 			fmt.Printf("[LEAVE] Failed to upsert employee shift for %s on %s: %v\n", leave.EmployeeID, d.Format("2006-01-02"), upsertErr)
