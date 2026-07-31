@@ -654,7 +654,9 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 		   AND NOT EXISTS (
 		       SELECT 1 FROM leaves lr
 		       WHERE lr.employee_id = e.id
-		         AND lr.status = 'approved'
+		         -- Matches GetApprovedForSchedule: manager approval is the terminal
+		         -- approved state. 'approved' is not a leave_status label at all.
+		         AND lr.status = 'approved_by_manager'
 		         AND $2::date BETWEEN lr.start_date AND lr.end_date
 		   )
 		   AND NOT EXISTS (

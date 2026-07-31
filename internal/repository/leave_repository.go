@@ -91,7 +91,12 @@ func (r *leaveRepo) GetLeavesForReminders(ctx context.Context) ([]models.Leave, 
 	rows, err := r.db.Query(ctx,
 		`SELECT `+leaveColumns+` FROM leaves l
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
-		 WHERE l.status IN ('approved_by_team_leader', 'approved_by_manager', 'approved')
+		 -- 'approved' is not one of the leave_status labels ('pending',
+		 -- 'approved_by_team_leader', 'approved_by_manager', 'rejected', 'cancelled'),
+		 -- and an unknown enum literal fails the whole query rather than matching
+		 -- nothing, so this ran hourly and never sent a single reminder:
+		 --   ERROR: invalid input value for enum leave_status: "approved"
+		 WHERE l.status IN ('approved_by_team_leader', 'approved_by_manager')
 		   AND l.reminder_sent_at IS NULL
 		   AND l.start_date = CURRENT_DATE + INTERVAL '2 days'
 		   AND l.applied_date <= l.start_date - INTERVAL '3 days'`)
