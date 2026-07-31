@@ -336,3 +336,36 @@ func TestSetPatternAppliesToFutureWeeksOnly(t *testing.T) {
 		t.Errorf("today's shift_id changed unexpectedly")
 	}
 }
+
+// TestPatternUpdateWithDuplicateTemplateRows reproduces the production failure:
+//
+//	upsert template for day (update): duplicate key value violates unique constraint
+//	"schedule_templates_employee_id_day_of_week_valid_from_key"
+//
+// Databases that predate the single-entry-per-weekday rule can hold several still-valid
+// entries for one weekday, distinguished only by valid_from. Rewriting valid_from on all
+// of them collapses them onto the same key.
+func TestPatternUpdateWithDuplicateTemplateRows(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	// Two still-valid Tuesday entries, exactly as an older database would hold them.
+	for _, vf := range []string{"2024-01-01", "2024-06-01"} {
+		if _, err := f.db.Exec(ctx,
+			`INSERT INTO schedule_templates (employee_id, day_of_week, shift_id, is_off, valid_from)
+			 VALUES ($1, 2, $2, false, $3::date)`, f.employeeID, f.eveningID, vf); err != nil {
+			t.Fatalf("seed duplicate template (%s): %v", vf, err)
+		}
+	}
+
+	tuesday := weekStart(1).AddDate(0, 0, 2)
+	if _, err := f.svc.SetEmployeeShift(ctx, f.employeeID, tuesday, &f.morningID, "working", nil, f.employeeID, "admin", true); err != nil {
+		t.Fatalf("permanent set failed with duplicate pattern rows: %v", err)
+	}
+
+	// The change must still carry into later weeks.
+	if err := f.svc.EnsureWeekSchedule(ctx, weekStart(3), &f.deptID); err != nil {
+		t.Fatalf("ensure later week: %v", err)
+	}
+	f.assertDay(t, weekStart(3).AddDate(0, 0, 2), "working", &f.morningID, "week +3 after duplicate-row update")
+}

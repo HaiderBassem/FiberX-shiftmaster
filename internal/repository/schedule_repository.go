@@ -166,6 +166,16 @@ func (r *scheduleRepo) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 // no historical row is ever removed. A weekday carrying several still-valid entries
 // gets them all updated to the same value, which converges on the right answer
 // whichever one templateWinnerOrder later picks.
+//
+// valid_from is deliberately left untouched. It is part of the table's
+// UNIQUE(employee_id, day_of_week, valid_from), so rewriting it to CURRENT_DATE across
+// several duplicate entries collapses them onto one key and the update fails with
+//
+//	duplicate key value violates unique constraint
+//	"schedule_templates_employee_id_day_of_week_valid_from_key"
+//
+// Older databases really do carry those duplicates. Since no column of the unique key
+// is modified here, this update cannot collide regardless of how many entries exist.
 func (r *scheduleRepo) UpsertTemplateForDay(
 	ctx context.Context,
 	employeeID uuid.UUID,
@@ -177,7 +187,6 @@ func (r *scheduleRepo) UpsertTemplateForDay(
 		`UPDATE schedule_templates
 		    SET shift_id   = $1,
 		        is_off     = $2,
-		        valid_from = CURRENT_DATE,
 		        updated_at = CURRENT_TIMESTAMP
 		  WHERE employee_id = $3 AND day_of_week = $4 AND valid_to IS NULL`,
 		shiftID, isOff, employeeID, dayOfWeek)
