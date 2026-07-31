@@ -71,9 +71,18 @@ BEGIN
          WHERE shift_date <= v_week_end;
 
         -- Leave days belong to the leave overlay, whatever their date.
+        --
+        -- Compared as text on purpose. 002_types.sql was edited after the first
+        -- deployments, so shift_status_type holds different labels depending on when
+        -- the database was created: 'hourly' is present on databases built from the
+        -- current file, absent on older ones (which store hourly leave as 'leave' with
+        -- a "[hourly]" reason tag). An enum literal that the local type lacks is a hard
+        -- error at parse time -- `invalid input value for enum shift_status_type` --
+        -- which aborts the whole migration. Casting to text makes an absent label
+        -- simply match nothing, so this runs on any vintage of the schema.
         UPDATE employee_shifts
            SET source = 'leave'
-         WHERE shift_status IN ('leave', 'vacation', 'sick', 'hourly');
+         WHERE shift_status::text IN ('leave', 'vacation', 'sick', 'hourly');
 
         -- Replacements and anything already worked are human decisions.
         UPDATE employee_shifts
