@@ -39,7 +39,7 @@ func (h *FiberxDataHandler) GetDocument(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	depID := getDepartmentID(c)
 
 	docID, err := uuid.Parse(c.Param("id"))

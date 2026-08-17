@@ -175,9 +175,14 @@ func (h *ItemRequestHandler) GetPendingRequests(c *gin.Context) {
 
 func (h *ItemRequestHandler) UpdateStatus(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"}); return }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"})
+		return
+	}
 
-	var req struct { Status string `json:"status" binding:"required"` }
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
@@ -192,7 +197,10 @@ func (h *ItemRequestHandler) UpdateStatus(c *gin.Context) {
 
 func (h *ItemRequestHandler) CancelRequest(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
-	if err != nil { c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"}); return }
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid id"})
+		return
+	}
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
@@ -203,4 +211,3 @@ func (h *ItemRequestHandler) CancelRequest(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

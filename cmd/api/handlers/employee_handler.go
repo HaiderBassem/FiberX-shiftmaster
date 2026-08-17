@@ -158,7 +158,6 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 		// allow an employee to always view their own profile
 		if requesterID != id {
 
-
 			scopeDeptID := getDepartmentID(c)
 
 			if scopeDeptID == nil || emp.DepartmentID == nil || *scopeDeptID != *emp.DepartmentID {
@@ -257,7 +256,7 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 					return
 				}
 			}
-			
+
 			managedDepts, err := h.deptRepo.GetByManagerID(c.Request.Context(), creatorID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -394,17 +393,17 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			if !isManagingTargetDept && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
 				return
 			}
-			
+
 			if target.Role == "admin" || target.Role == "manager" {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers cannot edit admin or manager accounts"})
 				return
 			}
-			
+
 			if req.Role != "" && req.Role != "employee" && req.Role != "team_leader" {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only set role to employee or team_leader"})
 				return
@@ -479,16 +478,41 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		CanCoverNightShift: req.CanCoverNightShift,
 		// Preserve permissions and preferences since they are managed by separate endpoints
 		// or omitted from the update payload
-		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
-		CanPostAnnouncements: func() bool { if req.CanPostAnnouncements != nil { return *req.CanPostAnnouncements }; return current.CanPostAnnouncements }(),
-		CanManageFiberxData:  func() bool { if req.CanManageFiberxData != nil { return *req.CanManageFiberxData }; return current.CanManageFiberxData }(),
-		CanManageServices:    func() bool { if req.CanManageServices != nil { return *req.CanManageServices }; return current.CanManageServices }(),
-		CanCreateTables:    current.CanCreateTables,
-		UIPreferences:      current.UIPreferences,
-		Status:             req.Status,
-		ProfileImage:       func() *string { if req.ProfileImage != nil { return req.ProfileImage }; return current.ProfileImage }(),
-		SecondaryPhone:     req.SecondaryPhone,
-		SecondaryEmail:     req.SecondaryEmail,
+		CanManageHelpDocs: func() bool {
+			if req.CanManageHelpDocs != nil {
+				return *req.CanManageHelpDocs
+			}
+			return current.CanManageHelpDocs
+		}(),
+		CanPostAnnouncements: func() bool {
+			if req.CanPostAnnouncements != nil {
+				return *req.CanPostAnnouncements
+			}
+			return current.CanPostAnnouncements
+		}(),
+		CanManageFiberxData: func() bool {
+			if req.CanManageFiberxData != nil {
+				return *req.CanManageFiberxData
+			}
+			return current.CanManageFiberxData
+		}(),
+		CanManageServices: func() bool {
+			if req.CanManageServices != nil {
+				return *req.CanManageServices
+			}
+			return current.CanManageServices
+		}(),
+		CanCreateTables: current.CanCreateTables,
+		UIPreferences:   current.UIPreferences,
+		Status:          req.Status,
+		ProfileImage: func() *string {
+			if req.ProfileImage != nil {
+				return req.ProfileImage
+			}
+			return current.ProfileImage
+		}(),
+		SecondaryPhone: req.SecondaryPhone,
+		SecondaryEmail: req.SecondaryEmail,
 	}
 
 	if err := h.employeeService.UpdateEmployee(c.Request.Context(), emp); err != nil {
@@ -519,7 +543,7 @@ func (h *EmployeeHandler) UpdateStatus(c *gin.Context) {
 
 	roleAny, _ := c.Get("role")
 	role, _ := roleAny.(string)
-	
+
 	if role == "team_leader" || role == "manager" {
 		requesterStr, _ := c.Get("employee_id")
 		requesterID, _ := uuid.Parse(requesterStr.(string))
@@ -541,7 +565,7 @@ func (h *EmployeeHandler) UpdateStatus(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
 			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
@@ -604,7 +628,7 @@ func (h *EmployeeHandler) Delete(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
 			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
@@ -675,11 +699,9 @@ func (h *EmployeeHandler) UpdatePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "password updated successfully"}})
 }
 
-
 type updateHelpPermissionRequest struct {
 	CanManageHelpDocs bool `json:"can_manage_help_docs"`
 }
-
 
 type updateFiberxPermissionRequest struct {
 	CanManageFiberxData bool `json:"can_manage_fiberx_data"`
@@ -811,7 +833,6 @@ func (h *EmployeeHandler) UpdateAnnouncementPermission(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-
 
 type updateTablePermissionRequest struct {
 	CanCreateTables bool `json:"can_create_tables"`

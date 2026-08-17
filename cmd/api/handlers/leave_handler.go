@@ -21,12 +21,12 @@ func NewLeaveHandler(leaveSvc *service.LeaveService) *LeaveHandler {
 
 type createLeaveRequest struct {
 	LeaveTypeID uuid.UUID `json:"leave_type_id" binding:"required"`
-	StartDate   string  `json:"start_date" binding:"required"`
-	EndDate     string  `json:"end_date" binding:"required"`
-	Reason      *string `json:"reason"`
-	Attachments *string `json:"attachments"`
-	StartTime   *string `json:"start_time"` // For hourly leaves (HH:MM)
-	EndTime     *string `json:"end_time"`   // For hourly leaves (HH:MM)
+	StartDate   string    `json:"start_date" binding:"required"`
+	EndDate     string    `json:"end_date" binding:"required"`
+	Reason      *string   `json:"reason"`
+	Attachments *string   `json:"attachments"`
+	StartTime   *string   `json:"start_time"` // For hourly leaves (HH:MM)
+	EndTime     *string   `json:"end_time"`   // For hourly leaves (HH:MM)
 }
 
 // Request creates a new leave request.
@@ -319,7 +319,7 @@ func (h *LeaveHandler) GetEmployeeBalances(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
 		return
 	}
-	
+
 	// Optional year param, default 2026
 	year := 2026
 	if c.Query("year") != "" {
@@ -349,7 +349,7 @@ func (h *LeaveHandler) UpdateEmployeeBalance(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid leave_type_id"})
 		return
 	}
-	
+
 	var req struct {
 		Year            int     `json:"year"`
 		Month           int     `json:"month"`

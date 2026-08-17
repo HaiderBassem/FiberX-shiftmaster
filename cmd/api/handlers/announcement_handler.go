@@ -27,7 +27,6 @@ func NewAnnouncementHandler(ar repository.AnnouncementRepository, svc service.An
 	}
 }
 
-
 func (h *AnnouncementHandler) GetActive(c *gin.Context) {
 	depID := getDepartmentID(c)
 	if depID == nil {
@@ -245,4 +244,3 @@ func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

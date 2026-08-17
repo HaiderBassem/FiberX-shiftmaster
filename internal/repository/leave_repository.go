@@ -153,7 +153,7 @@ func (r *leaveRepo) GetOverlappingLeavesCount(ctx context.Context, departmentID 
 		   AND l.status NOT IN ('rejected', 'cancelled')
 		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
 		   AND l.start_date <= $3 
-		   AND l.end_date >= $2`, 
+		   AND l.end_date >= $2`,
 		departmentID, startDate, endDate).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count: %w", err)
@@ -176,7 +176,7 @@ func (r *leaveRepo) GetOverlappingLeavesCountByShift(ctx context.Context, depart
 		   AND l.start_date <= $3 
 		   AND l.end_date >= $3
 		   AND ($4::boolean = false OR lt.unit = 'hours')
-		   AND ($4::boolean = true OR lt.unit = 'days')`, 
+		   AND ($4::boolean = true OR lt.unit = 'days')`,
 		departmentID, shiftID, date, isHourly).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count by shift: %w", err)

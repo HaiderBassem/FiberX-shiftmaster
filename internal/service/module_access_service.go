@@ -101,7 +101,7 @@ func (s *ModuleAccessService) GetMyModules(ctx context.Context, employeeID uuid.
 	if emp.Role == "admin" {
 		return s.repo.GetAllLinks(ctx)
 	}
-	
+
 	if emp.DepartmentID == nil {
 		return []models.ExternalLink{}, nil
 	}

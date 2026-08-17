@@ -141,7 +141,7 @@ func (s *EmployeeService) ChangePassword(ctx context.Context, id uuid.UUID, oldP
 		if emp.PasswordHash == nil || *emp.PasswordHash == "" {
 			return fmt.Errorf("no existing password, contact admin")
 		}
-		
+
 		err = bcrypt.CompareHashAndPassword([]byte(*emp.PasswordHash), []byte(oldPassword))
 		if err != nil {
 			return fmt.Errorf("incorrect old password")
@@ -166,7 +166,6 @@ func (s *EmployeeService) UpdateProfileImage(ctx context.Context, id uuid.UUID, 
 	return s.employeeRepo.UpdateProfileImage(ctx, id, imagePath)
 }
 
-
 func (s *EmployeeService) UpdateFiberxPermission(ctx context.Context, id uuid.UUID, canManageFiberxData bool) error {
 	return s.employeeRepo.UpdateFiberxPermission(ctx, id, canManageFiberxData)
 }
@@ -179,7 +178,6 @@ func (s *EmployeeService) UpdateAnnouncementPermission(ctx context.Context, id u
 	return s.employeeRepo.UpdateAnnouncementPermission(ctx, id, canPost)
 }
 
-
 func (s *EmployeeService) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
 	return s.employeeRepo.UpdateTablePermission(ctx, id, canCreate)
 }
@@ -191,4 +189,3 @@ func (s *EmployeeService) UpdateServicePermission(ctx context.Context, id uuid.U
 func (s *EmployeeService) UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error {
 	return s.employeeRepo.UpdatePreferences(ctx, id, prefs)
 }
-

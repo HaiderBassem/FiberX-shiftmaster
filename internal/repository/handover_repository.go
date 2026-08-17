@@ -37,7 +37,7 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 		Scan(&handover.ID, &handover.CreatedAt, &handover.UpdatedAt)
 }
 
-	func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
+func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
 	query := `
 		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.done_by, h.created_at, h.updated_at,
 		       c.first_name || ' ' || c.last_name as creator_name,
@@ -80,12 +80,12 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 		); err != nil {
 			return nil, err
 		}
-		
+
 		if err := json.Unmarshal(commentsJSON, &h.Comments); err != nil {
 			// ignore unmarshal errors for empty/invalid json
 			h.Comments = []models.HandoverComment{}
 		}
-		
+
 		handovers = append(handovers, h)
 	}
 	return handovers, rows.Err()

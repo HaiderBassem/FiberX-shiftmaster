@@ -53,13 +53,13 @@ func (s *TaskService) UpdateBoard(ctx context.Context, b *models.TaskBoard) erro
 	if !validTypes[b.RecurrenceType] {
 		return fmt.Errorf("invalid recurrence type: %s", b.RecurrenceType)
 	}
-	
+
 	// Fetch existing board to preserve fields not updated by the client
 	existing, err := s.boardRepo.GetByID(ctx, b.ID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch existing board: %w", err)
 	}
-	
+
 	b.DepartmentID = existing.DepartmentID
 	b.CreatedBy = existing.CreatedBy
 	b.CreatedAt = existing.CreatedAt
@@ -286,10 +286,10 @@ func (s *TaskService) checkTaskFutureDate(ctx context.Context, executionID uuid.
 	if err != nil {
 		return err
 	}
-	
+
 	assignedStr := assignedDate.Format("2006-01-02")
 	todayStr := time.Now().Format("2006-01-02")
-	
+
 	if assignedStr > todayStr {
 		return fmt.Errorf("cannot execute a task scheduled in the future")
 	}

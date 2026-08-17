@@ -10,7 +10,7 @@ import (
 func IPBlockerMiddleware(securityService *service.SecurityService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clientIP := c.ClientIP()
-		
+
 		if securityService.IsIPBlocked(c.Request.Context(), clientIP) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,

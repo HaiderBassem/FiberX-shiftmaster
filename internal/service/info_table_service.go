@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
-	"strings"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
+	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
@@ -34,7 +34,7 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 			creatorCanCreate = emp.CanCreateTables
 		}
 	}
-	
+
 	// Only admins, managers, team_leaders, or employees with explicit can_create_tables permission can create.
 	if creatorRole != "admin" && creatorRole != "manager" && !creatorCanCreate {
 		return nil, errors.New("unauthorized to create tables")
@@ -44,7 +44,7 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 }
 
 func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid.UUID, role string, departmentID *uuid.UUID) ([]models.InfoTable, error) {
-		tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
+	tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,12 +58,12 @@ func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid
 			filteredTables = append(filteredTables, tables[i])
 		}
 	}
-	
+
 	return filteredTables, nil
 }
 
 func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) (*models.InfoTable, error) {
-		table, err := s.repo.GetTableByID(ctx, tableID)
+	table, err := s.repo.GetTableByID(ctx, tableID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 	if table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID {
 		return true
 	}
-	
+
 	// Check explicit employee access first
 	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
 	if err == nil {
@@ -331,7 +331,7 @@ func (s *InfoTableService) AddEmployeeAccess(ctx context.Context, reqEmployeeID 
 			return errors.New("cannot manage access for employees outside your department")
 		}
 	}
-	
+
 	access := &models.InfoTableEmployeeAccess{
 		TableID:     tableID,
 		EmployeeID:  targetEmployeeID,
@@ -354,7 +354,7 @@ func (s *InfoTableService) RemoveEmployeeAccess(ctx context.Context, reqEmployee
 	if !s.HasManageAccessRight(ctx, tableID, reqEmployeeID, reqRole, reqDepID) {
 		return errors.New("unauthorized to manage access for this table")
 	}
-	
+
 	if reqRole != "admin" {
 		emp, err := s.employeeRepo.GetByID(ctx, targetEmployeeID)
 		if err != nil {

@@ -31,7 +31,7 @@ func (h *ModuleAccessHandler) CreateLink(c *gin.Context) {
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
-	
+
 	role, _ := c.Get("role")
 	deptID := getDepartmentID(c)
 
@@ -107,7 +107,7 @@ func (h *ModuleAccessHandler) GetAllLinks(c *gin.Context) {
 		// Get links they can access
 		empIDStr, _ := c.Get("employee_id")
 		empID, _ := uuid.Parse(empIDStr.(string))
-		
+
 		myLinks, err := h.svc.GetMyModules(c.Request.Context(), empID)
 		if err == nil {
 			// We can filter `links` based on `myLinks` to show what they can manage.
@@ -141,8 +141,8 @@ func (h *ModuleAccessHandler) GetAccess(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid link id"})
 		return
 	}
-	
-	depID := getDepartmentID(c) 
+
+	depID := getDepartmentID(c)
 
 	resp, err := h.svc.GetLinkAccess(c.Request.Context(), linkID, depID)
 	if err != nil {
@@ -198,7 +198,7 @@ func (h *ModuleAccessHandler) SetEmployeeExclusion(c *gin.Context) {
 
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
-	
+
 	if err := h.svc.SetEmployeeExclusion(c.Request.Context(), linkID, req.EmployeeID, req.Exclude, &empID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

@@ -142,7 +142,7 @@ func (s *EmailService) sendEmailGraphWithCC(to, cc []string, subject, body strin
 	}
 
 	message := map[string]interface{}{
-		"message": messageBody,
+		"message":         messageBody,
 		"saveToSentItems": "false",
 	}
 

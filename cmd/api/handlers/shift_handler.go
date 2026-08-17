@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"net/http"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"net/http"
 
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"

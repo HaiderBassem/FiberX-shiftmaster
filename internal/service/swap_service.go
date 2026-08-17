@@ -426,7 +426,7 @@ func (s *SwapService) CancelApprovedSwap(ctx context.Context, swapID uuid.UUID, 
 
 	// Notify both employees
 	msg := fmt.Sprintf("Your approved shift swap for %s has been cancelled by management. Please check your schedule.", swap.ShiftDate.Format("2006-01-02"))
-	
+
 	_ = s.notifService.SendNotification(ctx, &models.Notification{
 		RecipientID:       swap.RequesterID,
 		SenderID:          &cancelledBy,

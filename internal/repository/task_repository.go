@@ -142,7 +142,7 @@ func (r *taskRepo) GetSchedulesByBoard(ctx context.Context, boardID uuid.UUID) (
 }
 
 func (r *taskRepo) GetActiveSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
-	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ts.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	query := `SELECT ` + scheduleColumns + ` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ts.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get active schedules: %w", err)
@@ -152,7 +152,7 @@ func (r *taskRepo) GetActiveSchedules(ctx context.Context, departmentID *uuid.UU
 }
 
 func (r *taskRepo) GetAllSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
-	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	query := `SELECT ` + scheduleColumns + ` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get all schedules: %w", err)
@@ -282,7 +282,7 @@ func (r *taskRepo) GetBoardStats(ctx context.Context, departmentID *uuid.UUID) (
 		WHERE tb.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1)
 		GROUP BY tb.id, tb.name
 		ORDER BY tb.name`
-		
+
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get board stats: %w", err)
@@ -672,7 +672,6 @@ func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *
 	}
 
 	query += " ORDER BY te.completed_at DESC NULLS LAST, e.first_name"
-
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

@@ -77,9 +77,9 @@ func (h *DepartmentHandler) MyManaged(c *gin.Context) {
 }
 
 type createDepartmentRequest struct {
-	DepartmentCode  string      `json:"department_code" binding:"required"`
-	Name            string      `json:"name"            binding:"required"`
-	Description     *string     `json:"description"`
+	DepartmentCode        string      `json:"department_code" binding:"required"`
+	Name                  string      `json:"name"            binding:"required"`
+	Description           *string     `json:"description"`
 	MaxLeavesPerDay       *int        `json:"max_leaves_per_day"`
 	MaxHourlyLeavesPerDay *int        `json:"max_hourly_leaves_per_day"`
 	ManagerIDs            []uuid.UUID `json:"manager_ids"` // zero or more manager UUIDs
@@ -136,8 +136,8 @@ func (h *DepartmentHandler) Create(c *gin.Context) {
 }
 
 type updateDepartmentRequest struct {
-	Name            string      `json:"name"`
-	Description     *string     `json:"description"`
+	Name                  string      `json:"name"`
+	Description           *string     `json:"description"`
 	MaxLeavesPerDay       *int        `json:"max_leaves_per_day"`
 	MaxHourlyLeavesPerDay *int        `json:"max_hourly_leaves_per_day"`
 	ManagerIDs            []uuid.UUID `json:"manager_ids"` // if provided, replaces all current managers

@@ -72,7 +72,7 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 
 	poolCfg.ConnConfig.ConnectTimeout = cfg.ConnectTimeout
 	poolCfg.ConnConfig.RuntimeParams = map[string]string{
-		"application_name":                    "shiftmaster-api",
+		"application_name": "shiftmaster-api",
 		// Always use UTC at the DB session level. Timestamps are stored as UTC
 		// and the frontend converts to Asia/Baghdad (UTC+3) for display.
 		"timezone":                            "UTC",

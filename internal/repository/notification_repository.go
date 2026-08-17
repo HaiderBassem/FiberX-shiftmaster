@@ -19,7 +19,7 @@ type NotificationRepository interface {
 	MarkAsRead(ctx context.Context, id uuid.UUID) error
 	MarkAllAsRead(ctx context.Context, recipientID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	
+
 	// Web Push Subscriptions
 	SavePushSubscription(ctx context.Context, sub *models.PushSubscription) error
 	GetPushSubscriptionsByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]models.PushSubscription, error)
@@ -67,7 +67,11 @@ func (r *notificationRepo) GetUnreadCount(ctx context.Context, recipientID uuid.
 	return count, err
 }
 
-func (r *notificationRepo) scanNotifications(rows interface{ Next() bool; Scan(...interface{}) error; Err() error }) ([]models.Notification, error) {
+func (r *notificationRepo) scanNotifications(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+	Err() error
+}) ([]models.Notification, error) {
 	var notifs []models.Notification
 	for rows.Next() {
 		var n models.Notification
