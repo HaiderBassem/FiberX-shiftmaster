@@ -16,7 +16,9 @@ env:
   # declared 1.26, so the toolchain refused to build and every run was
   # meaningless.
   GO_VERSION: '1.26.1'
-  NODE_VERSION: '20'
+  # Node 20 is end-of-life. 24 is the current LTS and matches the runtime the
+  # actions themselves now run on, so there is one Node version in play.
+  NODE_VERSION: '24'
 
 jobs:
   backend:
@@ -52,10 +54,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
@@ -90,11 +92,18 @@ jobs:
       - name: Vet
         run: go vet ./cmd/... ./internal/... ./pkg/...
 
+      # v6 of this action targets golangci-lint v1 and does not understand the
+      # v2 configuration format that .golangci.yml uses, so the lint step could
+      # not have worked regardless of the Node runtime warning. v9 supports v2
+      # and runs on node24.
+      #
+      # The linter version is pinned rather than `latest` so CI reproduces the
+      # run this configuration was verified against; `latest` would let an
+      # unrelated change start failing when a new release adds checks.
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
-          args: --timeout=5m
+          version: v2.12.2
 
       - name: Apply migrations to the test database
         run: go run ./cmd/migrate -dir internal/database/migrations up
@@ -125,10 +134,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -177,10 +186,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
