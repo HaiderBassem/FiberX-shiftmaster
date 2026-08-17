@@ -240,7 +240,10 @@ func (c *Client) WritePump() {
 			if err != nil {
 				return
 			}
-			w.Write(message)
+			if _, err := w.Write(message); err != nil {
+				// The peer has gone; closing the writer would only mask it.
+				return
+			}
 
 			if err := w.Close(); err != nil {
 				return
@@ -280,7 +283,7 @@ func ServeWS(w http.ResponseWriter, r *http.Request, employeeID uuid.UUID) {
 	// Read pump to handle incoming messages (e.g. pongs) and detect disconnects
 	defer func() {
 		DefaultWSHub.RemoveClient(employeeID, client)
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	conn.SetReadLimit(512)

@@ -3,15 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
-	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
+	"shiftmaster-backend/internal/testutil"
 	"shiftmaster-backend/pkg/database"
 )
 
@@ -24,45 +23,17 @@ import (
 //
 //	SHIFTMASTER_TEST_DB=shiftmaster_verify go test ./internal/service/ -run Pattern -v
 //
-// Skipped when SHIFTMASTER_TEST_DB is unset.
+// SHIFTMASTER_TEST_DB accepts a bare database name or a full postgres:// URL;
+// see internal/testutil. Skipped when it is unset.
 
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
 
-	name := os.Getenv("SHIFTMASTER_TEST_DB")
-	if name == "" {
-		t.Skip("SHIFTMASTER_TEST_DB not set; skipping database-backed test")
-	}
+	cfg := testutil.TestDatabaseConfig(t)
 
-	host := os.Getenv("SHIFTMASTER_TEST_DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	user := os.Getenv("SHIFTMASTER_TEST_DB_USER")
-	if user == "" {
-		user = os.Getenv("USER")
-	}
-
-	db, err := database.New(config.DatabaseConfig{
-		Host:              host,
-		Port:              "5432",
-		User:              user,
-		Password:          os.Getenv("SHIFTMASTER_TEST_DB_PASSWORD"),
-		DBName:            name,
-		SSLMode:           "disable",
-		MaxOpenConns:      4,
-		MinConns:          1,
-		MaxConnLifetime:   time.Minute,
-		MaxConnIdleTime:   time.Minute,
-		ConnectTimeout:    5 * time.Second,
-		QueryTimeout:      15 * time.Second,
-		LongQueryTimeout:  30 * time.Second,
-		HealthCheckPeriod: time.Minute,
-		MaxRetries:        1,
-		RetryInterval:     time.Second,
-	})
+	db, err := database.New(cfg)
 	if err != nil {
-		t.Fatalf("connect to test db %q: %v", name, err)
+		t.Fatalf("connect to test db %q on %s:%s: %v", cfg.DBName, cfg.Host, cfg.Port, err)
 	}
 	t.Cleanup(db.Close)
 	return db

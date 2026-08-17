@@ -153,7 +153,7 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		}
 
 		balance, err := s.leaveBalanceRepo.GetByEmployeeLeaveTypeAndYear(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month)
-		var allocated float64 = float64(leaveType.DaysPerYear)
+		allocated := float64(leaveType.DaysPerYear)
 		var used float64 = 0
 		if err == nil && balance != nil {
 			allocated = balance.AllocatedAmount

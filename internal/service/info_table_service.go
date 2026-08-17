@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
+
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
 	"sort"
@@ -394,8 +396,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 
 	// Write Headers
 	for i, col := range table.Columns {
-		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		f.SetCellValue(sheetName, cell, col.Name)
+		cell, err := excelize.CoordinatesToCellName(i+1, 1)
+		if err != nil {
+			return nil, fmt.Errorf("build header cell reference: %w", err)
+		}
+		if err := f.SetCellValue(sheetName, cell, col.Name); err != nil {
+			return nil, fmt.Errorf("write header %q: %w", col.Name, err)
+		}
 	}
 
 	// Create bold style for headers
@@ -403,8 +410,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 		Font: &excelize.Font{Bold: true},
 	})
 	if err == nil {
-		lastCell, _ := excelize.CoordinatesToCellName(len(table.Columns), 1)
-		f.SetCellStyle(sheetName, "A1", lastCell, style)
+		lastCell, cellErr := excelize.CoordinatesToCellName(len(table.Columns), 1)
+		if cellErr == nil {
+			// Styling is cosmetic: a failure here must not fail the export.
+			if styleErr := f.SetCellStyle(sheetName, "A1", lastCell, style); styleErr != nil {
+				log.Printf("info tables: could not apply header style: %v", styleErr)
+			}
+		}
 	}
 
 	// Write Rows
@@ -412,8 +424,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 		for cIdx, col := range table.Columns {
 			val, ok := row.Data[col.ID]
 			if ok {
-				cell, _ := excelize.CoordinatesToCellName(cIdx+1, rIdx+2)
-				f.SetCellValue(sheetName, cell, val)
+				cell, err := excelize.CoordinatesToCellName(cIdx+1, rIdx+2)
+				if err != nil {
+					return nil, fmt.Errorf("build cell reference: %w", err)
+				}
+				if err := f.SetCellValue(sheetName, cell, val); err != nil {
+					return nil, fmt.Errorf("write cell %s: %w", cell, err)
+				}
 			}
 		}
 	}

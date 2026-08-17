@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"shiftmaster-backend/internal/testutil"
 )
 
 // testPool connects to the database named by SHIFTMASTER_TEST_DB.
@@ -14,10 +16,7 @@ import (
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
-	dsn := os.Getenv("SHIFTMASTER_TEST_DB")
-	if dsn == "" {
-		t.Skip("SHIFTMASTER_TEST_DB is not set; skipping migration ledger tests")
-	}
+	dsn := testutil.TestDatabaseDSN(t)
 
 	pool, err := pgxpool.New(context.Background(), dsn)
 	if err != nil {

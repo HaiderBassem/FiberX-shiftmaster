@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -63,7 +63,7 @@ func (s *EmailService) getAccessToken() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		return "", fmt.Errorf("failed to get token: %s", string(bodyBytes))
 	}
 
@@ -166,7 +166,7 @@ func (s *EmailService) sendEmailGraphWithCC(to, cc []string, subject, body strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusAccepted {
-		bodyBytes, _ := ioutil.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to send email. status code: %d, response: %s", resp.StatusCode, string(bodyBytes))
 	}
 

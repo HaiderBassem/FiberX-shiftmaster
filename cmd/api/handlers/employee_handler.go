@@ -1003,13 +1003,14 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 	leaves, err := h.leaveRepo.GetByEmployee(ctx, empID)
 	if err == nil {
 		for _, l := range leaves {
-			if l.Status == "approved" || l.Status == "approved_by_manager" {
+			switch l.Status {
+			case "approved", "approved_by_manager":
 				if l.StartTime != nil && l.EndTime != nil {
 					totalHourlyLeavesTaken++
 				} else {
 					totalLeavesTaken++
 				}
-			} else if l.Status == "pending" || l.Status == "approved_by_team_leader" {
+			case "pending", "approved_by_team_leader":
 				// Calculate pending amount and add to the corresponding balance
 				for i, b := range balances {
 					if b.LeaveTypeID == l.LeaveTypeID {

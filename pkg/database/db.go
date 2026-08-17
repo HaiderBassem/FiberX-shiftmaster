@@ -81,25 +81,24 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		"idle_in_transaction_session_timeout": "60000",
 	}
 
-	// BeforeAcquire: re-apply UTC timezone (RESET ALL in AfterRelease would
-	// wipe RuntimeParams, so we must re-set it here) and inject tenant context.
-	poolCfg.BeforeAcquire = func(ctx context.Context, conn *pgx.Conn) bool {
-		if _, err := conn.Exec(ctx, "SET timezone TO 'UTC'"); err != nil {
-			return false
-		}
+	// PrepareConn applies the caller's tenant context, if there is one.
+	//
+	// This used to also re-run "SET timezone TO 'UTC'" on every acquire, and was
+	// paired with an AfterRelease that ran a set_config round trip on every
+	// release to clear the tenant variables. Neither was doing anything useful:
+	// timezone is already fixed by RuntimeParams above and nothing resets it, and
+	// the tenant variables were only ever cleared because nothing had set them —
+	// WithTenant has no callers anywhere in the codebase and no migration defines
+	// a row-level-security policy that would read them. The pair cost two
+	// database round trips per acquire/release cycle for no effect.
+	//
+	// setTenantContext now writes all three variables in one statement whenever
+	// any of them is present, so each acquire fully defines them and a value
+	// cannot survive on a pooled connection into the next caller's hands. That
+	// removes the need for AfterRelease entirely while keeping the plumbing
+	// correct for whenever row-level security is actually introduced.
+	poolCfg.PrepareConn = func(ctx context.Context, conn *pgx.Conn) (bool, error) {
 		return setTenantContext(ctx, conn)
-	}
-
-	// AfterRelease: clear tenant-specific session variables so the next
-	// caller never inherits the previous user's context. We only reset the
-	// app settings rather than RESET ALL so that connection-level parameters
-	// (like statement_timeout) that are expensive to re-apply survive.
-	poolCfg.AfterRelease = func(conn *pgx.Conn) bool {
-		_, err := conn.Exec(context.Background(),
-			"SELECT set_config('app.current_company_id','',false),"+
-				"set_config('app.current_user_id','',false),"+
-				"set_config('app.client_ip','',false)")
-		return err == nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
@@ -127,23 +126,31 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	return db, nil
 }
 
-func setTenantContext(ctx context.Context, conn *pgx.Conn) bool {
-	if v, ok := ctx.Value(ContextKeyCompanyID).(string); ok && v != "" {
-		if _, err := conn.Exec(ctx, "SELECT set_config('app.current_company_id', $1, false)", v); err != nil {
-			return false
-		}
+// setTenantContext applies the tenant identifiers carried on ctx to the session.
+//
+// When none are present it makes no database call at all, which is the common
+// case today. When any is present all three are written in a single statement,
+// so the session's tenant variables are fully defined by the acquiring caller
+// and a previous caller's value can never be inherited from the pool.
+func setTenantContext(ctx context.Context, conn *pgx.Conn) (bool, error) {
+	companyID, _ := ctx.Value(ContextKeyCompanyID).(string)
+	userID, _ := ctx.Value(ContextKeyUserID).(string)
+	clientIP, _ := ctx.Value(ContextKeyClientIP).(string)
+
+	if companyID == "" && userID == "" && clientIP == "" {
+		return true, nil
 	}
-	if v, ok := ctx.Value(ContextKeyUserID).(string); ok && v != "" {
-		if _, err := conn.Exec(ctx, "SELECT set_config('app.current_user_id', $1, false)", v); err != nil {
-			return false
-		}
+
+	if _, err := conn.Exec(ctx,
+		`SELECT set_config('app.current_company_id', $1, false),
+		        set_config('app.current_user_id', $2, false),
+		        set_config('app.client_ip', $3, false)`,
+		companyID, userID, clientIP); err != nil {
+		// Returning the error discards this connection rather than handing back
+		// one whose tenant context could not be established.
+		return false, fmt.Errorf("set tenant context: %w", err)
 	}
-	if v, ok := ctx.Value(ContextKeyClientIP).(string); ok && v != "" {
-		if _, err := conn.Exec(ctx, "SELECT set_config('app.client_ip', $1, false)", v); err != nil {
-			return false
-		}
-	}
-	return true
+	return true, nil
 }
 
 // Context helpers

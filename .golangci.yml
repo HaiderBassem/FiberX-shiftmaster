@@ -1,0 +1,48 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: standard
+
+  exclusions:
+    generated: lax
+
+    paths:
+      # A dependency ships a Go file inside node_modules. It is not our code and
+      # is absent from a fresh checkout, but a local install would otherwise put
+      # it in scope.
+      - frontend/node_modules
+      - frontend/dist
+
+    rules:
+      # Deferred Close on a read-only handle: the error cannot be acted on and
+      # the data has already been consumed.
+      - linters: [errcheck]
+        source: '^\s*defer .*\.Close\(\)$'
+
+      # WebSocket deadline and control-frame writes. A failure here means the
+      # peer has gone away, which the surrounding read/write loop detects and
+      # handles by tearing the connection down; checking it separately would
+      # duplicate that logic without changing the outcome.
+      - path: internal/notification/ws_hub\.go
+        linters: [errcheck]
+        text: 'SetWriteDeadline|SetReadDeadline|WriteMessage|Conn\.Close'
+
+      # Best-effort cleanup on an error path that is already returning a more
+      # useful error to the caller.
+      - path: internal/upload/store\.go
+        linters: [errcheck]
+        text: 'os\.Remove|tmp\.Close'
+
+      # Test setup helpers: a failure would surface immediately as a failing
+      # assertion.
+      - path: _test\.go
+        linters: [errcheck]
+        text: 'os\.Setenv|os\.Unsetenv'
+
+      # Response bodies are drained and closed for connection reuse; a close
+      # failure has no bearing on the already-parsed response.
+      - linters: [errcheck]
+        text: 'resp\.Body\.Close|res\.Body\.Close'

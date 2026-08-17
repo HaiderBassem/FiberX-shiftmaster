@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,20 @@ type ProvinceHandler struct {
 
 func NewProvinceHandler(svc service.ProvinceService) *ProvinceHandler {
 	return &ProvinceHandler{svc: svc}
+}
+
+// respondProvinceError maps service errors onto status codes. A province owned by
+// another department reports 404 rather than 403, so the response does not
+// confirm that the id exists.
+func respondProvinceError(c *gin.Context, err error, fallback string) {
+	switch {
+	case errors.Is(err, service.ErrProvinceNotFound), errors.Is(err, service.ErrProvinceNotOwned):
+		c.JSON(http.StatusNotFound, gin.H{"error": service.ErrProvinceNotFound.Error()})
+	case errors.Is(err, service.ErrProvinceExists), errors.Is(err, service.ErrProvinceNameRequired):
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fallback})
+	}
 }
 
 func (h *ProvinceHandler) GetAll(c *gin.Context) {
@@ -136,12 +151,11 @@ func (h *ProvinceHandler) Share(c *gin.Context) {
 		return
 	}
 
-	// Verify the user owns this province before sharing
-	deptIDStr := c.GetString("department_id")
-	deptID, _ := uuid.Parse(deptIDStr)
-
-	_, err = h.svc.GetAll(c.Request.Context(), deptID)
-	// We'll trust the caller for now, but ideally we'd check if the province belongs to deptID
+	actingDeptID, err := uuid.Parse(c.GetString("department_id"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
 	var req struct {
 		DepartmentID uuid.UUID `json:"department_id" binding:"required"`
@@ -160,8 +174,8 @@ func (h *ProvinceHandler) Share(c *gin.Context) {
 		GrantedBy:    empID,
 	}
 
-	if err := h.svc.ShareProvince(c.Request.Context(), share); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to share province"})
+	if err := h.svc.ShareProvince(c.Request.Context(), actingDeptID, share); err != nil {
+		respondProvinceError(c, err, "Failed to share province")
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"data": share})
@@ -179,8 +193,14 @@ func (h *ProvinceHandler) Unshare(c *gin.Context) {
 		return
 	}
 
-	if err := h.svc.UnshareProvince(c.Request.Context(), provinceID, deptID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unshare province"})
+	actingDeptID, err := uuid.Parse(c.GetString("department_id"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	if err := h.svc.UnshareProvince(c.Request.Context(), actingDeptID, provinceID, deptID); err != nil {
+		respondProvinceError(c, err, "Failed to unshare province")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Unshared successfully"})
@@ -193,9 +213,15 @@ func (h *ProvinceHandler) GetShares(c *gin.Context) {
 		return
 	}
 
-	shares, err := h.svc.GetProvinceShares(c.Request.Context(), provinceID)
+	actingDeptID, err := uuid.Parse(c.GetString("department_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch shares"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	shares, err := h.svc.GetProvinceShares(c.Request.Context(), actingDeptID, provinceID)
+	if err != nil {
+		respondProvinceError(c, err, "Failed to fetch shares")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": shares})

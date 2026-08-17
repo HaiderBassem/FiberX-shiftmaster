@@ -98,6 +98,5 @@ func DepartmentContext(deptRepo repository.DepartmentRepository) gin.HandlerFunc
 		}
 
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"success": false, "error": "you can only access your own department"})
-		return
 	}
 }

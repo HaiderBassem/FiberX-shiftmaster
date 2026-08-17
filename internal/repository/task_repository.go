@@ -240,6 +240,9 @@ func (r *taskRepo) GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID 
 		args = append(args, *toDate)
 		argIdx++
 	}
+	// argIdx is deliberately left in step with args even though nothing reads it
+	// again here, so a clause appended below cannot reuse a placeholder number.
+	_ = argIdx
 
 	query += ` ORDER BY e.first_name, e.last_name, ta.assigned_date`
 
@@ -351,6 +354,7 @@ func (r *taskRepo) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.
 		args = append(args, *date)
 		argIdx++
 	}
+	_ = argIdx
 
 	query += ` ORDER BY first_name, last_name`
 
