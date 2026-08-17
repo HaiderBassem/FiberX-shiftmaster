@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -20,13 +21,17 @@ type AuthHandler struct {
 	authService     *service.AuthService
 	employeeService *service.EmployeeService
 	jwtCfg          config.JWTConfig
+	// secureCookies marks issued cookies Secure. Disabled outside production so
+	// they still work over plain http in local development.
+	secureCookies bool
 }
 
-func NewAuthHandler(authSvc *service.AuthService, empSvc *service.EmployeeService, jwtCfg config.JWTConfig) *AuthHandler {
+func NewAuthHandler(authSvc *service.AuthService, empSvc *service.EmployeeService, jwtCfg config.JWTConfig, secureCookies bool) *AuthHandler {
 	return &AuthHandler{
 		authService:     authSvc,
 		employeeService: empSvc,
 		jwtCfg:          jwtCfg,
+		secureCookies:   secureCookies,
 	}
 }
 
@@ -62,6 +67,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	h.setUploadCookie(c, emp)
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": loginResponse{
@@ -71,6 +78,41 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			Employee:     emp,
 		},
 	})
+}
+
+// setUploadCookie grants the browser access to stored files.
+//
+// Images are referenced by <img> tags, including tags inside rich-text content
+// held in the database, and a browser sends no Authorization header with those
+// requests. The cookie is scoped to the upload routes, HttpOnly and SameSite
+// strict, so it is neither readable by script nor usable by another origin.
+func (h *AuthHandler) setUploadCookie(c *gin.Context, emp *models.Employee) {
+	var deptID *string
+	if emp.DepartmentID != nil {
+		idStr := emp.DepartmentID.String()
+		deptID = &idStr
+	}
+
+	claims := &middleware.Claims{
+		EmployeeID:   emp.ID.String(),
+		Email:        emp.Email,
+		Role:         emp.Role,
+		DepartmentID: deptID,
+	}
+
+	if err := middleware.IssueUploadCookie(c, claims, h.jwtCfg.Secret, h.jwtCfg.Issuer, h.secureCookies); err != nil {
+		// Not fatal: the session is still usable, images simply will not load
+		// until the next successful refresh re-issues the cookie.
+		log.Printf("auth: failed to issue upload cookie for %s: %v", emp.ID, err)
+	}
+}
+
+// Logout clears the upload cookie. The access and refresh tokens are held by the
+// client, which discards them; this exists so the one credential the browser
+// stores on our behalf does not outlive the session.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	middleware.ClearUploadCookie(c, h.secureCookies)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "signed out"}})
 }
 
 // issueTokens mints a matched access/refresh pair from the employee's *current*
@@ -234,6 +276,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate token"})
 		return
 	}
+
+	// Renew alongside the tokens so a long session never loses image access.
+	h.setUploadCookie(c, emp)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

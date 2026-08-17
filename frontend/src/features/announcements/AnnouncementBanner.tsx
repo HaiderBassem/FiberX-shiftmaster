@@ -2,14 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, Bell, Info, X } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
+import { assetUrl } from '@/lib/assets';
 
-const getImageUrl = (url: string) => {
-  if (url.startsWith('http')) return url;
-  const base = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace('/api', '')
-    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
-  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
-};
+const getImageUrl = (url: string) => assetUrl(url);
 
 export const AnnouncementBanner: React.FC = () => {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);

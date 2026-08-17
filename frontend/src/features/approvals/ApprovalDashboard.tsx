@@ -11,6 +11,7 @@ import { ShieldCheck, CalendarOff, ArrowLeftRight, Users, AlertTriangle, CheckCi
 import { format } from 'date-fns';
 import { fmtDate, fmtDateTime, parseDate } from '@/lib/dateUtils';
 import { useTranslation } from 'react-i18next';
+import { assetUrl } from '@/lib/assets';
 
 // ─── Coverage Preview Widget ───────────────────────────────────────────────────
 const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) => {
@@ -174,7 +175,7 @@ const LeaveHistory = () => {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                     {item.employee_profile_image && (
-                      <img src={item.employee_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                      <img src={assetUrl(item.employee_profile_image)} alt="" className="w-5 h-5 rounded-full object-cover" />
                     )}
                     {item.employee_name}
                     <span className="text-xs text-muted-foreground font-mono">({item.employee_code})</span>
@@ -327,13 +328,13 @@ const SwapHistory = () => {
                   <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
                     <span className="flex items-center gap-1">
                       {t('approvals.requester')}
-                      {swap.requester_profile_image && <img src={swap.requester_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                      {swap.requester_profile_image && <img src={assetUrl(swap.requester_profile_image)} alt="" className="w-4 h-4 rounded-full object-cover" />}
                       {swap.requester_name}
                     </span>
                     ↔
                     <span className="flex items-center gap-1">
                       {t('approvals.target')}
-                      {swap.target_profile_image && <img src={swap.target_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                      {swap.target_profile_image && <img src={assetUrl(swap.target_profile_image)} alt="" className="w-4 h-4 rounded-full object-cover" />}
                       {swap.target_employee_name}
                     </span>
                   </CardDescription>
@@ -509,7 +510,7 @@ export const ApprovalDashboard = () => {
                       <div>
                         <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                           {leave.employee_profile_image && (
-                            <img src={leave.employee_profile_image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
+                            <img src={assetUrl(leave.employee_profile_image)} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
                           )}
                           {leave.employee_name}
                           <span className="text-xs text-muted-foreground font-mono">({leave.employee_code})</span>
@@ -626,13 +627,13 @@ export const ApprovalDashboard = () => {
                     <CardDescription className="flex items-center gap-2 flex-wrap mt-1">
                       <span className="flex items-center gap-1">
                         Requester
-                        {swap.requester_profile_image && <img src={swap.requester_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                        {swap.requester_profile_image && <img src={assetUrl(swap.requester_profile_image)} alt="" className="w-4 h-4 rounded-full object-cover" />}
                         {swap.requester_name || `#${swap.requester_id?.slice(0, 8)}`}
                       </span>
                       ↔
                       <span className="flex items-center gap-1">
                         Target
-                        {swap.target_profile_image && <img src={swap.target_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                        {swap.target_profile_image && <img src={assetUrl(swap.target_profile_image)} alt="" className="w-4 h-4 rounded-full object-cover" />}
                         {swap.target_employee_name || `#${swap.target_employee_id?.slice(0, 8)}`}
                       </span>
                     </CardDescription>

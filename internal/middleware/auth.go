@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // Token types. An access token and a refresh token are otherwise structurally
@@ -76,6 +78,36 @@ func ParseToken(tokenStr, secret, issuer, expectedType string) (*Claims, error) 
 	}
 
 	return claims, nil
+}
+
+// signScopedToken mints a short-lived token of a given type from an already
+// authenticated caller's claims. Used for credentials that exist to be handed to
+// one specific surface — the WebSocket upgrade, the upload routes — so that what
+// travels there cannot be replayed against the main API.
+func signScopedToken(claims *Claims, secret, issuer, tokenType string, ttl time.Duration) (string, error) {
+	now := time.Now()
+
+	scoped := Claims{
+		EmployeeID:   claims.EmployeeID,
+		Email:        claims.Email,
+		Role:         claims.Role,
+		DepartmentID: claims.DepartmentID,
+		TokenType:    tokenType,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   claims.EmployeeID,
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    issuer,
+			ID:        uuid.NewString(),
+		},
+	}
+
+	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, scoped).SignedString([]byte(secret))
+	if err != nil {
+		return "", fmt.Errorf("sign %s token: %w", tokenType, err)
+	}
+	return signed, nil
 }
 
 // bearerToken extracts a token from the Authorization header. It returns an empty

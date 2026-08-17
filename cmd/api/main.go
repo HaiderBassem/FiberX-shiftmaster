@@ -92,7 +92,7 @@ func main() {
 	provinceService := service.NewProvinceService(provinceRepo)
 
 	// --- Initialize Handlers ---
-	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT)
+	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT, cfg.Server.IsProduction())
 	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo, cfg.Upload)
 	deptHandler := handlers.NewDepartmentHandler(departmentRepo, employeeRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftRepo)

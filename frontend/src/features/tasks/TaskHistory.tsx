@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { fmtTime } from '@/lib/dateUtils';
+import { assetUrl } from '@/lib/assets';
 
 interface TaskHistoryRow {
   assignment_id: string;
@@ -110,7 +111,7 @@ export const TaskHistory = () => {
                     <p className="text-sm font-medium leading-none">{task.task_title}</p>
                     <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 pt-1">
                       {task.employee_profile_image && (
-                        <img src={task.employee_profile_image} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        <img src={assetUrl(task.employee_profile_image)} alt="" className="w-4 h-4 rounded-full object-cover" />
                       )}
                       <span className="font-medium text-foreground/80">{task.employee_name}</span>
                       {task.board_name && (

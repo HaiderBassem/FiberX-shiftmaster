@@ -48,14 +48,24 @@ func SetupRouter(
 	// keyed on a validated extension. gin's Static helper infers the type from the
 	// filename, which would return a stored .html or .svg as active content in this
 	// application's own origin.
-	api.GET("/uploads/*filepath", uploadH.ServeUpload)
-	api.HEAD("/uploads/*filepath", uploadH.ServeUpload)
+	// UploadAccess authorises from the scoped upload cookie or a signed URL;
+	// unauthenticated requests get 404, so probing cannot confirm that someone
+	// else's file exists.
+	uploads := api.Group("/uploads")
+	uploads.Use(middleware.UploadAccess(jwtSecret, jwtIssuer))
+	{
+		uploads.GET("/*filepath", uploadH.ServeUpload)
+		uploads.HEAD("/*filepath", uploadH.ServeUpload)
+	}
 
 	// --- Public routes ---
 	auth := api.Group("/auth")
 	{
 		auth.POST("/login", authH.Login)
 		auth.POST("/refresh", authH.Refresh)
+		// Clears the upload cookie. Public because a client with an already
+		// expired session must still be able to discard it.
+		auth.POST("/logout", authH.Logout)
 	}
 
 	// --- WebSocket upgrade ---

@@ -4,14 +4,9 @@ import { announcementService } from '../../services/announcementService';
 import type { Announcement } from '../../services/announcementService';
 import { AnnouncementPermissionsModal } from './AnnouncementPermissionsModal';
 import { useAuthStore } from '@/store/authStore';
+import { assetUrl } from '@/lib/assets';
 
-const getImageUrl = (url: string) => {
-  if (url.startsWith('http')) return url;
-  const base = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace('/api', '')
-    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
-  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
-};
+const getImageUrl = (url: string) => assetUrl(url);
 
 export const AnnouncementManager: React.FC = () => {
   const { user } = useAuthStore();

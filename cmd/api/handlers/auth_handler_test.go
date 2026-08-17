@@ -51,7 +51,7 @@ func newAuthTestRig(t *testing.T) *authTestRig {
 	authSvc := service.NewAuthService(repo, securitySvc, bcrypt.MinCost, 5, 15*time.Minute)
 	empSvc := service.NewEmployeeService(repo, nil, authSvc)
 
-	handler := NewAuthHandler(authSvc, empSvc, testJWTConfig())
+	handler := NewAuthHandler(authSvc, empSvc, testJWTConfig(), false)
 
 	r := gin.New()
 	r.POST("/auth/login", handler.Login)

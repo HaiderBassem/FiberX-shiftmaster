@@ -1,14 +1,11 @@
 package middleware
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 // TokenTypeWSTicket marks a credential that may only be used to open a WebSocket.
@@ -63,30 +60,11 @@ func (s *TicketStore) consume(id string, now time.Time) (alreadyUsed bool) {
 
 // IssueWSTicket mints a single-use ticket for an already-authenticated caller.
 func IssueWSTicket(claims *Claims, secret, issuer string) (string, time.Time, error) {
-	now := time.Now()
-	expiresAt := now.Add(WSTicketTTL)
-
-	ticketClaims := Claims{
-		EmployeeID:   claims.EmployeeID,
-		Email:        claims.Email,
-		Role:         claims.Role,
-		DepartmentID: claims.DepartmentID,
-		TokenType:    TokenTypeWSTicket,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   claims.EmployeeID,
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			IssuedAt:  jwt.NewNumericDate(now),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    issuer,
-			ID:        uuid.NewString(),
-		},
-	}
-
-	signed, err := jwt.NewWithClaims(jwt.SigningMethodHS256, ticketClaims).SignedString([]byte(secret))
+	signed, err := signScopedToken(claims, secret, issuer, TokenTypeWSTicket, WSTicketTTL)
 	if err != nil {
-		return "", time.Time{}, fmt.Errorf("sign websocket ticket: %w", err)
+		return "", time.Time{}, err
 	}
-	return signed, expiresAt, nil
+	return signed, time.Now().Add(WSTicketTTL), nil
 }
 
 // WSTicketAuth authenticates a WebSocket upgrade from a ticket.

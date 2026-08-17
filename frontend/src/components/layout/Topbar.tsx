@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { useNotification } from '@/providers/NotificationProvider';
+import { assetUrl } from '@/lib/assets';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
   const { i18n } = useTranslation();
@@ -157,7 +158,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary/15 flex items-center justify-center overflow-hidden">
             {user?.profile_image ? (
               <img 
-                src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${user.profile_image.startsWith('/api') ? user.profile_image : '/api' + user.profile_image}`} 
+                src={assetUrl(user.profile_image)} 
                 alt="Profile" 
                 className="w-full h-full object-cover" 
               />
