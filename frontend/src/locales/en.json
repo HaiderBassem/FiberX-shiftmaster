@@ -382,7 +382,10 @@
     "approved": "Approved",
     "tl_approved": "TL Approved",
     "rejected": "Rejected",
-    "to": "to"
+    "to": "to",
+    "unauthorized_title": "Unauthorized",
+    "unauthorized_message": "You don't have permission to access this page.",
+    "loading": "Loading"
   },
   "auth": {
     "welcome_back": "Welcome back",

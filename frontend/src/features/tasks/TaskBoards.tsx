@@ -552,13 +552,12 @@ const BoardDetailView = ({
   });
 
   // ── Grid stats ──
-  let gridTotal = 0, gridDone = 0, gridProgress = 0;
+  let gridTotal = 0, gridDone = 0;
   Object.values(gridData).forEach((emp) => {
     Object.values(emp.days).forEach((tasks) => {
       tasks.forEach((t) => {
         gridTotal++;
         if (t.status === 'completed') gridDone++;
-        else if (t.status === 'in_progress') gridProgress++;
       });
     });
   });

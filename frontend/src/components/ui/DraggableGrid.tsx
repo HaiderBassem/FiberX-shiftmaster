@@ -31,6 +31,23 @@ export interface GridLayout {
   order: string[]; // item IDs and folder IDs in order
 }
 
+/**
+ * Reads a saved grid layout out of the user's stored preferences.
+ *
+ * ui_preferences is free-form JSON persisted by the server, so its contents are
+ * unknown at compile time. This narrows a stored value to a usable layout and
+ * returns null when the shape is not what we expect, rather than asserting and
+ * failing later during render.
+ */
+export function readStoredLayout(value: unknown): GridLayout | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<GridLayout>;
+  if (!Array.isArray(candidate.order)) return null;
+  if (!candidate.folders || typeof candidate.folders !== 'object') return null;
+  return { folders: candidate.folders, order: candidate.order } as GridLayout;
+}
+
+
 interface DraggableGridProps {
   items: any[]; // The raw items (tables or docs)
   layout: GridLayout;
@@ -192,7 +209,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     if (!over) return;
 
     const activeIdStr = active.id as string;
-    let overIdStr = over.id as string;
+    const overIdStr = over.id as string;
 
     if (activeIdStr === overIdStr) return;
 

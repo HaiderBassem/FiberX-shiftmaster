@@ -852,7 +852,7 @@ const LeaderDashboard = () => {
                        const [startH, startM] = st.split(':').map(Number);
                        const [endH, endM] = et.split(':').map(Number);
                        const startMins = startH * 60 + startM;
-                       let endMins = endH * 60 + endM;
+                       const endMins = endH * 60 + endM;
                        
                        if (endMins < startMins) {
                          isActiveNow = currentMinutes >= startMins || currentMinutes <= endMins;

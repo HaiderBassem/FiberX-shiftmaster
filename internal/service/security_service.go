@@ -24,6 +24,10 @@ type SecurityService struct {
 
 	failedLogins sync.Map // map[string]*ipAttempts
 
+	// blockCache holds recent IsIPBlocked results. The middleware consults it on
+	// every request, so without a cache each request cost a query.
+	blockCache sync.Map // map[string]blockDecision
+
 	maxAttempts   int
 	blockDuration time.Duration
 	// window is how long a counter survives without a new failure. It also bounds
@@ -104,6 +108,7 @@ func (s *SecurityService) RecordFailedLogin(ctx context.Context, ip string) erro
 	}
 
 	s.failedLogins.Delete(ip)
+	s.invalidateBlockCache(ip)
 	return nil
 }
 
@@ -162,16 +167,63 @@ func (s *SecurityService) GetBlockedIPs(ctx context.Context) ([]models.IPBlock, 
 
 func (s *SecurityService) UnblockIP(ctx context.Context, ip string) error {
 	s.failedLogins.Delete(ip)
-	return s.repo.UnblockIP(ctx, ip)
+	if err := s.repo.UnblockIP(ctx, ip); err != nil {
+		return err
+	}
+	// Drop the cached decision so the unblock takes effect immediately rather
+	// than after the TTL.
+	s.invalidateBlockCache(ip)
+	return nil
 }
 
+// blockCacheTTL bounds how stale a cached block decision may be.
+//
+// Short enough that an unblock takes effect promptly and a newly blocked address
+// is stopped quickly, long enough that a burst of requests from one address does
+// not become a burst of queries.
+const blockCacheTTL = 10 * time.Second
+
+type blockDecision struct {
+	blocked   bool
+	expiresAt time.Time
+}
+
+// IsIPBlocked reports whether an address is currently blocked.
+//
+// This runs on *every* request through IPBlockerMiddleware. It used to issue a
+// database query each time, so ordinary traffic — none of which is blocked —
+// generated one query per request purely to be told so. Decisions are now cached
+// for a few seconds.
+//
+// Negative results are cached as well as positive ones: caching only blocks
+// would leave the common case, an address that is not blocked, querying every
+// time and would defeat the purpose.
 func (s *SecurityService) IsIPBlocked(ctx context.Context, ip string) bool {
-	if s.repo == nil {
+	if s.repo == nil || ip == "" {
 		return false
 	}
+
+	now := time.Now()
+
+	if cached, ok := s.blockCache.Load(ip); ok {
+		if decision, ok := cached.(blockDecision); ok && now.Before(decision.expiresAt) {
+			return decision.blocked
+		}
+	}
+
 	blocked, err := s.repo.IsIPBlocked(ctx, ip)
 	if err != nil {
+		// Fail open, as before: a database problem must not lock every user out.
+		// Deliberately not cached, so the next request retries.
 		return false
 	}
+
+	s.blockCache.Store(ip, blockDecision{blocked: blocked, expiresAt: now.Add(blockCacheTTL)})
 	return blocked
+}
+
+// invalidateBlockCache drops a cached decision so a change takes effect at once
+// rather than after the TTL.
+func (s *SecurityService) invalidateBlockCache(ip string) {
+	s.blockCache.Delete(ip)
 }

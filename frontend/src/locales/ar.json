@@ -382,7 +382,10 @@
     "approved": "مقبول",
     "tl_approved": "مقبول من مدير القسم",
     "rejected": "مرفوض",
-    "to": "إلى"
+    "to": "إلى",
+    "unauthorized_title": "غير مصرح",
+    "unauthorized_message": "ليس لديك إذن للوصول إلى هذه الصفحة.",
+    "loading": "جارٍ التحميل"
   },
   "auth": {
     "welcome_back": "أهلاً بك مجدداً",

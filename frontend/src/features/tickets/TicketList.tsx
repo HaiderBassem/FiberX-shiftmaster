@@ -60,7 +60,7 @@ export const TicketList = () => {
       } else if (res.data?.file) {
         setImages((prev) => [...prev, res.data.file]);
       }
-    } catch (err) {
+    } catch {
       toast.error(t('common.failed_upload'));
     } finally {
       setIsUploading(false);
@@ -334,7 +334,7 @@ const TicketComments = ({ ticket }: { ticket: any }) => {
       } else if (res.data?.file) {
         setCommentImages((prev) => [...prev, res.data.file]);
       }
-    } catch (err) {
+    } catch {
       toast.error('Upload failed');
     } finally {
       setUploading(false);

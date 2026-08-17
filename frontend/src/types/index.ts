@@ -1,1 +1,2 @@
 export * from './infoTable';
+export * from './domain';
