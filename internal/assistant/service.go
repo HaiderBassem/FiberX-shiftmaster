@@ -145,6 +145,13 @@ func (s *Service) Begin(employeeID uuid.UUID, text string) (func(), error) {
 func (s *Service) HandleMessage(ctx context.Context, employeeID uuid.UUID, conversationID *uuid.UUID, text string, emit Emit) (*ChatResult, error) {
 	text = strings.TrimSpace(text)
 
+	// Hard ceiling for the whole turn: every model round plus every tool,
+	// with headroom. The SSE handler lifts the HTTP write deadline for the
+	// stream, so this is what actually bounds a runaway turn.
+	turnBudget := time.Duration(s.deps.Cfg.MaxToolRounds+1)*s.deps.Cfg.Timeout + 30*time.Second
+	ctx, cancel := context.WithTimeout(ctx, turnBudget)
+	defer cancel()
+
 	started := time.Now()
 	actor, err := s.deps.LoadActor(ctx, employeeID)
 	if err != nil {
@@ -338,6 +345,15 @@ func (s *Service) Decide(ctx context.Context, employeeID, actionID uuid.UUID, ap
 	if err != nil {
 		return s.notDecidable(ctx, actor, actionID, err)
 	}
+
+	// From the moment the claim succeeds, the outcome must be recorded even
+	// if the approving client disconnects: a cancelled request context here
+	// would strand the action in 'approved' with the domain possibly
+	// half-touched. Execution therefore runs on a detached context with its
+	// own bound.
+	execCtx, cancelExec := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancelExec()
+	ctx = execCtx
 
 	def, ok := actionDefs()[claimed.ActionType]
 	if !ok {

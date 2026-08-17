@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -71,6 +72,12 @@ func (h *AssistantHandler) Chat(c *gin.Context) {
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
 	flusher, canFlush := c.Writer.(http.Flusher)
+
+	// The server's WriteTimeout covers the whole response; a multi-tool turn
+	// can legitimately outlive the default. Lift the write deadline for this
+	// stream — the turn itself is bounded by the service's own hard ceiling,
+	// so this does not create an unbounded connection.
+	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Time{})
 
 	emit := func(ev assistant.Event) {
 		payload, err := json.Marshal(ev)
