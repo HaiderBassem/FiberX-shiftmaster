@@ -260,6 +260,42 @@ func FormatDuration(d time.Duration) string {
 	}
 }
 
+// AbsoluteHourlyWindow materialises an hourly leave's stored clocks into
+// instants. The clocks live under the business-date convention, which is
+// ambiguous for a window lying entirely past midnight: "00:00→00:30" on date D
+// is D's own small hours for a day shift, but the morning AFTER D for an
+// overnight shift (the last half hour of a 16:30→00:30 shift). The shift is
+// the only thing that can disambiguate, so when the day's shift is overnight,
+// a window whose start clock precedes the shift's start clock is taken to lie
+// on the far side of midnight. Without shift context the plain rule applies:
+// only an end at or before the start wraps.
+func AbsoluteHourlyWindow(businessDate time.Time, startClock, endClock string, shiftStart *time.Time, shiftOvernight bool) (time.Time, time.Time, error) {
+	sh, sm, err := ParseClock(startClock)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	eh, em, err := ParseClock(endClock)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	y, m, d := businessDate.UTC().Date()
+	start := time.Date(y, m, d, sh, sm, 0, 0, zone)
+	end := time.Date(y, m, d, eh, em, 0, 0, zone)
+
+	if shiftOvernight && shiftStart != nil {
+		shiftClock := time.Duration(shiftStart.Hour())*time.Hour + time.Duration(shiftStart.Minute())*time.Minute
+		windowClock := time.Duration(sh)*time.Hour + time.Duration(sm)*time.Minute
+		if windowClock < shiftClock {
+			start = start.Add(24 * time.Hour)
+			end = end.Add(24 * time.Hour)
+		}
+	}
+	if !end.After(start) {
+		end = end.Add(24 * time.Hour)
+	}
+	return start, end, nil
+}
+
 // HourlyLeaveDuration computes the length of an hourly leave stored as two
 // HH:MM clocks under the business-date convention: an end at or before the
 // start crosses midnight. This is the same rule Materialize applies to shift

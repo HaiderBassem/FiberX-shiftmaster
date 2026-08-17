@@ -13,6 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"shiftmaster-backend/cmd/api/handlers"
+	"shiftmaster-backend/internal/assistant"
+	"shiftmaster-backend/internal/assistant/llm"
 	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/middleware"
 	"shiftmaster-backend/internal/notification"
@@ -59,6 +61,7 @@ func main() {
 	ticketRepo := repository.NewTicketRepository(db)
 	serviceRepo := repository.NewServiceRepository(db)
 	provinceRepo := repository.NewProvinceRepository(db)
+	assistantRepo := repository.NewAssistantRepository(db)
 
 	// --- Initialize Services ---
 	// IP-level blocking and per-account lockout both come from configuration rather
@@ -78,7 +81,7 @@ func main() {
 
 	pushService := notification.NewPushService(notifRepo, employeeRepo, cfg.VAPID)
 
-	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
+	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, shiftRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
@@ -90,6 +93,50 @@ func main() {
 	fiberxDataService := service.NewFiberxDataService(fiberxDataRepo, employeeRepo)
 	itemReqService := service.NewItemRequestService(itemReqRepo, employeeRepo, departmentRepo, emailService)
 	provinceService := service.NewProvinceService(provinceRepo)
+
+	// The AI assistant runs entirely over the services above; without an API
+	// key it stays dormant and its endpoints report themselves unavailable.
+	assistantService := assistant.NewService(&assistant.Deps{
+		Cfg: cfg.Assistant,
+		LLM: llm.NewAnthropic(llm.AnthropicConfig{
+			APIKey:     cfg.Assistant.APIKey,
+			Model:      cfg.Assistant.Model,
+			BaseURL:    cfg.Assistant.BaseURL,
+			MaxTokens:  cfg.Assistant.MaxTokens,
+			Timeout:    cfg.Assistant.Timeout,
+			MaxRetries: cfg.Assistant.MaxRetries,
+		}),
+		AssistantRepo:    assistantRepo,
+		EmployeeRepo:     employeeRepo,
+		DepartmentRepo:   departmentRepo,
+		ShiftRepo:        shiftRepo,
+		ScheduleRepo:     scheduleRepo,
+		LeaveRepo:        leaveRepo,
+		LeaveTypeRepo:    leaveTypeRepo,
+		TaskRepo:         taskRepo,
+		NotifRepo:        notifRepo,
+		AnnouncementRepo: announcementRepo,
+		HandoverRepo:     handoverRepo,
+		TicketRepo:       ticketRepo,
+		ItemReqRepo:      itemReqRepo,
+		HelpDocRepo:      helpDocRepo,
+		FiberxRepo:       fiberxDataRepo,
+		InfoTableRepo:    infoTableRepo,
+		ServiceRepo:      serviceRepo,
+		ProvinceRepo:     provinceRepo,
+		AuditLogRepo:     auditRepo,
+		AuthService:      authService,
+		LeaveService:     leaveService,
+		ScheduleService:  scheduleService,
+		TaskService:      taskService,
+		SwapService:      swapService,
+		InfoTableService: infoTableService,
+		HelpDocService:   helpDocService,
+		FiberxService:    fiberxDataService,
+		ItemReqService:   itemReqService,
+		ProvinceService:  provinceService,
+		AuditService:     auditService,
+	})
 
 	// --- Initialize Handlers ---
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT, cfg.Server.IsProduction())
@@ -116,6 +163,7 @@ func main() {
 	ticketHandler := handlers.NewTicketHandler(ticketRepo)
 	serviceHandler := handlers.NewServiceHandler(serviceRepo, db)
 	provinceHandler := handlers.NewProvinceHandler(provinceService)
+	assistantHandler := handlers.NewAssistantHandler(assistantService)
 
 	// --- Setup Gin Engine ---
 	if cfg.Server.IsProduction() {
@@ -162,7 +210,7 @@ func main() {
 	// Setup API routes
 	SetupRouter(r, cfg.JWT.Secret, cfg.JWT.Issuer, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
-		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler, provinceHandler,
+		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler, provinceHandler, assistantHandler,
 	)
 
 	// --- Start HTTP Server ---

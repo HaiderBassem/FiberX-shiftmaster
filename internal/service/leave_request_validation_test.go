@@ -31,6 +31,7 @@ func (f *fixture) newLeaveService(t *testing.T, now time.Time) *LeaveService {
 		repository.NewEmployeeRepository(f.db),
 		repository.NewDepartmentRepository(f.db),
 		repository.NewScheduleRepository(f.db),
+		repository.NewShiftRepository(f.db),
 		repository.NewLeaveBalanceRepository(f.db),
 		repository.NewLeaveTypeRepository(f.db),
 		NewNotificationService(repository.NewNotificationRepository(f.db)),
@@ -187,17 +188,27 @@ func TestOverlappingLeavesAreRejected(t *testing.T) {
 		t.Fatalf("duplicate window not rejected: %v", err)
 	}
 
-	// A window on the NEXT calendar date that intersects the wrapped part
-	// (00:00→01:00 on the 18th overlaps 23:30→00:30-of-the-17th at 00:00–00:30).
-	crossDay := leaveReq(f, hourlyID, date(2026, 8, 18), date(2026, 8, 18), "00:00", "01:00")
-	if err := svc.ValidateLeaveRequest(ctx, crossDay); err == nil || !strings.Contains(err.Error(), "already have") {
-		t.Fatalf("cross-date absolute overlap not rejected: %v", err)
+	// A second window on the SAME business date whose clocks lie entirely past
+	// midnight (00:00→01:00 of the 17th's overnight shift = the 18th 00:00–01:00
+	// in absolute terms) intersects the wrapped part of the first at 00:00–00:30.
+	// The fixture employee's default shift is 16:00→00:00, i.e. overnight, so
+	// the shift-aware materialisation places these clocks after midnight.
+	sameShiftTail := leaveReq(f, hourlyID, date(2026, 8, 17), date(2026, 8, 17), "00:00", "01:00")
+	if err := svc.ValidateLeaveRequest(ctx, sameShiftTail); err == nil || !strings.Contains(err.Error(), "already have") {
+		t.Fatalf("post-midnight absolute overlap not rejected: %v", err)
 	}
 
 	// Clear of the wrapped window: accepted.
-	clear := leaveReq(f, hourlyID, date(2026, 8, 18), date(2026, 8, 18), "01:00", "02:00")
+	clear := leaveReq(f, hourlyID, date(2026, 8, 17), date(2026, 8, 17), "01:00", "02:00")
 	if err := svc.ValidateLeaveRequest(ctx, clear); err != nil {
 		t.Fatalf("non-overlapping window rejected: %v", err)
+	}
+
+	// A window on the NEXT business date belongs to the NEXT day's shift; its
+	// clocks map to the 19th's small hours, nowhere near the 17th's window.
+	nextShift := leaveReq(f, hourlyID, date(2026, 8, 18), date(2026, 8, 18), "00:00", "01:00")
+	if err := svc.ValidateLeaveRequest(ctx, nextShift); err != nil {
+		t.Fatalf("next business date's window wrongly rejected: %v", err)
 	}
 
 	// A full-day leave covering the hourly leave's business date.

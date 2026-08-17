@@ -74,8 +74,15 @@ func TestTamperedSignatureRejected(t *testing.T) {
 	sig, exp := SignPath(path, accessSecret, time.Minute)
 	expStr := strconv.FormatInt(exp, 10)
 
+	// The flipped character must actually differ from the original: a fixed
+	// "A" matched the genuine signature about one run in 64 and made the test
+	// flake by "tampering" into the correct value.
+	flip := "A"
+	if sig[0] == 'A' {
+		flip = "B"
+	}
 	cases := map[string]string{
-		"flipped character": strings.Repeat("A", 1) + sig[1:],
+		"flipped character": flip + sig[1:],
 		"truncated":         sig[:len(sig)-4],
 		"empty":             "",
 		"not base64":        "!!!not-base64!!!",

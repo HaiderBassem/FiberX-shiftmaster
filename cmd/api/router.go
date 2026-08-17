@@ -38,6 +38,7 @@ func SetupRouter(
 	ticketH *handlers.TicketHandler,
 	serviceH *handlers.ServiceHandler,
 	provinceH *handlers.ProvinceHandler,
+	assistantH *handlers.AssistantHandler,
 ) {
 	// Replay cache for single-use WebSocket tickets.
 	wsTickets := middleware.NewTicketStore()
@@ -476,6 +477,18 @@ func SetupRouter(
 			services.PUT("/plans/reorder", serviceH.ReorderPlans)
 			services.PUT("/plans/:id", serviceH.UpdatePlan)
 			services.DELETE("/plans/:id", serviceH.DeletePlan)
+		}
+
+		// --- AI Assistant ---
+		// Chat streams SSE; the approve/reject endpoints are the human half of
+		// the pending-action security boundary — the model has no route here.
+		assistantGroup := protected.Group("/assistant")
+		{
+			assistantGroup.GET("/status", assistantH.Status)
+			assistantGroup.POST("/chat", assistantH.Chat)
+			assistantGroup.GET("/actions/:id", assistantH.GetAction)
+			assistantGroup.POST("/actions/:id/approve", assistantH.Approve)
+			assistantGroup.POST("/actions/:id/reject", assistantH.Reject)
 		}
 
 		// --- Provinces ---

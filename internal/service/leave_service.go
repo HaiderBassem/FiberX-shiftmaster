@@ -19,6 +19,7 @@ type LeaveService struct {
 	employeeRepo     repository.EmployeeRepository
 	departmentRepo   repository.DepartmentRepository
 	scheduleRepo     repository.ScheduleRepository
+	shiftRepo        repository.ShiftRepository
 	leaveBalanceRepo repository.LeaveBalanceRepository
 	leaveTypeRepo    repository.LeaveTypeRepository
 	notifService     *NotificationService
@@ -34,6 +35,7 @@ func NewLeaveService(
 	employeeRepo repository.EmployeeRepository,
 	departmentRepo repository.DepartmentRepository,
 	scheduleRepo repository.ScheduleRepository,
+	shiftRepo repository.ShiftRepository,
 	leaveBalanceRepo repository.LeaveBalanceRepository,
 	leaveTypeRepo repository.LeaveTypeRepository,
 	notifService *NotificationService,
@@ -45,6 +47,7 @@ func NewLeaveService(
 		employeeRepo:     employeeRepo,
 		departmentRepo:   departmentRepo,
 		scheduleRepo:     scheduleRepo,
+		shiftRepo:        shiftRepo,
 		leaveBalanceRepo: leaveBalanceRepo,
 		leaveTypeRepo:    leaveTypeRepo,
 		notifService:     notifService,
@@ -52,13 +55,6 @@ func NewLeaveService(
 		pushService:      pushService,
 		now:              time.Now,
 	}
-}
-
-func parseTimeStr(t string) (time.Time, error) {
-	if len(t) > 5 {
-		t = t[:5]
-	}
-	return time.Parse("15:04", t)
 }
 
 // hourlyLeaveHours computes the length of an hourly leave from its stored
@@ -122,32 +118,48 @@ func (s *LeaveService) SyncLeaveBalances(ctx context.Context, year int) error {
 	return nil
 }
 
-// leaveAbsoluteWindow materialises a leave into concrete instants in the
-// business timezone so windows can be compared for overlap. A full-day leave
-// occupies [start 00:00, end+1 00:00); an hourly leave occupies its clock
-// window anchored to its (single) business date, crossing midnight when the
-// end clock is at or before the start clock.
-func leaveAbsoluteWindow(l *models.Leave) (time.Time, time.Time, bool) {
-	loc := temporal.Location()
-	sy, sm, sd := l.StartDate.UTC().Date()
-
-	if l.StartTime != nil && l.EndTime != nil {
-		sh, smin, err1 := temporal.ParseClock(*l.StartTime)
-		eh, emin, err2 := temporal.ParseClock(*l.EndTime)
-		if err1 != nil || err2 != nil {
-			return time.Time{}, time.Time{}, false
-		}
-		start := time.Date(sy, sm, sd, sh, smin, 0, 0, loc)
-		end := time.Date(sy, sm, sd, eh, emin, 0, 0, loc)
-		if !end.After(start) {
-			end = end.Add(24 * time.Hour)
-		}
+// absoluteWindow materialises a leave into concrete instants in the business
+// timezone so windows can be compared for overlap and pastness. A full-day
+// leave occupies [start 00:00, end+1 00:00). An hourly leave occupies its
+// clock window anchored to its (single) business date — and because clocks on
+// an overnight shift can lie entirely past midnight ("the last half hour" of a
+// 16:30→00:30 shift is 00:00→00:30), the day's shift is consulted to
+// disambiguate which side of midnight the window sits on.
+func (s *LeaveService) absoluteWindow(ctx context.Context, emp *models.Employee, l *models.Leave) (time.Time, time.Time, bool) {
+	if l.StartTime == nil || l.EndTime == nil {
+		loc := temporal.Location()
+		sy, sm, sd := l.StartDate.UTC().Date()
+		ey, em, ed := l.EndDate.UTC().Date()
+		start := time.Date(sy, sm, sd, 0, 0, 0, 0, loc)
+		end := time.Date(ey, em, ed, 0, 0, 0, 0, loc).Add(24 * time.Hour)
 		return start, end, true
 	}
 
-	ey, em, ed := l.EndDate.UTC().Date()
-	start := time.Date(sy, sm, sd, 0, 0, 0, 0, loc)
-	end := time.Date(ey, em, ed, 0, 0, 0, 0, loc).Add(24 * time.Hour)
+	day := l.StartDate.UTC().Truncate(24 * time.Hour)
+
+	// Effective shift for that day: the day row's shift if set, else the
+	// employee's default — the same rule the rest of the application uses.
+	var shiftID *uuid.UUID
+	if emp != nil {
+		shiftID = emp.DefaultShiftID
+	}
+	if es, err := s.scheduleRepo.GetEmployeeShift(ctx, l.EmployeeID, day); err == nil && es != nil && es.ShiftID != nil {
+		shiftID = es.ShiftID
+	}
+	var shiftStart *time.Time
+	shiftOvernight := false
+	if shiftID != nil && s.shiftRepo != nil {
+		if sh, err := s.shiftRepo.GetByID(ctx, *shiftID); err == nil && sh != nil {
+			st := sh.StartTime
+			shiftStart = &st
+			shiftOvernight = !sh.EndTime.After(sh.StartTime)
+		}
+	}
+
+	start, end, err := temporal.AbsoluteHourlyWindow(day, *l.StartTime, *l.EndTime, shiftStart, shiftOvernight)
+	if err != nil {
+		return time.Time{}, time.Time{}, false
+	}
 	return start, end, true
 }
 
@@ -205,6 +217,13 @@ func (s *LeaveService) ValidateLeaveRequest(ctx context.Context, leave *models.L
 		}
 	}
 
+	// The employee is needed both for shift-aware window materialisation and
+	// for the department caps below.
+	emp, err := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if err != nil {
+		return fmt.Errorf("employee not found: %w", err)
+	}
+
 	// Past-date rule, evaluated on the business calendar (Asia/Baghdad). The
 	// old check truncated in UTC, which put the day boundary at 03:00 local.
 	// Day leaves must start today or later. An hourly leave is judged by its
@@ -217,7 +236,7 @@ func (s *LeaveService) ValidateLeaveRequest(ctx context.Context, leave *models.L
 		if startDay.Before(todayBusiness.AddDate(0, 0, -1)) {
 			return fmt.Errorf("cannot request leave for past dates")
 		}
-		if _, end, ok := leaveAbsoluteWindow(leave); ok && !end.After(now) {
+		if _, end, ok := s.absoluteWindow(ctx, emp, leave); ok && !end.After(now) {
 			return fmt.Errorf("cannot request an hourly leave for a time that has already passed")
 		}
 	} else if startDay.Before(todayBusiness) {
@@ -276,24 +295,18 @@ func (s *LeaveService) ValidateLeaveRequest(ctx context.Context, leave *models.L
 		}
 	}
 
-	// Validate employee exists
-	emp, err := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
-	if err != nil {
-		return fmt.Errorf("employee not found: %w", err)
-	}
-
 	// Double-booking guard: the same employee cannot hold two live leaves
 	// whose absolute windows intersect. The candidate fetch reaches one day
 	// each side because an hourly window on the previous date can cross
 	// midnight into this one.
-	newStart, newEnd, ok := leaveAbsoluteWindow(leave)
+	newStart, newEnd, ok := s.absoluteWindow(ctx, emp, leave)
 	if ok {
 		rangeFrom := leave.StartDate.UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)
 		rangeTo := leave.EndDate.UTC().Truncate(24*time.Hour).AddDate(0, 0, 1)
 		existing, exErr := s.leaveRepo.GetActiveByEmployeeInRange(ctx, leave.EmployeeID, rangeFrom, rangeTo)
 		if exErr == nil {
 			for i := range existing {
-				exStart, exEnd, exOK := leaveAbsoluteWindow(&existing[i])
+				exStart, exEnd, exOK := s.absoluteWindow(ctx, emp, &existing[i])
 				if !exOK {
 					continue
 				}

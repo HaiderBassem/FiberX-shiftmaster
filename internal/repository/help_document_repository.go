@@ -67,6 +67,46 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 	return docs, nil
 }
 
+// SearchDocuments is the list query narrowed by a case-insensitive match and
+// bounded by limit, for the assistant's knowledge lookup. The visibility
+// predicate is identical to GetVisibleDocuments — same department scope, same
+// hide handling — so search can never surface a document the list would not.
+// Content is truncated in SQL: the caller builds a snippet, not a mirror.
+func (r *HelpDocumentRepository) SearchDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageHelpDocs bool, search string, limit int) ([]models.HelpDocument, error) {
+	query := `
+		SELECT
+			d.id, d.department_id, d.title, LEFT(d.content, 4000), d.created_by, d.created_at, d.updated_at,
+			COALESCE(a.access_level, 'read') as access_level
+		FROM help_documents d
+		LEFT JOIN help_document_access a ON a.document_id = d.id AND a.employee_id = $2
+		WHERE d.department_id = $1
+		  AND (d.title ILIKE '%' || $3 || '%' OR d.content ILIKE '%' || $3 || '%')
+	`
+	if role != "manager" && role != "admin" && !canManageHelpDocs {
+		query += ` AND COALESCE(a.access_level, 'read') != 'hide' `
+	}
+	query += ` ORDER BY d.updated_at DESC LIMIT $4`
+
+	rows, err := r.db.Query(ctx, query, departmentID, employeeID, search, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var docs []models.HelpDocument
+	for rows.Next() {
+		var d models.HelpDocument
+		var accLevel string
+		if err := rows.Scan(&d.ID, &d.DepartmentID, &d.Title, &d.Content,
+			&d.CreatedBy, &d.CreatedAt, &d.UpdatedAt, &accLevel); err != nil {
+			return nil, err
+		}
+		d.AccessLevel = &accLevel
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
+}
+
 func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, departmentID *uuid.UUID, role string, canManageHelpDocs bool) (*models.HelpDocument, error) {
 	query := `
 		SELECT 
