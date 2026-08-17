@@ -61,8 +61,16 @@ func main() {
 	provinceRepo := repository.NewProvinceRepository(db)
 
 	// --- Initialize Services ---
-	securityService := service.NewSecurityService(securityRepo, 10, 1) // 10 attempts, 1 hour block
-	authService := service.NewAuthService(employeeRepo, securityService, cfg.JWT.BcryptCost)
+	// IP-level blocking and per-account lockout both come from configuration rather
+	// than hardcoded constants, so an operator can tune them without a rebuild.
+	securityService := service.NewSecurityService(securityRepo, cfg.Security.MaxLoginAttempts*2, cfg.Security.LockoutDuration())
+	authService := service.NewAuthService(
+		employeeRepo,
+		securityService,
+		cfg.JWT.BcryptCost,
+		cfg.Security.MaxLoginAttempts,
+		cfg.Security.LockoutDuration(),
+	)
 	notifService := service.NewNotificationService(notifRepo)
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
@@ -84,8 +92,8 @@ func main() {
 	provinceService := service.NewProvinceService(provinceRepo)
 
 	// --- Initialize Handlers ---
-	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT.Secret, cfg.JWT.AccessExpireMin, cfg.JWT.RefreshExpireDays)
-	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo)
+	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT)
+	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo, cfg.Upload)
 	deptHandler := handlers.NewDepartmentHandler(departmentRepo, employeeRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftRepo)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
@@ -100,7 +108,7 @@ func main() {
 	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService)
 	pushHandler := handlers.NewPushHandler(notifRepo, cfg.VAPID)
 	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, shiftRepo, scheduleRepo, notifService)
-	uploadHandler := handlers.NewUploadHandler()
+	uploadHandler := handlers.NewUploadHandler(cfg.Upload)
 	moduleAccessHandler := handlers.NewModuleAccessHandler(moduleAccessService)
 	fiberxDataHandler := handlers.NewFiberxDataHandler(fiberxDataService)
 	securityHandler := handlers.NewSecurityHandler(securityService)
@@ -117,6 +125,18 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+
+	// Without this, gin trusts every upstream and derives ClientIP from any
+	// X-Forwarded-For the caller supplies. Both the IP blocker and the failed-login
+	// throttle key off ClientIP, so a spoofable value would let an attacker evade
+	// blocking by rotating the header, and let them get someone else's address
+	// blocked by forging it.
+	if err := r.SetTrustedProxies(cfg.Security.TrustedProxies); err != nil {
+		log.Fatalf("Failed to configure trusted proxies: %v", err)
+	}
+
+	// The WebSocket upgrader refuses every connection until this is set.
+	notification.ConfigureOrigins(cfg.CORS.AllowedOrigins)
 
 	// CORS
 	r.Use(cors.New(cors.Config{
@@ -140,7 +160,7 @@ func main() {
 	})
 
 	// Setup API routes
-	SetupRouter(r, cfg.JWT.Secret, departmentRepo,
+	SetupRouter(r, cfg.JWT.Secret, cfg.JWT.Issuer, departmentRepo,
 		authHandler, empHandler, deptHandler, shiftHandler,
 		scheduleHandler, leaveHandler, swapHandler, taskHandler, notifHandler, auditHandler, leaveTypeHandler, infoTableHandler, helpDocHandler, announcementHandler, pushHandler, handoverHandler, uploadHandler, moduleAccessHandler, fiberxDataHandler, securityHandler, itemReqHandler, ticketHandler, serviceHandler, provinceHandler,
 	)

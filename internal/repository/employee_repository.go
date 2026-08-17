@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -36,8 +37,14 @@ type EmployeeRepository interface {
 	UpdateServicePermission(ctx context.Context, id uuid.UUID, canManage bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
 	GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error)
-	IncrementFailedLogin(ctx context.Context, email string) (int, error)
-	ResetFailedLogin(ctx context.Context, id uuid.UUID) error
+
+	// Authentication lockout. Lock state lives in the database rather than in
+	// process memory so it survives a restart and stays consistent across replicas.
+	RegisterFailedLogin(ctx context.Context, email string, maxAttempts int, lockoutDuration time.Duration) (*time.Time, error)
+	ClearFailedLogins(ctx context.Context, id uuid.UUID) error
+	GetLockoutByEmail(ctx context.Context, email string) (*time.Time, error)
+	GetLockoutByID(ctx context.Context, id uuid.UUID) (*time.Time, error)
+	Unlock(ctx context.Context, id uuid.UUID) error
 }
 
 type employeeRepo struct {
@@ -300,10 +307,6 @@ func (r *employeeRepo) ForceDelete(ctx context.Context, id uuid.UUID) error {
 	})
 }
 
-
-
-
-
 func (r *employeeRepo) UpdateFiberxPermission(ctx context.Context, id uuid.UUID, canManageFiberxData bool) error {
 	query := `UPDATE employees SET can_manage_fiberx_data = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, canManageFiberxData)
@@ -322,7 +325,6 @@ func (r *employeeRepo) UpdateAnnouncementPermission(ctx context.Context, id uuid
 	return err
 }
 
-
 func (r *employeeRepo) UpdateTablePermission(ctx context.Context, id uuid.UUID, canCreate bool) error {
 	query := `UPDATE employees SET can_create_tables = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`
 	_, err := r.db.Exec(ctx, query, id, canCreate)
@@ -340,7 +342,6 @@ func (r *employeeRepo) UpdatePreferences(ctx context.Context, id uuid.UUID, pref
 	_, err := r.db.Exec(ctx, query, id, prefs)
 	return err
 }
-
 
 func (r *employeeRepo) GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error) {
 	rows, err := r.db.Query(ctx, `SELECT email FROM employees WHERE department_id = $1 AND status = 'active' AND email IS NOT NULL`, departmentID)
@@ -362,16 +363,93 @@ func (r *employeeRepo) GetEmailsByDepartment(ctx context.Context, departmentID u
 	return emails, nil
 }
 
-func (r *employeeRepo) IncrementFailedLogin(ctx context.Context, email string) (int, error) {
-	var attempts int
-	err := r.db.QueryRow(ctx, `UPDATE employees SET failed_login_attempts = failed_login_attempts + 1 WHERE email = $1 RETURNING failed_login_attempts`, email).Scan(&attempts)
-	if err != nil {
-		return 0, err
+// RegisterFailedLogin records one failed password attempt and applies a temporary
+// lock once maxAttempts is reached. It returns the lock expiry when the account is
+// locked, or nil when it is not.
+//
+// The whole decision is a single statement so that concurrent failed logins for the
+// same account cannot interleave between the read and the write. SELECT ... FOR
+// UPDATE inside the CTE serialises them at the row level; without it, N parallel
+// requests could each read the same counter and collectively land far past the
+// threshold without ever triggering the lock.
+//
+// An expired lock resets the counter to 1 rather than continuing to accumulate, so
+// a user who returns the next day starts from a clean slate instead of being
+// re-locked by their first typo.
+func (r *employeeRepo) RegisterFailedLogin(ctx context.Context, email string, maxAttempts int, lockoutDuration time.Duration) (*time.Time, error) {
+	if maxAttempts < 1 {
+		maxAttempts = 1
 	}
-	return attempts, nil
+
+	var lockedUntil *time.Time
+	err := r.db.QueryRow(ctx, `
+		WITH target AS (
+			SELECT id,
+			       CASE
+			           WHEN locked_until IS NOT NULL AND locked_until <= now() THEN 1
+			           ELSE COALESCE(failed_login_attempts, 0) + 1
+			       END AS attempts
+			FROM employees
+			WHERE email = $1
+			FOR UPDATE
+		)
+		UPDATE employees e
+		SET failed_login_attempts = t.attempts,
+		    locked_until = CASE
+		                       WHEN t.attempts >= $2 THEN now() + make_interval(secs => $3)
+		                       WHEN e.locked_until IS NOT NULL AND e.locked_until <= now() THEN NULL
+		                       ELSE e.locked_until
+		                   END
+		FROM target t
+		WHERE e.id = t.id
+		RETURNING e.locked_until
+	`, email, maxAttempts, lockoutDuration.Seconds()).Scan(&lockedUntil)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			// No such account. Not an error worth surfacing: reporting it would turn
+			// the login endpoint into an account-existence oracle.
+			return nil, nil
+		}
+		return nil, fmt.Errorf("register failed login: %w", err)
+	}
+
+	return lockedUntil, nil
 }
 
-func (r *employeeRepo) ResetFailedLogin(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx, `UPDATE employees SET failed_login_attempts = 0 WHERE id = $1`, id)
+// ClearFailedLogins resets the counter and releases any lock. Called after a
+// successful authentication.
+func (r *employeeRepo) ClearFailedLogins(ctx context.Context, id uuid.UUID) error {
+	_, err := r.db.Exec(ctx,
+		`UPDATE employees SET failed_login_attempts = 0, locked_until = NULL WHERE id = $1`, id)
 	return err
+}
+
+// Unlock releases a lock administratively without touching employment status.
+func (r *employeeRepo) Unlock(ctx context.Context, id uuid.UUID) error {
+	return r.ClearFailedLogins(ctx, id)
+}
+
+func (r *employeeRepo) GetLockoutByEmail(ctx context.Context, email string) (*time.Time, error) {
+	var lockedUntil *time.Time
+	err := r.db.QueryRow(ctx, `SELECT locked_until FROM employees WHERE email = $1`, email).Scan(&lockedUntil)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get lockout by email: %w", err)
+	}
+	return lockedUntil, nil
+}
+
+func (r *employeeRepo) GetLockoutByID(ctx context.Context, id uuid.UUID) (*time.Time, error) {
+	var lockedUntil *time.Time
+	err := r.db.QueryRow(ctx, `SELECT locked_until FROM employees WHERE id = $1`, id).Scan(&lockedUntil)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get lockout by id: %w", err)
+	}
+	return lockedUntil, nil
 }

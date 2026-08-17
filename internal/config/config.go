@@ -146,6 +146,56 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
+// knownPlaceholderSecrets are values shipped in .env.example or otherwise published.
+// They are long enough to satisfy the length check, so they must be rejected by value.
+var knownPlaceholderSecrets = map[string]bool{
+	"super_secret_jwt_key_that_must_be_changed_before_production": true,
+	"generate_a_secure_random_string_here":                        true,
+	"change_me_change_me_change_me_change_me":                     true,
+	"your_jwt_secret_here_min_32_characters_long":                 true,
+}
+
+// IsPlaceholderSecret reports whether a secret is a known published placeholder,
+// or is trivially low-entropy (a single repeated character, or an obvious marker).
+func IsPlaceholderSecret(secret string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(secret))
+	if knownPlaceholderSecrets[normalized] {
+		return true
+	}
+
+	for _, marker := range []string{"changeme", "change_me", "placeholder", "example", "insecure", "replace_me"} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+
+	// A secret built from a single repeated character carries no entropy regardless of length.
+	if len(normalized) > 0 {
+		first := normalized[0]
+		uniform := true
+		for i := 0; i < len(normalized); i++ {
+			if normalized[i] != first {
+				uniform = false
+				break
+			}
+		}
+		if uniform {
+			return true
+		}
+	}
+
+	return false
+}
+
+// distinctRunes counts the number of unique runes in s.
+func distinctRunes(s string) int {
+	seen := make(map[rune]struct{}, len(s))
+	for _, r := range s {
+		seen[r] = struct{}{}
+	}
+	return len(seen)
+}
+
 func LoadDatabaseConfig() DatabaseConfig {
 	return DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
@@ -196,7 +246,9 @@ func loadSecurityConfig() SecurityConfig {
 		RateLimitWindowMin: getEnvInt("RATE_LIMIT_WINDOW_MIN", 15),
 		MaxLoginAttempts:   getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
 		LockoutDurationMin: getEnvInt("LOCKOUT_DURATION_MIN", 15),
-		TrustedProxies:     getEnvSlice("TRUSTED_PROXIES", "0.0.0.0"),
+		// Defaults to loopback only: the API sits behind Caddy on 127.0.0.1, and a
+		// wider default would let any client spoof its address via X-Forwarded-For.
+		TrustedProxies: getEnvSlice("TRUSTED_PROXIES", "127.0.0.1"),
 	}
 }
 
@@ -219,9 +271,12 @@ func loadCORSConfig() CORSConfig {
 
 func loadUploadConfig() UploadConfig {
 	return UploadConfig{
-		BasePath:     getEnv("UPLOAD_BASE_PATH", "./uploads"),
-		MaxSizeMB:    getEnvInt("UPLOAD_MAX_FILE_SIZE_MB", 5),
-		AllowedTypes: getEnvSlice("UPLOAD_ALLOWED_TYPES", "pdf,png,jpg,jpeg,doc,docx"),
+		BasePath:  getEnv("UPLOAD_BASE_PATH", "./uploads"),
+		MaxSizeMB: getEnvInt("UPLOAD_MAX_FILE_SIZE_MB", 5),
+		// Image endpoints intersect this list with the formats the server can actually
+		// decode and re-encode (see internal/upload), so listing a document type here
+		// never makes it acceptable to an image endpoint.
+		AllowedTypes: getEnvSlice("UPLOAD_ALLOWED_TYPES", "png,jpg,jpeg,gif,pdf,doc,docx"),
 	}
 }
 
@@ -260,7 +315,7 @@ func (c *Config) Validate() error {
 	if err := c.Server.Validate(); err != nil {
 		return fmt.Errorf("server: %w", err)
 	}
-	if err := c.JWT.Validate(); err != nil {
+	if err := c.JWT.Validate(c.Server.IsProduction()); err != nil {
 		return fmt.Errorf("jwt: %w", err)
 	}
 	if err := c.Security.Validate(); err != nil {
@@ -316,13 +371,33 @@ func (s *ServerConfig) Validate() error {
 	return nil
 }
 
-// Validate checks JWT configuration.
-func (j *JWTConfig) Validate() error {
+// Validate checks JWT configuration. A placeholder or low-entropy signing key is
+// always rejected: the value in .env.example is long enough to pass a length check,
+// so a deployment that forgot to override it would otherwise boot and sign every
+// token with a key published in the repository.
+func (j *JWTConfig) Validate(isProduction bool) error {
 	if len(j.Secret) < 32 {
 		return fmt.Errorf("secret must be at least 32 characters")
 	}
+	if IsPlaceholderSecret(j.Secret) {
+		return fmt.Errorf("secret is a known placeholder value; generate one with: openssl rand -hex 32")
+	}
+	if isProduction {
+		if len(j.Secret) < 48 {
+			return fmt.Errorf("secret must be at least 48 characters in production")
+		}
+		if distinctRunes(j.Secret) < 16 {
+			return fmt.Errorf("secret has too little entropy (%d distinct characters); generate one with: openssl rand -hex 32", distinctRunes(j.Secret))
+		}
+	}
+	if j.Issuer == "" {
+		return fmt.Errorf("issuer is required")
+	}
 	if j.AccessExpireMin < 1 {
 		return fmt.Errorf("access_expire_min must be at least 1")
+	}
+	if isProduction && j.AccessExpireMin > 60 {
+		return fmt.Errorf("access_expire_min must not exceed 60 in production")
 	}
 	if j.RefreshExpireDays < 1 {
 		return fmt.Errorf("refresh_expire_days must be at least 1")
@@ -335,6 +410,13 @@ func (j *JWTConfig) Validate() error {
 
 // Validate checks security configuration.
 func (s *SecurityConfig) Validate() error {
+	if s.MaxLoginAttempts < 1 {
+		return fmt.Errorf("max_login_attempts must be at least 1")
+	}
+	if s.LockoutDurationMin < 1 {
+		return fmt.Errorf("lockout_duration_min must be at least 1")
+	}
+
 	for _, proxy := range s.TrustedProxies {
 		proxy = strings.TrimSpace(proxy)
 		if proxy == "" {
@@ -452,6 +534,37 @@ func (s *SecurityConfig) IsTrustedProxy(ip string) bool {
 	}
 
 	return false
+}
+
+// IsAllowedOrigin reports whether origin exactly matches a configured allowed origin.
+// Matching is exact on scheme+host+port; there is deliberately no prefix, suffix or
+// wildcard matching, because "https://evil-shift-master.org" must not match
+// "https://shift-master.org". A configured "*" allows any origin and is only ever
+// intended for local development.
+func (c *CORSConfig) IsAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	for _, allowed := range c.AllowedOrigins {
+		allowed = strings.TrimSpace(allowed)
+		if allowed == "*" {
+			return true
+		}
+		if strings.EqualFold(strings.TrimSuffix(allowed, "/"), strings.TrimSuffix(origin, "/")) {
+			return true
+		}
+	}
+	return false
+}
+
+// Enabled reports whether web push is configured.
+func (v *VAPIDConfig) Enabled() bool {
+	return v.PublicKey != "" && v.PrivateKey != ""
+}
+
+// Enabled reports whether Graph API email delivery is configured.
+func (g *GraphAPIConfig) Enabled() bool {
+	return g.TenantID != "" && g.ClientID != "" && g.ClientSecret != ""
 }
 
 // MaxSizeBytes returns max file size in bytes.

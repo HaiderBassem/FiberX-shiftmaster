@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,10 +12,69 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// allowedOrigins holds the exact origins permitted to open a WebSocket. It is
+// populated once at startup by ConfigureOrigins.
+//
+// The upgrade handshake is a plain HTTP request that carries the user's cookies and
+// is not subject to the same-origin policy, so an unrestricted CheckOrigin lets any
+// website on the internet open an authenticated socket on the visitor's behalf
+// (cross-site WebSocket hijacking). Until ConfigureOrigins runs, every upgrade is
+// refused rather than allowed: failing closed means a wiring mistake shows up as a
+// broken socket in testing, not as an open door in production.
+var (
+	originMu       sync.RWMutex
+	allowedOrigins []string
+	originsSet     bool
+)
+
+// ConfigureOrigins sets the origins accepted by the WebSocket upgrader.
+func ConfigureOrigins(origins []string) {
+	originMu.Lock()
+	defer originMu.Unlock()
+
+	allowedOrigins = make([]string, 0, len(origins))
+	for _, o := range origins {
+		if trimmed := strings.TrimSpace(strings.TrimSuffix(o, "/")); trimmed != "" {
+			allowedOrigins = append(allowedOrigins, trimmed)
+		}
+	}
+	originsSet = true
+}
+
+// isOriginAllowed reports whether the handshake's Origin header is acceptable.
+func isOriginAllowed(r *http.Request) bool {
+	originMu.RLock()
+	defer originMu.RUnlock()
+
+	if !originsSet {
+		log.Println("WS: rejecting upgrade, allowed origins are not configured")
+		return false
+	}
+
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		// Browsers always send Origin on a WebSocket handshake. An absent header
+		// means a non-browser client, which cannot be the victim of a cross-site
+		// request, but also cannot be vouched for — refuse it.
+		return false
+	}
+
+	origin = strings.TrimSuffix(origin, "/")
+	for _, allowed := range allowedOrigins {
+		if allowed == "*" {
+			return true
+		}
+		if strings.EqualFold(allowed, origin) {
+			return true
+		}
+	}
+
+	log.Printf("WS: rejected upgrade from disallowed origin %q", origin)
+	return false
+}
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for the websocket
-	},
+	CheckOrigin:      isOriginAllowed,
 	HandshakeTimeout: 10 * time.Second,
 }
 

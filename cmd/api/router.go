@@ -12,6 +12,7 @@ import (
 func SetupRouter(
 	r *gin.Engine,
 	jwtSecret string,
+	jwtIssuer string,
 	deptRepo repository.DepartmentRepository,
 	authH *handlers.AuthHandler,
 	empH *handlers.EmployeeHandler,
@@ -39,9 +40,13 @@ func SetupRouter(
 	provinceH *handlers.ProvinceHandler,
 ) {
 	api := r.Group("/api")
-	
-	// Serve static uploads under /api/uploads
-	api.Static("/uploads", "./uploads")
+
+	// Serve uploads through a handler that pins the Content-Type to a fixed table
+	// keyed on a validated extension. gin's Static helper infers the type from the
+	// filename, which would return a stored .html or .svg as active content in this
+	// application's own origin.
+	api.GET("/uploads/*filepath", uploadH.ServeUpload)
+	api.HEAD("/uploads/*filepath", uploadH.ServeUpload)
 
 	// --- Public routes ---
 	auth := api.Group("/auth")
@@ -52,7 +57,7 @@ func SetupRouter(
 
 	// --- Protected routes (JWT required) ---
 	protected := api.Group("")
-	protected.Use(middleware.JWTAuth(jwtSecret))
+	protected.Use(middleware.JWTAuth(jwtSecret, jwtIssuer))
 	protected.Use(middleware.DepartmentContext(deptRepo))
 	{
 		// Uploads
