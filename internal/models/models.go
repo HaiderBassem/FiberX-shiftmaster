@@ -125,6 +125,20 @@ const (
 	ShiftSourceLeave     = "leave"
 )
 
+// HourlyLeaveReasonPrefix marks a leave row that occupies part of a day rather
+// than the whole of it.
+//
+// This is a wire contract, not an implementation detail: the calendar and
+// schedule views both detect hourly leave by testing leave_reason for this
+// prefix. It exists because shift_status cannot reliably carry 'hourly' — the
+// enum does not have that value on every deployed database — so the information
+// rides along in the reason text instead.
+//
+// Whether to apply it is decided by leave_types.is_hourly. It used to be decided
+// by comparing the type's name against "hourly" and against an Arabic literal
+// that was tested against the English column and so never matched.
+const HourlyLeaveReasonPrefix = "[hourly] "
+
 // PatternDay is one weekday of an employee's fixed weekly pattern.
 type PatternDay struct {
 	DayOfWeek int        `json:"day_of_week"` // 0=Sunday … 6=Saturday
@@ -224,6 +238,7 @@ type Leave struct {
 	LeaveTypeID          uuid.UUID  `json:"leave_type_id"`
 	LeaveTypeNameAr      *string    `json:"leave_type_name_ar"`
 	LeaveTypeNameEn      *string    `json:"leave_type_name_en"`
+	LeaveTypeIsHourly    bool       `json:"leave_type_is_hourly"`
 	StartDate            time.Time  `json:"start_date"`
 	EndDate              time.Time  `json:"end_date"`
 	TotalDays            int        `json:"total_days"`
