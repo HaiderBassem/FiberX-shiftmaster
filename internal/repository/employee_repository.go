@@ -37,6 +37,7 @@ type EmployeeRepository interface {
 	UpdateServicePermission(ctx context.Context, id uuid.UUID, canManage bool) error
 	UpdatePreferences(ctx context.Context, id uuid.UUID, prefs map[string]interface{}) error
 	GetEmailsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]string, error)
+	GetActiveIDsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]uuid.UUID, error)
 
 	// Authentication lockout. Lock state lives in the database rather than in
 	// process memory so it survives a restart and stays consistent across replicas.
@@ -361,6 +362,30 @@ func (r *employeeRepo) GetEmailsByDepartment(ctx context.Context, departmentID u
 		}
 	}
 	return emails, nil
+}
+
+// GetActiveIDsByDepartment returns the ids of active employees in a department.
+//
+// Used to fan real-time notifications out to a whole department. Deriving the
+// recipient list from push subscriptions instead would silently skip everyone who
+// never granted browser notification permission.
+func (r *employeeRepo) GetActiveIDsByDepartment(ctx context.Context, departmentID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id FROM employees WHERE department_id = $1 AND status = 'active'`, departmentID)
+	if err != nil {
+		return nil, fmt.Errorf("get active employee ids by department: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan employee id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // RegisterFailedLogin records one failed password attempt and applies a temporary

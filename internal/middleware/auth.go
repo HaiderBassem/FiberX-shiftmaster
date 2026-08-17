@@ -105,13 +105,16 @@ func SetAuthContext(c *gin.Context, claims *Claims) {
 
 // JWTAuth returns middleware that validates access tokens. Only tokens of type
 // "access" are accepted; a refresh token presented here is rejected.
+//
+// Credentials are read exclusively from the Authorization header. A ?token=
+// query fallback used to apply to every protected route, which meant any request
+// could put a bearer token somewhere that reverse proxies log, browsers keep in
+// history, and pages leak through Referer. The WebSocket, the one endpoint that
+// genuinely cannot set a header, now uses a separate short-lived single-use
+// ticket instead (see WSTicketAuth).
 func JWTAuth(secret, issuer string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := bearerToken(c)
-		if tokenStr == "" {
-			// Fallback to query string for SSE / EventSource
-			tokenStr = strings.TrimSpace(c.Query("token"))
-		}
 
 		if tokenStr == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{

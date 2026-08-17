@@ -39,6 +39,9 @@ func SetupRouter(
 	serviceH *handlers.ServiceHandler,
 	provinceH *handlers.ProvinceHandler,
 ) {
+	// Replay cache for single-use WebSocket tickets.
+	wsTickets := middleware.NewTicketStore()
+
 	api := r.Group("/api")
 
 	// Serve uploads through a handler that pins the Content-Type to a fixed table
@@ -54,6 +57,16 @@ func SetupRouter(
 		auth.POST("/login", authH.Login)
 		auth.POST("/refresh", authH.Refresh)
 	}
+
+	// --- WebSocket upgrade ---
+	// Kept outside the JWTAuth group: a browser cannot set an Authorization header
+	// on a WebSocket, so this route alone authenticates from a short-lived
+	// single-use ticket obtained from POST /notifications/ws-ticket.
+	api.GET("/notifications/ws",
+		middleware.WSTicketAuth(jwtSecret, jwtIssuer, wsTickets),
+		middleware.DepartmentContext(deptRepo),
+		notifH.ServeWS,
+	)
 
 	// --- Protected routes (JWT required) ---
 	protected := api.Group("")
@@ -138,7 +151,7 @@ func SetupRouter(
 			fiberxData.POST("", fiberxDataH.CreateDocument)
 			fiberxData.PUT("/:id", fiberxDataH.UpdateDocument)
 			fiberxData.DELETE("/:id", fiberxDataH.DeleteDocument)
-			
+
 			// Access Management
 			fiberxData.GET("/:id/access", fiberxDataH.GetEmployeeAccessList)
 			fiberxData.POST("/:id/access", fiberxDataH.SetEmployeeAccess)
@@ -199,7 +212,9 @@ func SetupRouter(
 			notifs.GET("/unread/count", notifH.UnreadCount)
 			notifs.POST("/:id/read", notifH.MarkAsRead)
 			notifs.POST("/read-all", notifH.MarkAllAsRead)
-			notifs.GET("/ws", notifH.ServeWS)
+			// Exchanges the header-borne access token for a credential that is safe
+			// to put in the WebSocket URL.
+			notifs.POST("/ws-ticket", notifH.IssueWSTicket)
 		}
 
 		// Item Requests
@@ -225,11 +240,11 @@ func SetupRouter(
 			infoTables.POST("/:id/rows", infoTableH.CreateTableRow)
 			infoTables.PUT("/:id/rows/:rowId", infoTableH.UpdateTableRow)
 			infoTables.DELETE("/:id/rows/:rowId", infoTableH.DeleteTableRow)
-			
+
 			// Export / Import
 			infoTables.GET("/:id/export", infoTableH.ExportToExcel)
 			infoTables.POST("/:id/import", infoTableH.ImportFromExcel)
-			
+
 			// Access Management
 			infoTables.GET("/:id/access", infoTableH.GetAccessLists)
 			infoTables.POST("/:id/access", infoTableH.AddEmployeeAccess)
@@ -245,7 +260,7 @@ func SetupRouter(
 			helpDocs.POST("", helpDocH.CreateDocument)
 			helpDocs.PUT("/:id", helpDocH.UpdateDocument)
 			helpDocs.DELETE("/:id", helpDocH.DeleteDocument)
-			
+
 			// Access Management
 			helpDocs.GET("/:id/access", helpDocH.GetAccessList)
 			helpDocs.POST("/:id/access", helpDocH.SetEmployeeAccess)
@@ -255,7 +270,7 @@ func SetupRouter(
 		externalLinks := protected.Group("/external-links")
 		{
 			externalLinks.GET("/my-links", moduleAccessH.GetMyModules)
-			
+
 			// Management endpoints (Admin, Manager, Team Leader)
 			externalLinks.GET("", middleware.RequireRole("admin", "manager", "team_leader"), moduleAccessH.GetAllLinks)
 			externalLinks.POST("", middleware.RequireRole("admin", "manager", "team_leader"), moduleAccessH.CreateLink)
@@ -346,8 +361,6 @@ func SetupRouter(
 			tlWrite.DELETE("/item-requests/categories/:id", itemReqH.DeleteCategory)
 		}
 
-
-
 		// Push Notifications
 		push := protected.Group("/push")
 		{
@@ -375,7 +388,7 @@ func SetupRouter(
 			// Schedule management
 			admin.POST("/schedules/:id/publish", scheduleH.Publish)
 			admin.POST("/schedules/shifts/:id/replace", scheduleH.AssignReplacement)
-			
+
 			// Leave Types management
 			admin.POST("/leave-types", leaveTypeH.Create)
 			admin.PUT("/leave-types/:id", leaveTypeH.Update)

@@ -76,7 +76,7 @@ func main() {
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifService, emailService, db)
 
-	pushService := notification.NewPushService(notifRepo, cfg.VAPID)
+	pushService := notification.NewPushService(notifRepo, employeeRepo, cfg.VAPID)
 
 	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
@@ -100,7 +100,7 @@ func main() {
 	leaveHandler := handlers.NewLeaveHandler(leaveService)
 	swapHandler := handlers.NewSwapHandler(swapService)
 	taskHandler := handlers.NewTaskHandler(taskService)
-	notifHandler := handlers.NewNotificationHandler(notifService)
+	notifHandler := handlers.NewNotificationHandler(notifService, cfg.JWT)
 	auditHandler := handlers.NewAuditHandler(auditService)
 	leaveTypeHandler := handlers.NewLeaveTypeHandler(leaveTypeService)
 	infoTableHandler := handlers.NewInfoTableHandler(infoTableService)

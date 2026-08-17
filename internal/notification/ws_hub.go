@@ -120,36 +120,102 @@ func (h *WSHub) RemoveClient(employeeID uuid.UUID, client *Client) {
 	}
 }
 
-func (h *WSHub) SendToEmployee(employeeID uuid.UUID, payload PushPayload) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+// deliver enqueues data for a client, reporting whether it was accepted.
+//
+// A full buffer means the peer has stopped reading: a suspended tab, a dropped
+// connection the TCP stack has not given up on yet, or a client too slow to keep
+// pace. Previously the write was discarded and the client left registered, so it
+// silently missed every later message while holding a connection, a goroutine and
+// a 256-slot channel for as long as the process lived. Such a client is now
+// evicted instead, and reconnects on its own.
+func deliver(client *Client, data []byte) bool {
+	select {
+	case client.Send <- data:
+		return true
+	default:
+		return false
+	}
+}
 
-	if clients, ok := h.clients[employeeID]; ok {
-		data, _ := json.Marshal(payload)
-		for client := range clients {
-			select {
-			case client.Send <- data:
-			default:
-				// If send buffer is full, remove the client
-				// It will be removed in a goroutine to prevent deadlock
-			}
+// evict deregisters an unresponsive client and closes its connection.
+//
+// Callers must not hold h.mu: RemoveClient takes the write lock. RemoveClient is
+// idempotent, so the deferred call in ServeWS that follows the connection close
+// is a no-op, and the send channel is closed exactly once.
+func (h *WSHub) evict(employeeID uuid.UUID, client *Client) {
+	log.Printf("WS: evicting unresponsive client %s for employee %s", client.ID, employeeID)
+	h.RemoveClient(employeeID, client)
+	if client.Conn != nil {
+		_ = client.Conn.Close()
+	}
+}
+
+func (h *WSHub) SendToEmployee(employeeID uuid.UUID, payload PushPayload) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("WS: failed to marshal payload: %v", err)
+		return
+	}
+
+	// Collect stalled clients under the read lock, then evict outside it: evicting
+	// closes a connection, which wakes ServeWS's reader, which calls RemoveClient
+	// and takes the write lock. Doing that here would deadlock.
+	var stalled []*Client
+
+	h.mu.RLock()
+	for client := range h.clients[employeeID] {
+		if !deliver(client, data) {
+			stalled = append(stalled, client)
 		}
+	}
+	h.mu.RUnlock()
+
+	for _, client := range stalled {
+		h.evict(employeeID, client)
+	}
+}
+
+// SendToEmployees fans a payload out to several recipients.
+func (h *WSHub) SendToEmployees(employeeIDs []uuid.UUID, payload PushPayload) {
+	for _, id := range employeeIDs {
+		h.SendToEmployee(id, payload)
 	}
 }
 
 func (h *WSHub) Broadcast(payload PushPayload) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	data, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("WS: failed to marshal payload: %v", err)
+		return
+	}
 
-	data, _ := json.Marshal(payload)
-	for _, clients := range h.clients {
+	type stalledClient struct {
+		employeeID uuid.UUID
+		client     *Client
+	}
+	var stalled []stalledClient
+
+	h.mu.RLock()
+	for employeeID, clients := range h.clients {
 		for client := range clients {
-			select {
-			case client.Send <- data:
-			default:
+			if !deliver(client, data) {
+				stalled = append(stalled, stalledClient{employeeID, client})
 			}
 		}
 	}
+	h.mu.RUnlock()
+
+	for _, s := range stalled {
+		h.evict(s.employeeID, s.client)
+	}
+}
+
+// ConnectedEmployees reports how many distinct employees currently hold a socket.
+// Used by tests and for operational visibility.
+func (h *WSHub) ConnectedEmployees() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
 }
 
 // WritePump pumps messages from the hub to the websocket connection.
