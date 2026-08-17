@@ -14,16 +14,17 @@ import (
 
 // Config holds all application configuration.
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	JWT      JWTConfig
-	Security SecurityConfig
-	Logging  LoggingConfig
-	CORS     CORSConfig
-	Upload   UploadConfig
-	SMTP     SMTPConfig
-	GraphAPI GraphAPIConfig
-	VAPID    VAPIDConfig
+	Database  DatabaseConfig
+	Server    ServerConfig
+	JWT       JWTConfig
+	Security  SecurityConfig
+	Logging   LoggingConfig
+	CORS      CORSConfig
+	Upload    UploadConfig
+	SMTP      SMTPConfig
+	GraphAPI  GraphAPIConfig
+	VAPID     VAPIDConfig
+	Assistant AssistantConfig
 }
 
 // DatabaseConfig holds database connection and pool settings.
@@ -122,21 +123,48 @@ type VAPIDConfig struct {
 	Subject    string
 }
 
+// AssistantConfig holds the AI assistant settings. The assistant is an
+// optional feature: without an API key every other part of the application
+// runs unchanged and the assistant endpoints report themselves unavailable.
+type AssistantConfig struct {
+	APIKey    string
+	Model     string
+	BaseURL   string
+	MaxTokens int
+	// Timeout bounds a single model call; a whole conversation turn is capped
+	// at roughly Timeout × (MaxToolRounds + retries).
+	Timeout    time.Duration
+	MaxRetries int
+
+	// Abuse and cost limits.
+	RequestsPerMinute   int // per employee
+	MaxToolRounds       int // model↔tool iterations per turn
+	MaxInputChars       int // one user message
+	MaxContextMsgs      int // transcript window replayed to the model
+	MaxConversationMsgs int // hard cap per conversation before a new one is required
+
+	PendingActionTTL time.Duration
+}
+
+// Enabled reports whether the assistant can actually reach a model.
+func (a AssistantConfig) Enabled() bool { return a.APIKey != "" }
+
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Database: LoadDatabaseConfig(),
-		Server:   loadServerConfig(),
-		JWT:      loadJWTConfig(),
-		Security: loadSecurityConfig(),
-		Logging:  loadLoggingConfig(),
-		CORS:     loadCORSConfig(),
-		Upload:   loadUploadConfig(),
-		SMTP:     loadSMTPConfig(),
-		GraphAPI: loadGraphAPIConfig(),
-		VAPID:    loadVAPIDConfig(),
+		Database:  LoadDatabaseConfig(),
+		Server:    loadServerConfig(),
+		JWT:       loadJWTConfig(),
+		Security:  loadSecurityConfig(),
+		Logging:   loadLoggingConfig(),
+		CORS:      loadCORSConfig(),
+		Upload:    loadUploadConfig(),
+		SMTP:      loadSMTPConfig(),
+		GraphAPI:  loadGraphAPIConfig(),
+		VAPID:     loadVAPIDConfig(),
+		Assistant: loadAssistantConfig(),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -307,6 +335,29 @@ func loadVAPIDConfig() VAPIDConfig {
 	}
 }
 
+func loadAssistantConfig() AssistantConfig {
+	// ANTHROPIC_API_KEY is accepted as a fallback because it is the
+	// conventional variable name; ASSISTANT_API_KEY wins when both are set.
+	key := getEnv("ASSISTANT_API_KEY", "")
+	if key == "" {
+		key = getEnv("ANTHROPIC_API_KEY", "")
+	}
+	return AssistantConfig{
+		APIKey:              key,
+		Model:               getEnv("ASSISTANT_MODEL", "claude-sonnet-5"),
+		BaseURL:             getEnv("ASSISTANT_BASE_URL", "https://api.anthropic.com"),
+		MaxTokens:           getEnvInt("ASSISTANT_MAX_TOKENS", 1500),
+		Timeout:             getEnvSeconds("ASSISTANT_TIMEOUT_SECONDS", 45),
+		MaxRetries:          getEnvInt("ASSISTANT_MAX_RETRIES", 2),
+		RequestsPerMinute:   getEnvInt("ASSISTANT_REQUESTS_PER_MINUTE", 8),
+		MaxToolRounds:       getEnvInt("ASSISTANT_MAX_TOOL_ROUNDS", 6),
+		MaxInputChars:       getEnvInt("ASSISTANT_MAX_INPUT_CHARS", 4000),
+		MaxContextMsgs:      getEnvInt("ASSISTANT_MAX_CONTEXT_MESSAGES", 24),
+		MaxConversationMsgs: getEnvInt("ASSISTANT_MAX_CONVERSATION_MESSAGES", 200),
+		PendingActionTTL:    getEnvSeconds("ASSISTANT_PENDING_ACTION_TTL_SECONDS", 300),
+	}
+}
+
 // Validate checks all configuration values.
 func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {
@@ -329,6 +380,45 @@ func (c *Config) Validate() error {
 	}
 	if err := c.GraphAPI.Validate(); err != nil {
 		return fmt.Errorf("graphapi: %w", err)
+	}
+	if err := c.Assistant.Validate(); err != nil {
+		return fmt.Errorf("assistant: %w", err)
+	}
+	return nil
+}
+
+// Validate checks assistant configuration. Limits are validated even when the
+// feature is disabled so a typo is caught before the key is ever added.
+func (a *AssistantConfig) Validate() error {
+	if a.MaxTokens < 256 || a.MaxTokens > 16384 {
+		return fmt.Errorf("max_tokens must be between 256 and 16384")
+	}
+	if a.Timeout < 5*time.Second || a.Timeout > 5*time.Minute {
+		return fmt.Errorf("timeout must be between 5s and 5m")
+	}
+	if a.MaxRetries < 0 || a.MaxRetries > 5 {
+		return fmt.Errorf("max_retries must be between 0 and 5")
+	}
+	if a.RequestsPerMinute < 1 || a.RequestsPerMinute > 120 {
+		return fmt.Errorf("requests_per_minute must be between 1 and 120")
+	}
+	if a.MaxToolRounds < 1 || a.MaxToolRounds > 12 {
+		return fmt.Errorf("max_tool_rounds must be between 1 and 12")
+	}
+	if a.MaxInputChars < 100 || a.MaxInputChars > 32000 {
+		return fmt.Errorf("max_input_chars must be between 100 and 32000")
+	}
+	if a.MaxContextMsgs < 2 || a.MaxContextMsgs > 100 {
+		return fmt.Errorf("max_context_messages must be between 2 and 100")
+	}
+	if a.MaxConversationMsgs < a.MaxContextMsgs {
+		return fmt.Errorf("max_conversation_messages must be at least max_context_messages")
+	}
+	if a.PendingActionTTL < 30*time.Second || a.PendingActionTTL > time.Hour {
+		return fmt.Errorf("pending_action_ttl must be between 30s and 1h")
+	}
+	if a.Enabled() && a.Model == "" {
+		return fmt.Errorf("model is required when an API key is set")
 	}
 	return nil
 }

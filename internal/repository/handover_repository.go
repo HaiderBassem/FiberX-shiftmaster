@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 
@@ -13,10 +14,10 @@ import (
 type HandoverRepository interface {
 	Create(ctx context.Context, handover *models.Handover) error
 	GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error)
-	Claim(ctx context.Context, id, employeeID uuid.UUID) error
-	Unclaim(ctx context.Context, id, employeeID uuid.UUID) error
-	AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error
-	Complete(ctx context.Context, id, employeeID uuid.UUID) error
+	Claim(ctx context.Context, id, employeeID, departmentID uuid.UUID) error
+	Unclaim(ctx context.Context, id, employeeID, departmentID uuid.UUID) error
+	AddComment(ctx context.Context, id, employeeID, departmentID uuid.UUID, comment string) error
+	Complete(ctx context.Context, id, employeeID, departmentID uuid.UUID) error
 }
 
 type handoverRepo struct {
@@ -91,44 +92,71 @@ func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UU
 	return handovers, rows.Err()
 }
 
-func (r *handoverRepo) Claim(ctx context.Context, id, employeeID uuid.UUID) error {
+// The department predicate on every mutation below is the authorization
+// boundary: handovers are a department-internal workflow, and these used to
+// accept any handover ID from any authenticated user in the company.
+
+func (r *handoverRepo) Claim(ctx context.Context, id, employeeID, departmentID uuid.UUID) error {
 	query := `
 		UPDATE shift_handovers
 		SET status = 'claimed', claimed_by = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2 AND status = 'open'
+		WHERE id = $2 AND department_id = $3 AND status = 'open'
 	`
-	_, err := r.db.Exec(ctx, query, employeeID, id)
-	return err
+	tag, err := r.db.Exec(ctx, query, employeeID, id, departmentID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("handover not found or not open")
+	}
+	return nil
 }
 
-func (r *handoverRepo) Unclaim(ctx context.Context, id, employeeID uuid.UUID) error {
+func (r *handoverRepo) Unclaim(ctx context.Context, id, employeeID, departmentID uuid.UUID) error {
 	query := `
 		UPDATE shift_handovers
 		SET status = 'open', claimed_by = NULL, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $1 AND claimed_by = $2 AND status = 'claimed'
+		WHERE id = $1 AND claimed_by = $2 AND department_id = $3 AND status = 'claimed'
 	`
-	_, err := r.db.Exec(ctx, query, id, employeeID)
-	return err
+	tag, err := r.db.Exec(ctx, query, id, employeeID, departmentID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("handover not found or not claimed by you")
+	}
+	return nil
 }
 
-func (r *handoverRepo) AddComment(ctx context.Context, id, employeeID uuid.UUID, comment string) error {
+func (r *handoverRepo) AddComment(ctx context.Context, id, employeeID, departmentID uuid.UUID, comment string) error {
 	query := `
 		INSERT INTO handover_comments (handover_id, employee_id, comment)
-		VALUES ($1, $2, $3)
+		SELECT $1, $2, $3
+		WHERE EXISTS (SELECT 1 FROM shift_handovers WHERE id = $1 AND department_id = $4)
 	`
-	_, err := r.db.Exec(ctx, query, id, employeeID, comment)
-	if err == nil {
-		_, _ = r.db.Exec(ctx, "UPDATE shift_handovers SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", id)
+	tag, err := r.db.Exec(ctx, query, id, employeeID, comment, departmentID)
+	if err != nil {
+		return err
 	}
-	return err
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("handover not found")
+	}
+	_, _ = r.db.Exec(ctx, "UPDATE shift_handovers SET updated_at = CURRENT_TIMESTAMP WHERE id = $1", id)
+	return nil
 }
 
-func (r *handoverRepo) Complete(ctx context.Context, id, employeeID uuid.UUID) error {
+func (r *handoverRepo) Complete(ctx context.Context, id, employeeID, departmentID uuid.UUID) error {
 	query := `
 		UPDATE shift_handovers
 		SET status = 'completed', done_by = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2
+		WHERE id = $2 AND department_id = $3 AND status <> 'completed'
 	`
-	_, err := r.db.Exec(ctx, query, employeeID, id)
-	return err
+	tag, err := r.db.Exec(ctx, query, employeeID, id, departmentID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("handover not found or already completed")
+	}
+	return nil
 }

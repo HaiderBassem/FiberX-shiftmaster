@@ -17,6 +17,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -50,6 +52,9 @@ type Migration struct {
 type Result struct {
 	Applied []string
 	Skipped []string
+	// Adopted lists files that Adopt recorded without executing, because their
+	// objects already existed in a database that predates the ledger.
+	Adopted []string
 	// Changed lists files whose contents no longer match what was recorded.
 	// Already-applied migrations are immutable history; an edit means someone
 	// changed a file that has run somewhere, and the two databases have now
@@ -192,16 +197,18 @@ func Baseline(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) e
 // aborts immediately and returns the error: a partially migrated database must
 // be visible, not reported as success.
 func Run(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) (*Result, error) {
+	// Never nil, even on early failure: callers report what ran before checking
+	// the error.
+	result := &Result{}
+
 	if err := EnsureLedger(ctx, pool); err != nil {
-		return nil, err
+		return result, err
 	}
 
 	seen, err := applied(ctx, pool)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
-
-	result := &Result{}
 
 	for _, m := range migrations {
 		if recorded, ok := seen[m.Filename]; ok {
@@ -217,6 +224,103 @@ func Run(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) (*Resu
 			return result, err
 		}
 		result.Applied = append(result.Applied, m.Filename)
+	}
+
+	return result, nil
+}
+
+// replayCodes are the SQLSTATE codes that arise when an already-applied
+// migration is replayed against the schema it helped produce, and they are the
+// only errors Adopt forgives. Three classes, all observed replaying this
+// repository's own series against a database it built:
+//
+//   - "already exists": the objects the file creates are there from its
+//     original run (003 onward).
+//   - "does not exist": the file references an object that a later migration
+//     dropped or renamed. Example: 010 indexes departments.manager_id, which
+//     016 removed.
+//   - integrity violations (class 23): a seed insert re-runs against
+//     constraints that later migrations tightened. Example: 043 seeds
+//     provinces, which 045 made department-scoped and NOT NULL.
+//
+// Anything else — syntax errors, datatype mismatches, permission failures —
+// is a real failure and aborts.
+var replayCodes = map[string]struct{}{
+	"42701": {}, // duplicate_column
+	"42710": {}, // duplicate_object: types, constraints, roles
+	"42723": {}, // duplicate_function
+	"42P06": {}, // duplicate_schema
+	"42P07": {}, // duplicate_table: also indexes, sequences, views
+	"42703": {}, // undefined_column: column dropped by a later migration
+	"42P01": {}, // undefined_table: table dropped by a later migration
+	"42704": {}, // undefined_object: type or constraint dropped later
+	"42883": {}, // undefined_function: function dropped or re-signatured later
+}
+
+func isReplayErr(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	if strings.HasPrefix(pgErr.Code, "23") { // integrity_constraint_violation
+		return true
+	}
+	_, ok := replayCodes[pgErr.Code]
+	return ok
+}
+
+// Adopt is Run for a database that predates the ledger and therefore already
+// contains most of the schema, such as a production database first created by
+// the old psql loop.
+//
+// Each pending migration is attempted exactly like Run. When one fails in a
+// way that can only come from replaying already-applied history (see
+// replayCodes), the transaction is rolled back — leaving the database
+// untouched — and the file is recorded as applied, on the grounds that history
+// has already run it. Any other failure aborts, exactly like Run. Migrations
+// newer than the existing schema apply normally, so a legacy database both
+// adopts its past and catches up in one pass. Existing data is never dropped
+// or modified beyond what the pending migrations themselves do.
+func Adopt(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) (*Result, error) {
+	result := &Result{}
+
+	if err := EnsureLedger(ctx, pool); err != nil {
+		return result, err
+	}
+
+	seen, err := applied(ctx, pool)
+	if err != nil {
+		return result, err
+	}
+
+	for _, m := range migrations {
+		if recorded, ok := seen[m.Filename]; ok {
+			if recorded != m.Checksum {
+				result.Changed = append(result.Changed, m.Filename)
+			}
+			result.Skipped = append(result.Skipped, m.Filename)
+			continue
+		}
+
+		started := time.Now()
+		err := applyOne(ctx, pool, m, started)
+		if err == nil {
+			result.Applied = append(result.Applied, m.Filename)
+			continue
+		}
+		if !isReplayErr(err) {
+			return result, err
+		}
+
+		// The schema already contains this migration's objects; applyOne rolled
+		// its attempt back, so only the ledger entry is written.
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO schema_migrations (filename, checksum) VALUES ($1, $2)`,
+			m.Filename, m.Checksum,
+		); err != nil {
+			return result, fmt.Errorf("record adopted %s: %w", m.Filename, err)
+		}
+		result.Adopted = append(result.Adopted, m.Filename)
 	}
 
 	return result, nil

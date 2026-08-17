@@ -20,6 +20,10 @@ type LeaveRepository interface {
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetOverlappingLeavesCount(ctx context.Context, departmentID uuid.UUID, startDate, endDate time.Time) (int, error)
 	GetOverlappingLeavesCountByShift(ctx context.Context, departmentID uuid.UUID, shiftID uuid.UUID, date time.Time, isHourly bool) (int, error)
+	// GetActiveByEmployeeInRange returns the employee's own leaves that are
+	// still live (pending or approved) and whose date range touches [from, to].
+	// Used for double-booking checks; the caller compares hourly windows.
+	GetActiveByEmployeeInRange(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.Leave, error)
 	GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
@@ -111,6 +115,22 @@ func (r *leaveRepo) GetLeavesForReminders(ctx context.Context) ([]models.Leave, 
 func (r *leaveRepo) MarkReminderSent(ctx context.Context, leaveID uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `UPDATE leaves SET reminder_sent_at = CURRENT_TIMESTAMP WHERE id = $1`, leaveID)
 	return err
+}
+
+func (r *leaveRepo) GetActiveByEmployeeInRange(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.Leave, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+leaveColumns+` FROM leaves l
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE l.employee_id = $1
+		   AND l.status IN ('pending', 'approved_by_team_leader', 'approved_by_manager')
+		   AND l.start_date <= $3 AND l.end_date >= $2
+		 ORDER BY l.start_date`,
+		employeeID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("get active leaves in range: %w", err)
+	}
+	defer rows.Close()
+	return r.scanLeaves(rows)
 }
 
 func (r *leaveRepo) GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error) {

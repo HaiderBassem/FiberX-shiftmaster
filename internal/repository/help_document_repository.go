@@ -67,7 +67,7 @@ func (r *HelpDocumentRepository) GetVisibleDocuments(ctx context.Context, depart
 	return docs, nil
 }
 
-func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string, canManageHelpDocs bool) (*models.HelpDocument, error) {
+func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, departmentID *uuid.UUID, role string, canManageHelpDocs bool) (*models.HelpDocument, error) {
 	query := `
 		SELECT 
 			d.id, d.department_id, d.title, d.content, d.created_by, d.created_at, d.updated_at,
@@ -89,6 +89,16 @@ func (r *HelpDocumentRepository) GetDocumentByID(ctx context.Context, id uuid.UU
 			return nil, nil // not found
 		}
 		return nil, err
+	}
+
+	// Help documents are department-scoped. The list query has always
+	// filtered by department; this point read used to have no department
+	// predicate at all, so any employee could fetch any department's document
+	// by UUID. Admins keep global scope, matching DepartmentContext. The
+	// mismatch reads as not-found so the endpoint cannot confirm which IDs
+	// exist elsewhere.
+	if role != "admin" && (departmentID == nil || d.DepartmentID != *departmentID) {
+		return nil, nil
 	}
 
 	if role == "manager" || role == "admin" || canManageHelpDocs {

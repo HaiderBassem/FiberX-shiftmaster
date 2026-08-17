@@ -483,14 +483,49 @@ func (s *ScheduleService) AssignReplacement(ctx context.Context, shiftID uuid.UU
 	return nil
 }
 
-// CheckIn records an employee's check-in time.
-func (s *ScheduleService) CheckIn(ctx context.Context, shiftID uuid.UUID) error {
-	return s.scheduleRepo.CheckIn(ctx, shiftID)
+// CheckIn records the actor's check-in on their own shift row. Repeating an
+// already-done check-in succeeds without rewriting the original timestamp;
+// someone else's row is reported as not found rather than forbidden, so the
+// endpoint cannot be used to probe which row IDs exist.
+func (s *ScheduleService) CheckIn(ctx context.Context, shiftRowID, actorID uuid.UUID) error {
+	stamped, err := s.scheduleRepo.CheckIn(ctx, shiftRowID, actorID)
+	if err != nil {
+		return fmt.Errorf("check in: %w", err)
+	}
+	if stamped {
+		return nil
+	}
+	es, err := s.scheduleRepo.GetEmployeeShiftByID(ctx, shiftRowID)
+	if err != nil || es == nil || es.EmployeeID != actorID {
+		return fmt.Errorf("shift not found")
+	}
+	if es.CheckInTime != nil {
+		return nil // already checked in — idempotent
+	}
+	return fmt.Errorf("check in failed")
 }
 
-// CheckOut records an employee's check-out time and calculates hours.
-func (s *ScheduleService) CheckOut(ctx context.Context, shiftID uuid.UUID) error {
-	return s.scheduleRepo.CheckOut(ctx, shiftID)
+// CheckOut records the actor's check-out and computed hours, requiring a prior
+// check-in. A repeated check-out succeeds without recomputing hours.
+func (s *ScheduleService) CheckOut(ctx context.Context, shiftRowID, actorID uuid.UUID) error {
+	stamped, err := s.scheduleRepo.CheckOut(ctx, shiftRowID, actorID)
+	if err != nil {
+		return fmt.Errorf("check out: %w", err)
+	}
+	if stamped {
+		return nil
+	}
+	es, err := s.scheduleRepo.GetEmployeeShiftByID(ctx, shiftRowID)
+	if err != nil || es == nil || es.EmployeeID != actorID {
+		return fmt.Errorf("shift not found")
+	}
+	if es.CheckOutTime != nil {
+		return nil // already checked out — idempotent
+	}
+	if es.CheckInTime == nil {
+		return fmt.Errorf("cannot check out before checking in")
+	}
+	return fmt.Errorf("check out failed")
 }
 
 // GetDailyShifts returns all shifts for a specific date.

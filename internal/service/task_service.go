@@ -296,8 +296,32 @@ func (s *TaskService) checkTaskFutureDate(ctx context.Context, executionID uuid.
 	return nil
 }
 
+// authorizeExecutionActor enforces who may drive an execution's status: the
+// assignee themselves, an admin, or a team leader / manager whose department
+// is the assignee's. These routes used to check nothing beyond a valid login,
+// so any employee could start or complete any other employee's task by ID.
+func (s *TaskService) authorizeExecutionActor(ctx context.Context, executionID, actorID uuid.UUID, actorRole string) error {
+	ownerID, ownerDept, err := s.taskRepo.GetExecutionOwner(ctx, executionID)
+	if err != nil {
+		return fmt.Errorf("task execution not found")
+	}
+	if ownerID == actorID || actorRole == "admin" {
+		return nil
+	}
+	if actorRole == "team_leader" || actorRole == "manager" {
+		actor, err := s.employeeRepo.GetByID(ctx, actorID)
+		if err == nil && actor.DepartmentID != nil && ownerDept != nil && *actor.DepartmentID == *ownerDept {
+			return nil
+		}
+	}
+	return fmt.Errorf("you are not authorized to update this task")
+}
+
 // StartTask marks a task execution as in_progress with a timestamp.
-func (s *TaskService) StartTask(ctx context.Context, executionID uuid.UUID) error {
+func (s *TaskService) StartTask(ctx context.Context, executionID, actorID uuid.UUID, actorRole string) error {
+	if err := s.authorizeExecutionActor(ctx, executionID, actorID, actorRole); err != nil {
+		return err
+	}
 	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
 		return err
 	}
@@ -305,7 +329,10 @@ func (s *TaskService) StartTask(ctx context.Context, executionID uuid.UUID) erro
 }
 
 // CompleteTask marks a task execution as completed with a timestamp.
-func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, completionType string, notes *string) error {
+func (s *TaskService) CompleteTask(ctx context.Context, executionID, actorID uuid.UUID, actorRole string, completionType string, notes *string) error {
+	if err := s.authorizeExecutionActor(ctx, executionID, actorID, actorRole); err != nil {
+		return err
+	}
 	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
 		return err
 	}
@@ -316,7 +343,10 @@ func (s *TaskService) CompleteTask(ctx context.Context, executionID uuid.UUID, c
 	return s.taskRepo.CompleteExecution(ctx, executionID, completionType, notes)
 }
 
-func (s *TaskService) UpdateTaskStatus(ctx context.Context, executionID uuid.UUID, status string, notes *string) error {
+func (s *TaskService) UpdateTaskStatus(ctx context.Context, executionID, actorID uuid.UUID, actorRole string, status string, notes *string) error {
+	if err := s.authorizeExecutionActor(ctx, executionID, actorID, actorRole); err != nil {
+		return err
+	}
 	if err := s.checkTaskFutureDate(ctx, executionID); err != nil {
 		return err
 	}

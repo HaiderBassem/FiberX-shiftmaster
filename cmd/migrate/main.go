@@ -4,6 +4,9 @@
 //
 //	migrate up        apply everything pending (default)
 //	migrate status    report what is pending, apply nothing
+//	migrate adopt     up, but when a migration fails only because its objects
+//	                  already exist, record it as applied instead — for a
+//	                  database that predates the ledger
 //	migrate baseline  record the whole series as applied without running it
 //
 // Exit status is non-zero on any failure, so a deploy script that does not
@@ -56,10 +59,12 @@ func main() {
 		runUp(ctx, pool, migrations)
 	case "status":
 		runStatus(ctx, pool, migrations)
+	case "adopt":
+		runAdopt(ctx, pool, migrations)
 	case "baseline":
 		runBaseline(ctx, pool, migrations)
 	default:
-		fatalf("error: unknown command %q (expected up, status or baseline)", command)
+		fatalf("error: unknown command %q (expected up, status, adopt or baseline)", command)
 	}
 }
 
@@ -117,6 +122,29 @@ func runUp(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migrati
 	}
 
 	reportf("ok: %d applied, %d already recorded", len(result.Applied), len(result.Skipped))
+}
+
+func runAdopt(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
+	result, err := migrate.Adopt(ctx, pool, migrations)
+
+	for _, name := range result.Applied {
+		reportf("applied  %s", name)
+	}
+	for _, name := range result.Adopted {
+		reportf("adopted  %s", name)
+	}
+	warnIfChanged(result.Changed)
+
+	if err != nil {
+		warnf("%d applied, %d adopted before the failure", len(result.Applied), len(result.Adopted))
+		fatalf("error: %v", err)
+	}
+
+	reportf("ok: %d applied, %d adopted, %d already recorded",
+		len(result.Applied), len(result.Adopted), len(result.Skipped))
+	if len(result.Adopted) > 0 {
+		warnf("note: adopted migrations were recorded without executing, because their objects already existed")
+	}
 }
 
 func runStatus(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {

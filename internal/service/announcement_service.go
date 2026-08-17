@@ -13,6 +13,11 @@ import (
 
 type AnnouncementService interface {
 	CreateAnnouncement(ctx context.Context, announcement *models.Announcement, role string) error
+	// CanManage reports whether the actor may create, delete or (de)activate
+	// announcements: admins, managers, or employees granted
+	// can_post_announcements. One rule for all four mutations — delete and
+	// (de)activate used to be open to every member of the department.
+	CanManage(ctx context.Context, employeeID uuid.UUID, role string) bool
 }
 
 type announcementService struct {
@@ -29,6 +34,14 @@ func NewAnnouncementService(ar repository.AnnouncementRepository, er repository.
 		emailService:     es,
 		pushService:      ps,
 	}
+}
+
+func (s *announcementService) CanManage(ctx context.Context, employeeID uuid.UUID, role string) bool {
+	if role == "admin" || role == "manager" {
+		return true
+	}
+	emp, err := s.employeeRepo.GetByID(ctx, employeeID)
+	return err == nil && emp != nil && emp.CanPostAnnouncements
 }
 
 func (s *announcementService) CreateAnnouncement(ctx context.Context, a *models.Announcement, role string) error {

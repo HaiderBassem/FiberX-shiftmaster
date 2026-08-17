@@ -327,6 +327,178 @@ func TestBaselineRecordsWithoutExecuting(t *testing.T) {
 	}
 }
 
+// Adopt is how a production deploy recovers when the database predates the
+// ledger: the schema exists, the ledger records little or nothing, and a plain
+// Run dies on the first CREATE TABLE. This mirrors that state exactly — some
+// files already recorded, the schema and its data already present, and one
+// genuinely new migration that must actually execute.
+func TestAdoptRecordsExistingSchemaAndAppliesNew(t *testing.T) {
+	pool := testPool(t)
+	freshSchema(t, pool)
+	ctx := context.Background()
+
+	// The legacy database: schema built long ago, with production data in it.
+	if _, err := pool.Exec(ctx, "CREATE TABLE legacy (id INT PRIMARY KEY)"); err != nil {
+		t.Fatalf("create legacy table: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "INSERT INTO legacy VALUES (1)"); err != nil {
+		t.Fatalf("seed legacy data: %v", err)
+	}
+
+	dir := writeMigrations(t, map[string]string{
+		"001_idempotent.sql": "CREATE TABLE IF NOT EXISTS idem (id INT);",
+		"002_legacy.sql":     "CREATE TABLE legacy (id INT PRIMARY KEY);",
+		"003_new.sql":        "CREATE TABLE brand_new (id INT);",
+	})
+	migrations, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	// A failed `up` has already recorded the idempotent file, as it did in
+	// production before dying on the first plain CREATE TABLE.
+	if _, err := Run(ctx, pool, migrations[:1]); err != nil {
+		t.Fatalf("seed ledger: %v", err)
+	}
+
+	result, err := Adopt(ctx, pool, migrations)
+	if err != nil {
+		t.Fatalf("adopt: %v", err)
+	}
+	if len(result.Skipped) != 1 || result.Skipped[0] != "001_idempotent.sql" {
+		t.Errorf("skipped = %v, want the already-recorded file", result.Skipped)
+	}
+	if len(result.Adopted) != 1 || result.Adopted[0] != "002_legacy.sql" {
+		t.Errorf("adopted = %v, want the pre-existing table's file", result.Adopted)
+	}
+	if len(result.Applied) != 1 || result.Applied[0] != "003_new.sql" {
+		t.Errorf("applied = %v, want only the genuinely new file", result.Applied)
+	}
+
+	// The legacy data survived adoption.
+	var n int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM legacy").Scan(&n); err != nil || n != 1 {
+		t.Errorf("legacy data: count=%d err=%v, want 1 row intact", n, err)
+	}
+
+	// The ledger is now complete, so the next run is a strict no-op.
+	again, err := Run(ctx, pool, migrations)
+	if err != nil {
+		t.Fatalf("run after adopt: %v", err)
+	}
+	if len(again.Applied) != 0 || len(again.Skipped) != 3 {
+		t.Errorf("after adopt: applied=%v skipped=%v, want everything recorded", again.Applied, again.Skipped)
+	}
+}
+
+// Replaying history can also fail forwards: an old migration references a
+// column that a later, also-applied migration dropped. In this series, 010
+// indexes departments.manager_id and 016 drops that column, so on a legacy
+// database the replay of 010 dies with undefined_column. Adopt must treat that
+// as history too.
+func TestAdoptForgivesReferencesToDroppedObjects(t *testing.T) {
+	pool := testPool(t)
+	freshSchema(t, pool)
+	ctx := context.Background()
+
+	// The end state of a legacy database: the table exists, but the column the
+	// old migration indexed was dropped by a later one.
+	if _, err := pool.Exec(ctx, "CREATE TABLE depts (id INT)"); err != nil {
+		t.Fatalf("create table: %v", err)
+	}
+
+	dir := writeMigrations(t, map[string]string{
+		"001_depts.sql": "CREATE TABLE depts (id INT, manager_id INT);",
+		"002_index.sql": "CREATE INDEX idx_mgr ON depts (manager_id);",
+	})
+	migrations, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	result, err := Adopt(ctx, pool, migrations)
+	if err != nil {
+		t.Fatalf("adopt: %v", err)
+	}
+	if len(result.Adopted) != 2 {
+		t.Errorf("adopted = %v, want both files recorded as history", result.Adopted)
+	}
+}
+
+// Adopt must forgive only failures that come from replaying applied history:
+// objects that already exist, or references to objects a later migration
+// dropped. A migration that is genuinely broken — here, a syntax error — has
+// to abort the run unrecorded, exactly as with Run.
+func TestAdoptStillAbortsOnRealFailures(t *testing.T) {
+	pool := testPool(t)
+	freshSchema(t, pool)
+	ctx := context.Background()
+
+	dir := writeMigrations(t, map[string]string{
+		"001_broken.sql": "CREATE TABEL typo (id INT);",
+		"002_later.sql":  "CREATE TABLE later (id INT);",
+	})
+	migrations, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	result, err := Adopt(ctx, pool, migrations)
+	if err == nil {
+		t.Fatal("a broken migration did not produce an error")
+	}
+	if len(result.Adopted) != 0 {
+		t.Errorf("a broken migration was adopted: %v", result.Adopted)
+	}
+
+	var recorded int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM schema_migrations`).Scan(&recorded); err != nil {
+		t.Fatalf("query ledger: %v", err)
+	}
+	if recorded != 0 {
+		t.Errorf("ledger records %d migration(s) after an aborted adopt, want 0", recorded)
+	}
+}
+
+// When a file fails on a duplicate mid-way, everything it did before the
+// failure must roll back before the file is recorded: adoption records history,
+// it must not half-apply the present.
+func TestAdoptRollsBackBeforeRecording(t *testing.T) {
+	pool := testPool(t)
+	freshSchema(t, pool)
+	ctx := context.Background()
+
+	if _, err := pool.Exec(ctx, "CREATE TABLE existing (id INT)"); err != nil {
+		t.Fatalf("create existing table: %v", err)
+	}
+
+	dir := writeMigrations(t, map[string]string{
+		"001_mixed.sql": "CREATE TABLE fresh (id INT); CREATE TABLE existing (id INT);",
+	})
+	migrations, err := Load(dir)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	result, err := Adopt(ctx, pool, migrations)
+	if err != nil {
+		t.Fatalf("adopt: %v", err)
+	}
+	if len(result.Adopted) != 1 {
+		t.Fatalf("adopted = %v, want the mixed file", result.Adopted)
+	}
+
+	var freshExists bool
+	if err := pool.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM information_schema.tables
+		                WHERE table_name = 'fresh' AND table_schema = current_schema())`).Scan(&freshExists); err != nil {
+		t.Fatalf("check fresh table: %v", err)
+	}
+	if freshExists {
+		t.Error("an adopted migration left partial work behind; it should have rolled back")
+	}
+}
+
 func TestStatusReportsPending(t *testing.T) {
 	pool := testPool(t)
 	freshSchema(t, pool)

@@ -38,9 +38,9 @@ func (s *NotificationService) GetUnreadCount(ctx context.Context, recipientID uu
 	return s.notifRepo.GetUnreadCount(ctx, recipientID)
 }
 
-// MarkAsRead marks a single notification as read.
-func (s *NotificationService) MarkAsRead(ctx context.Context, id uuid.UUID) error {
-	return s.notifRepo.MarkAsRead(ctx, id)
+// MarkAsRead marks one of the recipient's own notifications as read.
+func (s *NotificationService) MarkAsRead(ctx context.Context, id, recipientID uuid.UUID) error {
+	return s.notifRepo.MarkAsRead(ctx, id, recipientID)
 }
 
 // MarkAllAsRead marks all unread notifications as read for a recipient.

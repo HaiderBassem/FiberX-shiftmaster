@@ -10,6 +10,7 @@ import (
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/repository"
+	"shiftmaster-backend/internal/temporal"
 )
 
 // LeaveService handles leave request business logic with approval chain.
@@ -23,6 +24,9 @@ type LeaveService struct {
 	notifService     *NotificationService
 	emailService     *EmailService
 	pushService      notification.PushService
+	// now is the clock used by date validation. Injectable so tests can pin
+	// the after-midnight overnight-shift cases; production uses time.Now.
+	now func() time.Time
 }
 
 func NewLeaveService(
@@ -46,6 +50,7 @@ func NewLeaveService(
 		notifService:     notifService,
 		emailService:     emailService,
 		pushService:      pushService,
+		now:              time.Now,
 	}
 }
 
@@ -54,6 +59,20 @@ func parseTimeStr(t string) (time.Time, error) {
 		t = t[:5]
 	}
 	return time.Parse("15:04", t)
+}
+
+// hourlyLeaveHours computes the length of an hourly leave from its stored
+// clocks. An end at or before the start crosses midnight — the same convention
+// shifts themselves use (a 16:30→00:30 shift ends the next day), so the last
+// hour of an overnight shift (23:30→00:30) is representable as a single row on
+// the shift's business date. Plain end-minus-start subtraction used to make
+// such a window come out negative and be rejected.
+func hourlyLeaveHours(startClock, endClock string) (float64, error) {
+	d, err := temporal.HourlyLeaveDuration(startClock, endClock)
+	if err != nil {
+		return 0, err
+	}
+	return d.Hours(), nil
 }
 
 func (s *LeaveService) GetEmployeeLeaveBalances(ctx context.Context, empID uuid.UUID, year int) ([]models.EmployeeLeaveBalance, error) {
@@ -103,46 +122,106 @@ func (s *LeaveService) SyncLeaveBalances(ctx context.Context, year int) error {
 	return nil
 }
 
-// RequestLeave creates a new leave request.
-// - If the requester is a team_leader → notifies managers directly (skips TL step).
-// - If the requester is an employee → notifies all team leaders in the same department.
-func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) error {
-	// Validate dates
+// leaveAbsoluteWindow materialises a leave into concrete instants in the
+// business timezone so windows can be compared for overlap. A full-day leave
+// occupies [start 00:00, end+1 00:00); an hourly leave occupies its clock
+// window anchored to its (single) business date, crossing midnight when the
+// end clock is at or before the start clock.
+func leaveAbsoluteWindow(l *models.Leave) (time.Time, time.Time, bool) {
+	loc := temporal.Location()
+	sy, sm, sd := l.StartDate.UTC().Date()
+
+	if l.StartTime != nil && l.EndTime != nil {
+		sh, smin, err1 := temporal.ParseClock(*l.StartTime)
+		eh, emin, err2 := temporal.ParseClock(*l.EndTime)
+		if err1 != nil || err2 != nil {
+			return time.Time{}, time.Time{}, false
+		}
+		start := time.Date(sy, sm, sd, sh, smin, 0, 0, loc)
+		end := time.Date(sy, sm, sd, eh, emin, 0, 0, loc)
+		if !end.After(start) {
+			end = end.Add(24 * time.Hour)
+		}
+		return start, end, true
+	}
+
+	ey, em, ed := l.EndDate.UTC().Date()
+	start := time.Date(sy, sm, sd, 0, 0, 0, 0, loc)
+	end := time.Date(ey, em, ed, 0, 0, 0, 0, loc).Add(24 * time.Hour)
+	return start, end, true
+}
+
+// ValidateLeaveRequest enforces every business rule for a new leave request
+// without creating anything. RequestLeave calls it before inserting; the
+// assistant's approval flow calls it once to build the preview and relies on
+// RequestLeave running it again at execution time, so a request that stopped
+// being valid between preview and approval is refused rather than executed.
+func (s *LeaveService) ValidateLeaveRequest(ctx context.Context, leave *models.Leave) error {
 	if leave.EndDate.Before(leave.StartDate) {
 		return fmt.Errorf("end date cannot be before start date")
 	}
-	if leave.StartDate.Before(time.Now().Truncate(24 * time.Hour)) {
-		return fmt.Errorf("cannot request leave for past dates")
-	}
 
-	// Get leave type if specified
+	// Resolve the leave type. The type decides whether this is an hourly or a
+	// day request, so requests without a resolvable type cannot skip the rules.
 	var leaveType *models.LeaveType
-	var err error
 	if leave.LeaveTypeID != uuid.Nil {
-		leaveType, err = s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
+		lt, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID)
 		if err != nil {
 			return fmt.Errorf("leave type not found")
 		}
+		leaveType = lt
 	}
 
-	// Calculate requested amount (days or hours)
-	requestedAmount := 0.0
 	isHourly := leaveType != nil && leaveType.Unit == "hours"
+	hasTimes := leave.StartTime != nil && leave.EndTime != nil && *leave.StartTime != "" && *leave.EndTime != ""
 
-	if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-		startTime, err1 := parseTimeStr(*leave.StartTime)
-		endTime, err2 := parseTimeStr(*leave.EndTime)
-		if err1 == nil && err2 == nil {
-			requestedAmount = endTime.Sub(startTime).Hours()
-			if requestedAmount <= 0 {
-				return fmt.Errorf("end time must be after start time")
-			}
+	// Times and type must agree. An hourly request without a window is
+	// meaningless, and a window on a day-based type used to be silently
+	// counted as whole days while still rendering as an hourly leave.
+	if isHourly && !hasTimes {
+		return fmt.Errorf("this leave type is hourly: start_time and end_time are required")
+	}
+	if !isHourly && hasTimes {
+		return fmt.Errorf("this leave type covers whole days: remove start_time and end_time")
+	}
+	// An hourly leave belongs to exactly one business date. The clock window
+	// itself may cross midnight — that is still the same business date, the
+	// same convention overnight shifts use.
+	if isHourly && !leave.StartDate.UTC().Truncate(24*time.Hour).Equal(leave.EndDate.UTC().Truncate(24*time.Hour)) {
+		return fmt.Errorf("an hourly leave must start and end on the same date")
+	}
+
+	// Requested amount, in the unit the balance is kept in.
+	requestedAmount := 0.0
+	if isHourly {
+		hours, err := hourlyLeaveHours(*leave.StartTime, *leave.EndTime)
+		if err != nil {
+			return err
 		}
+		requestedAmount = hours
 	} else {
-		// Count days inclusive
 		for d := leave.StartDate.UTC().Truncate(24 * time.Hour); !d.After(leave.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
 			requestedAmount += 1.0
 		}
+	}
+
+	// Past-date rule, evaluated on the business calendar (Asia/Baghdad). The
+	// old check truncated in UTC, which put the day boundary at 03:00 local.
+	// Day leaves must start today or later. An hourly leave is judged by its
+	// window's END instant, so the last hour of an overnight shift can still
+	// be requested after midnight while the shift is running.
+	now := s.now().In(temporal.Location())
+	todayBusiness := temporal.BusinessDate(now)
+	startDay := leave.StartDate.UTC().Truncate(24 * time.Hour)
+	if isHourly {
+		if startDay.Before(todayBusiness.AddDate(0, 0, -1)) {
+			return fmt.Errorf("cannot request leave for past dates")
+		}
+		if _, end, ok := leaveAbsoluteWindow(leave); ok && !end.After(now) {
+			return fmt.Errorf("cannot request an hourly leave for a time that has already passed")
+		}
+	} else if startDay.Before(todayBusiness) {
+		return fmt.Errorf("cannot request leave for past dates")
 	}
 
 	if leaveType != nil && leaveType.DaysPerYear > 0 {
@@ -174,10 +253,8 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 						}
 						if y == year && m == month {
 							if isHourly && l.StartTime != nil && l.EndTime != nil {
-								st, err1 := parseTimeStr(*l.StartTime)
-								en, err2 := parseTimeStr(*l.EndTime)
-								if err1 == nil && err2 == nil {
-									pendingAmount += en.Sub(st).Hours()
+								if hours, hErr := hourlyLeaveHours(*l.StartTime, *l.EndTime); hErr == nil {
+									pendingAmount += hours
 								}
 							} else if !isHourly {
 								for d := l.StartDate.UTC().Truncate(24 * time.Hour); !d.After(l.EndDate.UTC().Truncate(24 * time.Hour)); d = d.AddDate(0, 0, 1) {
@@ -205,6 +282,29 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		return fmt.Errorf("employee not found: %w", err)
 	}
 
+	// Double-booking guard: the same employee cannot hold two live leaves
+	// whose absolute windows intersect. The candidate fetch reaches one day
+	// each side because an hourly window on the previous date can cross
+	// midnight into this one.
+	newStart, newEnd, ok := leaveAbsoluteWindow(leave)
+	if ok {
+		rangeFrom := leave.StartDate.UTC().Truncate(24*time.Hour).AddDate(0, 0, -1)
+		rangeTo := leave.EndDate.UTC().Truncate(24*time.Hour).AddDate(0, 0, 1)
+		existing, exErr := s.leaveRepo.GetActiveByEmployeeInRange(ctx, leave.EmployeeID, rangeFrom, rangeTo)
+		if exErr == nil {
+			for i := range existing {
+				exStart, exEnd, exOK := leaveAbsoluteWindow(&existing[i])
+				if !exOK {
+					continue
+				}
+				if newStart.Before(exEnd) && exStart.Before(newEnd) {
+					return fmt.Errorf("you already have a leave request covering %s (status: %s)",
+						exStart.Format("2006-01-02 15:04"), existing[i].Status)
+				}
+			}
+		}
+	}
+
 	// Department daily caps, unless this leave type is explicitly exempt.
 	// The exemption used to be inferred by matching the type's name against
 	// "Emergency", so renaming or translating the type silently removed it.
@@ -213,12 +313,9 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	if !bypassesDailyLimit && emp.DepartmentID != nil {
 		dept, err := s.departmentRepo.GetByID(ctx, *emp.DepartmentID)
 		if err == nil {
-			isHourly := false
-			if leaveType != nil && leaveType.IsHourly {
-				isHourly = true
-			}
+			capIsHourly := leaveType != nil && leaveType.IsHourly
 			limit := dept.MaxLeavesPerDay
-			if isHourly {
+			if capIsHourly {
 				limit = dept.MaxHourlyLeavesPerDay
 			}
 
@@ -231,10 +328,10 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 					}
 
 					if shiftID != nil {
-						overlappingCount, err := s.leaveRepo.GetOverlappingLeavesCountByShift(ctx, *emp.DepartmentID, *shiftID, d, isHourly)
+						overlappingCount, err := s.leaveRepo.GetOverlappingLeavesCountByShift(ctx, *emp.DepartmentID, *shiftID, d, capIsHourly)
 						if err == nil && overlappingCount >= *limit {
 							leaveTypeStr := "leaves"
-							if isHourly {
+							if capIsHourly {
 								leaveTypeStr = "hourly leaves"
 							}
 							return fmt.Errorf("the maximum number of allowed %s per shift for your department has been reached on %s", leaveTypeStr, d.Format("2006-01-02"))
@@ -243,6 +340,22 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+// RequestLeave creates a new leave request.
+// - If the requester is a team_leader → notifies managers directly (skips TL step).
+// - If the requester is an employee → notifies all team leaders in the same department.
+func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) error {
+	if err := s.ValidateLeaveRequest(ctx, leave); err != nil {
+		return err
+	}
+
+	emp, err := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
+	if err != nil {
+		return fmt.Errorf("employee not found: %w", err)
 	}
 
 	if err := s.leaveRepo.Create(ctx, leave); err != nil {
@@ -414,7 +527,8 @@ func (s *LeaveService) ApproveByTeamLeader(ctx context.Context, leaveID uuid.UUI
 		)
 	}
 
-	if s.pushService != nil {
+	// emp comes from a lookup whose error is ignored above; it can be nil.
+	if s.pushService != nil && emp != nil {
 		go func(eID uuid.UUID) {
 			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Approved", "Your leave request has been fully approved by "+tlName, "/leaves")
 		}(emp.ID)
@@ -508,7 +622,7 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 		)
 	}
 
-	if s.pushService != nil {
+	if s.pushService != nil && emp != nil {
 		go func(eID uuid.UUID) {
 			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Approved", "Your leave request has been fully approved by a manager!", "/leaves")
 		}(emp.ID)
@@ -565,10 +679,8 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 			amountToRevert := 0.0
 			isHourly := leaveType.Unit == "hours"
 			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-				st, err1 := parseTimeStr(*leave.StartTime)
-				en, err2 := parseTimeStr(*leave.EndTime)
-				if err1 == nil && err2 == nil {
-					amountToRevert = en.Sub(st).Hours()
+				if hours, hErr := hourlyLeaveHours(*leave.StartTime, *leave.EndTime); hErr == nil {
+					amountToRevert = hours
 				}
 			} else {
 				for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
@@ -709,10 +821,8 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			amountTaken := 0.0
 			isHourly := leaveType.Unit == "hours"
 			if leave.StartTime != nil && leave.EndTime != nil && isHourly {
-				st, err1 := parseTimeStr(*leave.StartTime)
-				en, err2 := parseTimeStr(*leave.EndTime)
-				if err1 == nil && err2 == nil {
-					amountTaken = en.Sub(st).Hours()
+				if hours, hErr := hourlyLeaveHours(*leave.StartTime, *leave.EndTime); hErr == nil {
+					amountTaken = hours
 				}
 			} else {
 				for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
@@ -751,6 +861,15 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		return fmt.Errorf("leave not found: %w", err)
 	}
 
+	// Only requests still awaiting a decision can be rejected. A fully
+	// approved leave has shifts and balance applied; the verb for undoing
+	// those is CancelApprovedLeave, which reverts them. Reject used to accept
+	// any status, silently flipping approved/cancelled leaves to rejected
+	// while leaving their side effects in place.
+	if leave.Status != "pending" && leave.Status != "approved_by_team_leader" {
+		return fmt.Errorf("leave cannot be rejected in its current status: %s", leave.Status)
+	}
+
 	// Record the rejection
 	notesPtr := &reason
 	if err := s.leaveRepo.RecordApproval(ctx, leaveID, rejectedBy, rejectorRole, "rejected", notesPtr); err != nil {
@@ -785,7 +904,7 @@ func (s *LeaveService) RejectLeave(ctx context.Context, leaveID uuid.UUID, rejec
 		)
 	}
 
-	if s.pushService != nil {
+	if s.pushService != nil && emp != nil {
 		go func(eID uuid.UUID) {
 			_ = s.pushService.SendToEmployee(context.Background(), eID, "Leave Rejected", "Your leave request has been rejected.", "/leaves")
 		}(emp.ID)
@@ -912,7 +1031,9 @@ func (s *LeaveService) SendUpcomingLeaveReminders(ctx context.Context) error {
 				s.emailService.SendEmailAsync([]string{tl.Email}, title, msg)
 
 				// Send Push Notification
-				_ = s.pushService.SendToEmployee(ctx, tl.ID, title, msg, "/approvals")
+				if s.pushService != nil {
+					_ = s.pushService.SendToEmployee(ctx, tl.ID, title, msg, "/approvals")
+				}
 			}
 		}
 

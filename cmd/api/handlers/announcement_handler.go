@@ -178,6 +178,12 @@ func (h *AnnouncementHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
+		return
+	}
+
 	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
@@ -198,6 +204,12 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
+		return
+	}
+
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
 		return
 	}
 
@@ -232,6 +244,12 @@ func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
 		return
 	}
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
+		return
+	}
+
 	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})

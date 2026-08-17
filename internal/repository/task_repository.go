@@ -55,6 +55,9 @@ type TaskRepository interface {
 	// Task Executions
 	GetExecutionByAssignment(ctx context.Context, assignmentID uuid.UUID) (*models.TaskExecution, error)
 	GetAssignmentDateByExecution(ctx context.Context, executionID uuid.UUID) (time.Time, error)
+	// GetExecutionOwner resolves who an execution belongs to, for ownership
+	// checks on the self-service status transitions.
+	GetExecutionOwner(ctx context.Context, executionID uuid.UUID) (employeeID uuid.UUID, departmentID *uuid.UUID, err error)
 	CreateExecution(ctx context.Context, te *models.TaskExecution) error
 	StartExecution(ctx context.Context, id uuid.UUID) error
 	UpdateExecutionStatus(ctx context.Context, id uuid.UUID, status string, notes *string) error
@@ -603,6 +606,22 @@ func (r *taskRepo) GetAssignmentDateByExecution(ctx context.Context, executionID
 		return time.Time{}, fmt.Errorf("get assignment date by execution: %w", err)
 	}
 	return assignedDate, nil
+}
+
+func (r *taskRepo) GetExecutionOwner(ctx context.Context, executionID uuid.UUID) (uuid.UUID, *uuid.UUID, error) {
+	var employeeID uuid.UUID
+	var departmentID *uuid.UUID
+	err := r.db.QueryRow(ctx,
+		`SELECT ta.employee_id, e.department_id
+		 FROM task_executions te
+		 JOIN task_assignments ta ON ta.id = te.assignment_id
+		 JOIN employees e ON e.id = ta.employee_id
+		 WHERE te.id = $1`, executionID,
+	).Scan(&employeeID, &departmentID)
+	if err != nil {
+		return uuid.Nil, nil, fmt.Errorf("get execution owner: %w", err)
+	}
+	return employeeID, departmentID, nil
 }
 
 func (r *taskRepo) CreateExecution(ctx context.Context, te *models.TaskExecution) error {

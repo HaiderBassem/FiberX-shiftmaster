@@ -113,7 +113,12 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 		return
 	}
 
-	if err := h.notifSvc.MarkAsRead(c.Request.Context(), id); err != nil {
+	recipient, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.notifSvc.MarkAsRead(c.Request.Context(), id, recipient); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}

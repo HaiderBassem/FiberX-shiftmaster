@@ -57,6 +57,40 @@ func (h *ServiceHandler) canManageServices(c *gin.Context) bool {
 	return false
 }
 
+// provinceVisible reports whether the caller's department owns the province or
+// has it shared with them; admins see all. Catalog reads used to take a
+// province ID straight from the query string with no check, which made every
+// department's price list readable company-wide despite provinces being
+// deliberately department-scoped (migration 045).
+func (h *ServiceHandler) provinceVisible(c *gin.Context, provinceID uuid.UUID) bool {
+	if actorRole(c) == "admin" {
+		return true
+	}
+	dept := getDepartmentID(c)
+	if dept == nil {
+		return false
+	}
+	var visible bool
+	err := h.db.QueryRow(c.Request.Context(),
+		`SELECT EXISTS(
+		    SELECT 1 FROM provinces p
+		    LEFT JOIN province_department_shares ps
+		        ON ps.province_id = p.id AND ps.department_id = $2
+		    WHERE p.id = $1 AND (p.department_id = $2 OR ps.id IS NOT NULL))`,
+		provinceID, *dept).Scan(&visible)
+	return err == nil && visible
+}
+
+// categoryProvinceVisible resolves a category's province and applies the same
+// visibility rule.
+func (h *ServiceHandler) categoryProvinceVisible(c *gin.Context, categoryID uuid.UUID) bool {
+	cat, err := h.repo.GetCategoryByID(c.Request.Context(), categoryID)
+	if err != nil || cat == nil {
+		return false
+	}
+	return h.provinceVisible(c, cat.ProvinceID)
+}
+
 // ═══════════════════════════════════════════════════════════
 // Category Endpoints
 // ═══════════════════════════════════════════════════════════
@@ -71,6 +105,11 @@ func (h *ServiceHandler) ListCategoriesByProvince(c *gin.Context) {
 	provinceID, err := uuid.Parse(provinceIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid province ID"})
+		return
+	}
+
+	if !h.provinceVisible(c, provinceID) {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Province not found"})
 		return
 	}
 
@@ -241,6 +280,11 @@ func (h *ServiceHandler) ListPlans(c *gin.Context) {
 		return
 	}
 
+	if !h.categoryProvinceVisible(c, catID) {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Category not found"})
+		return
+	}
+
 	plans, err := h.repo.GetPlansByCategory(c.Request.Context(), catID)
 	if err != nil {
 		log.Printf("ListPlans error: %v", err)
@@ -264,6 +308,10 @@ func (h *ServiceHandler) GetPlan(c *gin.Context) {
 
 	plan, err := h.repo.GetPlanByID(c.Request.Context(), planID)
 	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Plan not found"})
+		return
+	}
+	if !h.categoryProvinceVisible(c, plan.CategoryID) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "Plan not found"})
 		return
 	}

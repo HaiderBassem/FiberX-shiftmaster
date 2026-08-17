@@ -10,6 +10,7 @@ import (
 
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/service"
+	"shiftmaster-backend/internal/temporal"
 )
 
 // ScheduleHandler handles schedule generation, publishing, shifts, and replacements.
@@ -74,7 +75,7 @@ func (h *ScheduleHandler) Publish(c *gin.Context) {
 func (h *ScheduleHandler) DailyShifts(c *gin.Context) {
 	dateStr := c.Query("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = temporal.DateString(temporal.BusinessDate(time.Now()))
 	}
 	date, err := parseTime(dateStr)
 	if err != nil {
@@ -170,8 +171,13 @@ func (h *ScheduleHandler) CheckIn(c *gin.Context) {
 		return
 	}
 
-	if err := h.scheduleSvc.CheckIn(c.Request.Context(), shiftID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+	actor, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.scheduleSvc.CheckIn(c.Request.Context(), shiftID, actor); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
@@ -186,8 +192,13 @@ func (h *ScheduleHandler) CheckOut(c *gin.Context) {
 		return
 	}
 
-	if err := h.scheduleSvc.CheckOut(c.Request.Context(), shiftID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+	actor, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.scheduleSvc.CheckOut(c.Request.Context(), shiftID, actor); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
@@ -198,7 +209,7 @@ func (h *ScheduleHandler) CheckOut(c *gin.Context) {
 func (h *ScheduleHandler) AvailableReplacements(c *gin.Context) {
 	dateStr := c.Query("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = temporal.DateString(temporal.BusinessDate(time.Now()))
 	}
 	date, err := parseTime(dateStr)
 	if err != nil {

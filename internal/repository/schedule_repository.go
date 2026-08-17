@@ -48,8 +48,8 @@ type ScheduleRepository interface {
 	UpdateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	UpdateShiftStatus(ctx context.Context, id uuid.UUID, status string, reason *string) error
 	AssignReplacement(ctx context.Context, id uuid.UUID, replacementEmployeeID uuid.UUID, approvedBy uuid.UUID) error
-	CheckIn(ctx context.Context, id uuid.UUID) error
-	CheckOut(ctx context.Context, id uuid.UUID) error
+	CheckIn(ctx context.Context, id, employeeID uuid.UUID) (bool, error)
+	CheckOut(ctx context.Context, id, employeeID uuid.UUID) (bool, error)
 	UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	// UpsertGeneratedShift writes a pattern-derived day, leaving manual and leave days alone.
 	UpsertGeneratedShift(ctx context.Context, es *models.EmployeeShift) error
@@ -505,18 +505,32 @@ func (r *scheduleRepo) AssignReplacement(ctx context.Context, id uuid.UUID, repl
 	return err
 }
 
-func (r *scheduleRepo) CheckIn(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE employee_shifts SET check_in_time=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id)
-	return err
+// CheckIn stamps the check-in once. The predicate keeps it idempotent (a
+// second click cannot rewrite the original time) and self-scoped (only the
+// row's own employee can stamp it — this used to accept any row ID from any
+// authenticated user).
+func (r *scheduleRepo) CheckIn(ctx context.Context, id, employeeID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE employee_shifts SET check_in_time=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$1 AND employee_id=$2 AND check_in_time IS NULL`, id, employeeID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
-func (r *scheduleRepo) CheckOut(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
+// CheckOut stamps the check-out once, only after a check-in exists — a
+// check-out with no check-in used to compute NULL worked hours.
+func (r *scheduleRepo) CheckOut(ctx context.Context, id, employeeID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`UPDATE employee_shifts SET check_out_time=CURRENT_TIMESTAMP,
 			actual_worked_hours=EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - check_in_time))/3600,
-			updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id)
-	return err
+			updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$1 AND employee_id=$2 AND check_in_time IS NOT NULL AND check_out_time IS NULL`, id, employeeID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *scheduleRepo) UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error {

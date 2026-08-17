@@ -46,7 +46,7 @@ func (h *HelpDocumentHandler) GetDocument(c *gin.Context) {
 		return
 	}
 
-	doc, err := h.svc.GetDocumentByID(c.Request.Context(), docID, empID, role)
+	doc, err := h.svc.GetDocumentByID(c.Request.Context(), docID, empID, getDepartmentID(c), role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -109,7 +109,7 @@ func (h *HelpDocumentHandler) UpdateDocument(c *gin.Context) {
 	}
 	req.ID = docID
 
-	updated, err := h.svc.UpdateDocument(c.Request.Context(), &req, empID, role)
+	updated, err := h.svc.UpdateDocument(c.Request.Context(), &req, empID, getDepartmentID(c), role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -130,7 +130,7 @@ func (h *HelpDocumentHandler) DeleteDocument(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.DeleteDocument(c.Request.Context(), docID, empID, role)
+	err = h.svc.DeleteDocument(c.Request.Context(), docID, empID, getDepartmentID(c), role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -151,7 +151,7 @@ func (h *HelpDocumentHandler) GetAccessList(c *gin.Context) {
 		return
 	}
 
-	list, err := h.svc.GetDocumentAccessList(c.Request.Context(), docID, empID, role)
+	list, err := h.svc.GetDocumentAccessList(c.Request.Context(), docID, empID, getDepartmentID(c), role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -181,7 +181,7 @@ func (h *HelpDocumentHandler) SetEmployeeAccess(c *gin.Context) {
 		return
 	}
 
-	err = h.svc.SetEmployeeAccess(c.Request.Context(), docID, req.EmployeeID, req.AccessLevel, empID, role)
+	err = h.svc.SetEmployeeAccess(c.Request.Context(), docID, req.EmployeeID, req.AccessLevel, empID, getDepartmentID(c), role)
 	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return

@@ -14,15 +14,15 @@
 #   chmod +x deploy.sh
 #   sudo ./deploy.sh
 #
-# FIRST RUN ON AN EXISTING DATABASE
-#   The migration series is now recorded in a schema_migrations table. A database
-#   that predates that table has the schema but no record of it, so the migrator
-#   would try to replay all 49 files. Adopt the ledger once, before deploying:
-#
-#       ./shiftmaster-migrate -dir internal/database/migrations baseline
-#
-#   That records every file as applied without executing any of it. Only do this
-#   on a database whose schema already matches the series.
+# EXISTING DATABASES ARE KEPT
+#   The migration series is recorded in a schema_migrations table. A database
+#   that predates that table has the schema but no record of it, so a plain
+#   `migrate up` would try to replay the whole series and fail on the first
+#   CREATE TABLE. When that happens, this script automatically falls back to
+#   `migrate adopt`: each pending migration is attempted, one that fails only
+#   because its objects already exist is rolled back and recorded as applied,
+#   and genuinely new migrations run normally. Existing data is never dropped.
+#   Any other migration failure still aborts the deploy.
 # =============================================================================
 
 set -euo pipefail
@@ -96,8 +96,19 @@ set -a
 source "$APP_DIR/.env"
 set +a
 
-sudo -E -u "$SERVICE_USER" "$APP_DIR/shiftmaster-migrate" \
-    -dir "$PROJECT_DIR/internal/database/migrations" up
+# First try the strict path. On a database that predates the ledger (schema
+# present, nothing recorded) it fails on the first CREATE TABLE; fall back to
+# `adopt`, which records already-present migrations instead of replaying them
+# and applies only the genuinely new ones. The existing database and all its
+# data are kept either way. Real failures still abort the deploy: adopt only
+# forgives "already exists" errors, and set -e stops the script if it fails.
+if ! sudo -E -u "$SERVICE_USER" "$APP_DIR/shiftmaster-migrate" \
+    -dir "$PROJECT_DIR/internal/database/migrations" up; then
+    echo "[WARN] Plain migration failed; the database likely predates the migration ledger."
+    echo "[INFO] Adopting the existing schema (existing data is preserved)..."
+    sudo -E -u "$SERVICE_USER" "$APP_DIR/shiftmaster-migrate" \
+        -dir "$PROJECT_DIR/internal/database/migrations" adopt
+fi
 echo "  [OK] Migrations applied"
 
 # ── 6. Install systemd service ──

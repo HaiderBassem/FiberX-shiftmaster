@@ -111,8 +111,14 @@ func (h *HandoverHandler) ClaimHandover(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	if err := h.handoverRepo.Claim(c.Request.Context(), handoverID, empID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to claim handover"})
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no department context"})
+		return
+	}
+
+	if err := h.handoverRepo.Claim(c.Request.Context(), handoverID, empID, *deptID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to claim handover"})
 		return
 	}
 
@@ -129,8 +135,14 @@ func (h *HandoverHandler) UnclaimHandover(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	if err := h.handoverRepo.Unclaim(c.Request.Context(), handoverID, empID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unclaim handover"})
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no department context"})
+		return
+	}
+
+	if err := h.handoverRepo.Unclaim(c.Request.Context(), handoverID, empID, *deptID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to unclaim handover"})
 		return
 	}
 
@@ -157,8 +169,14 @@ func (h *HandoverHandler) AddHandoverComment(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	if err := h.handoverRepo.AddComment(c.Request.Context(), handoverID, empID, req.Comment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add comment to handover"})
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no department context"})
+		return
+	}
+
+	if err := h.handoverRepo.AddComment(c.Request.Context(), handoverID, empID, *deptID, req.Comment); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to add comment to handover"})
 		return
 	}
 
@@ -175,8 +193,14 @@ func (h *HandoverHandler) CompleteHandover(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	if err := h.handoverRepo.Complete(c.Request.Context(), handoverID, empID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete handover"})
+	deptID := getDepartmentID(c)
+	if deptID == nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "no department context"})
+		return
+	}
+
+	if err := h.handoverRepo.Complete(c.Request.Context(), handoverID, empID, *deptID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to complete handover"})
 		return
 	}
 
