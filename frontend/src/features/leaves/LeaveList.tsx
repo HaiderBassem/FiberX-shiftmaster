@@ -96,7 +96,11 @@ export const LeaveList = () => {
             if (isHourly && l.start_time && l.end_time) {
               const [h1, m1] = l.start_time.split(':').map(Number);
               const [h2, m2] = l.end_time.split(':').map(Number);
-              pendingAmount += (h2 - h1) + (m2 - m1) / 60;
+              // An end at or before the start crosses midnight (e.g. the last
+              // hour of an overnight shift, 23:30 -> 00:30 = 1h, not -23h).
+              let mins = h2 * 60 + m2 - (h1 * 60 + m1);
+              if (mins <= 0) mins += 24 * 60;
+              pendingAmount += mins / 60;
             } else if (!isHourly) {
               const d1 = new Date(l.start_date);
               const d2 = new Date(l.end_date);

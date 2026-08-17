@@ -6,6 +6,9 @@ import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { RichTextEditor } from '@/components/RichTextEditor';
+import { lazy, Suspense } from 'react';
+
+const AssistantPanel = lazy(() => import('@/features/assistant/AssistantPanel'));
 import {
   Users, CheckCircle2, Clock, Play, CalendarDays, Shield, BarChart3,
   CheckSquare, TrendingUp, Briefcase, AlertCircle, X, AlertTriangle, Sun
@@ -303,6 +306,12 @@ const EmployeeDashboard = () => {
           {t('dashboard.welcome_back')}, {user?.first_name?.split(' ')[0]} 👋
         </h2>
         <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <Suspense fallback={null}>
+          <AssistantPanel />
+        </Suspense>
       </motion.div>
 
       {/* Today's Shift Card — always visible for employee */}
@@ -647,6 +656,10 @@ const LeaderDashboard = () => {
 
       <motion.div variants={itemVariants}>
         <AnnouncementBanner />
+
+      <Suspense fallback={null}>
+        <AssistantPanel />
+      </Suspense>
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">

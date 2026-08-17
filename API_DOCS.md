@@ -274,6 +274,26 @@ file exists.
 
 ---
 
+## AI assistant
+
+All routes require a normal access token. The assistant runs entirely over
+the domain services documented above: the model can only call read tools and
+stage *pending actions*; every state change requires the user to approve the
+staged action through the endpoints below. Without ASSISTANT_API_KEY the
+status endpoint reports `enabled: false` and chat returns 503.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/assistant/status` | `{enabled}` — whether a model is configured |
+| POST | `/api/assistant/chat` | Body `{message, conversation_id?}`. Streams SSE events: `status`, `text`, `tool`, `approval`, `error`, `done`. 429 on rate limit, 409 while a previous turn is running |
+| GET | `/api/assistant/actions/:id` | Current state of one of the caller's staged actions |
+| POST | `/api/assistant/actions/:id/approve` | Executes the exact frozen action after re-validation. Single-use: replays, double clicks and other users get 409 with the action's real state |
+| POST | `/api/assistant/actions/:id/reject` | Marks the staged action rejected; nothing executes |
+
+Staged actions expire after ASSISTANT_PENDING_ACTION_TTL_SECONDS (default
+5 minutes) and are superseded when a newer action is staged in the same
+conversation.
+
 ## Health
 
 `GET /health` (outside `/api`) returns `{"status": "healthy"}` and performs a real
