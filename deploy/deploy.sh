@@ -146,7 +146,10 @@ echo "[INFO] Waiting for the API to become healthy..."
 
 API_STATUS="000"
 for _ in $(seq 1 15); do
-    API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/health || echo "000")
+    # On connection failure curl still prints its 000 from -w, so a fallback
+    # echo used to double it into "000000".
+    API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/health || true)
+    [ -z "$API_STATUS" ] && API_STATUS="000"
     [ "$API_STATUS" = "200" ] && break
     sleep 1
 done
@@ -162,7 +165,8 @@ else
 fi
 echo "---------------------------------------------"
 echo "  Logs:                                      "
-echo "    API:   journalctl -u shiftmaster -f      "
+echo "    API:   $LOG_DIR/api.log                  "
+echo "           $LOG_DIR/api-error.log            "
 echo "    Caddy: /var/log/caddy/shiftmaster.log    "
 echo "============================================="
 
@@ -170,8 +174,18 @@ echo "============================================="
 # through its exit status so any surrounding automation stops.
 if [ "$API_STATUS" != "200" ]; then
     echo ""
-    echo "[ERROR] The API did not become healthy. Check:" >&2
-    echo "   1. Database credentials in $APP_DIR/.env" >&2
-    echo "   2. sudo journalctl -u shiftmaster --no-pager -n 50" >&2
+    echo "[ERROR] The API did not become healthy." >&2
+    # The unit redirects the process output to files, so journalctl only shows
+    # systemd's own restart messages — the actual startup error lives here:
+    if [ -s "$LOG_DIR/api-error.log" ]; then
+        echo "--- last lines of $LOG_DIR/api-error.log ---------------------------" >&2
+        sudo tail -n 15 "$LOG_DIR/api-error.log" >&2 || true
+        echo "--------------------------------------------------------------------" >&2
+    fi
+    echo "Check:" >&2
+    echo "   1. The startup error above (full log: $LOG_DIR/api-error.log)" >&2
+    echo "   2. Configuration in $APP_DIR/.env — production refuses to boot on a" >&2
+    echo "      placeholder/short JWT_SECRET or a missing APP_SECRET_KEY" >&2
+    echo "   3. sudo systemctl status shiftmaster --no-pager" >&2
     exit 1
 fi
