@@ -23,6 +23,18 @@
 #   because its objects already exist is rolled back and recorded as applied,
 #   and genuinely new migrations run normally. Existing data is never dropped.
 #   Any other migration failure still aborts the deploy.
+#
+# SCHEMA OWNED BY A DIFFERENT ROLE
+#   If the database was originally created by a different PostgreSQL role than
+#   DB_USER in .env (commonly postgres), migrations that alter existing objects
+#   fail with "must be owner of ..." (SQLSTATE 42501). The migrator detects
+#   this before touching anything and prints the fix; the usual one is a single
+#   superuser command from the repository root:
+#
+#     sudo -u postgres psql -d <DB_NAME> -v new_owner=<DB_USER> \
+#         -f deploy/transfer-ownership.sql
+#
+#   then re-run this script.
 # =============================================================================
 
 set -euo pipefail

@@ -374,3 +374,84 @@ func Status(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) (pe
 	}
 	return pending, changed, nil
 }
+
+// ─── Ownership diagnostics ──────────────────────────────────────────────────
+//
+// A database that was first created by a different role than the one running
+// the migrator fails in a characteristic way: replaying old files trips over
+// "must be owner of function/table/view" (SQLSTATE 42501) instead of "already
+// exists", and genuinely new ALTERs cannot run at all. The failure itself is
+// correct — nothing should be adopted or half-applied in that state — but the
+// bare SQLSTATE sends an operator in the wrong direction. These helpers let
+// the CLI name the actual problem and its fix.
+
+// OwnershipGap reports that the connected role does not hold the privileges of
+// the role that owns the existing schema.
+type OwnershipGap struct {
+	// CurrentUser is the role this migrator is connected as.
+	CurrentUser string
+	// Owner is the role that owns the anchor table.
+	Owner string
+}
+
+// CheckOwnership probes whether the connected role can alter the existing
+// schema, using the series' anchor table (departments) as the representative
+// object. Returns nil on a fresh database (nothing owned by anyone yet) and
+// nil when the connected role is the owner or holds the owner's privileges
+// through role membership. The lookup honours search_path, so it inspects the
+// same schema the migrations run in.
+func CheckOwnership(ctx context.Context, pool *pgxpool.Pool) (*OwnershipGap, error) {
+	var owner, current string
+	var hasPrivs bool
+	err := pool.QueryRow(ctx, `
+		SELECT pg_get_userbyid(c.relowner), current_user,
+		       pg_has_role(current_user, c.relowner, 'USAGE')
+		FROM pg_class c
+		WHERE c.oid = to_regclass('departments')`,
+	).Scan(&owner, &current, &hasPrivs)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil // fresh database: the series will create and own everything
+	}
+	if err != nil {
+		return nil, fmt.Errorf("check schema ownership: %w", err)
+	}
+	if hasPrivs {
+		return nil, nil
+	}
+	return &OwnershipGap{CurrentUser: current, Owner: owner}, nil
+}
+
+// IsInsufficientPrivilege reports whether err is PostgreSQL's
+// insufficient_privilege (42501) — "must be owner of …" and friends.
+func IsInsufficientPrivilege(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "42501"
+}
+
+// Pending lists the filenames not yet recorded, tolerating a database that has
+// no ledger at all (everything is pending there). Unlike Status it creates
+// nothing, so it is safe to call before privileges have been established.
+func Pending(ctx context.Context, pool *pgxpool.Pool, migrations []Migration) ([]string, error) {
+	var hasLedger bool
+	if err := pool.QueryRow(ctx,
+		`SELECT to_regclass('schema_migrations') IS NOT NULL`).Scan(&hasLedger); err != nil {
+		return nil, fmt.Errorf("probe ledger: %w", err)
+	}
+
+	seen := map[string]string{}
+	if hasLedger {
+		var err error
+		seen, err = applied(ctx, pool)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var pending []string
+	for _, m := range migrations {
+		if _, ok := seen[m.Filename]; !ok {
+			pending = append(pending, m.Filename)
+		}
+	}
+	return pending, nil
+}

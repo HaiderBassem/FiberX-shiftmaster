@@ -108,7 +108,68 @@ func fatalf(format string, args ...any) {
 	os.Exit(1)
 }
 
+// preflightOwnership stops up/adopt before they touch anything when the work
+// ahead cannot succeed: migrations are pending, but the connected role does
+// not hold the privileges of the role that owns the existing schema. Without
+// this the run dies partway through with a bare "must be owner of …", after
+// possibly recording some adoptions — correct, but pointlessly confusing.
+// Diagnostics failing (odd permissions on catalogs, etc.) never block the run;
+// the real attempt will produce its own error.
+func preflightOwnership(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
+	gap, err := migrate.CheckOwnership(ctx, pool)
+	if err != nil || gap == nil {
+		return
+	}
+	pending, err := migrate.Pending(ctx, pool, migrations)
+	if err != nil || len(pending) == 0 {
+		return
+	}
+	warnOwnershipRemediation(gap)
+	fatalf("error: %d migration(s) are pending but role %q cannot alter the existing schema", len(pending), gap.CurrentUser)
+}
+
+// warnOwnershipRemediation explains the owner/user mismatch and every way out
+// of it. Printed both by the pre-flight and when a run still manages to die
+// with insufficient_privilege (mixed ownership the anchor-table probe misses).
+func warnOwnershipRemediation(gap *migrate.OwnershipGap) {
+	warnf("")
+	if gap != nil {
+		warnf("The existing schema is owned by role %q, but this migrator is connected as %q,", gap.Owner, gap.CurrentUser)
+		warnf("which does not hold that role's privileges. Migrations that alter existing objects")
+		warnf("cannot run until that is fixed. One of the following, then re-run the deploy:")
+	} else {
+		warnf("Some existing objects are owned by a different role than the one this migrator is")
+		warnf("connected as. One of the following, then re-run the deploy:")
+	}
+	warnf("")
+	warnf("  1. Transfer ownership to the application role (recommended — future deploys just work).")
+	warnf("     As a PostgreSQL superuser, from the repository root:")
+	warnf("       sudo -u postgres psql -d <DB_NAME> -v new_owner=<DB_USER> -f deploy/transfer-ownership.sql")
+	warnf("")
+	warnf("  2. Grant the application role the owner's privileges (ONLY if the owner is not a superuser):")
+	warnf("       GRANT <owner_role> TO <DB_USER>;")
+	warnf("")
+	warnf("  3. Run this migrator once with the owner's credentials:")
+	warnf("       DB_USER=<owner_role> DB_PASSWORD=... ./shiftmaster-migrate -dir ... adopt")
+	warnf("")
+}
+
+// warnIfPrivilege prints the remediation block when a run failed on
+// insufficient_privilege despite the pre-flight (per-object ownership can be
+// mixed; the pre-flight probes one representative table).
+func warnIfPrivilege(ctx context.Context, pool *pgxpool.Pool, err error) {
+	if !migrate.IsInsufficientPrivilege(err) {
+		return
+	}
+	gap, gapErr := migrate.CheckOwnership(ctx, pool)
+	if gapErr != nil {
+		gap = nil
+	}
+	warnOwnershipRemediation(gap)
+}
+
 func runUp(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
+	preflightOwnership(ctx, pool, migrations)
 	result, err := migrate.Run(ctx, pool, migrations)
 
 	for _, name := range result.Applied {
@@ -118,6 +179,7 @@ func runUp(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migrati
 
 	if err != nil {
 		warnf("%d applied before the failure", len(result.Applied))
+		warnIfPrivilege(ctx, pool, err)
 		fatalf("error: %v", err)
 	}
 
@@ -125,6 +187,7 @@ func runUp(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migrati
 }
 
 func runAdopt(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
+	preflightOwnership(ctx, pool, migrations)
 	result, err := migrate.Adopt(ctx, pool, migrations)
 
 	for _, name := range result.Applied {
@@ -137,6 +200,7 @@ func runAdopt(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migr
 
 	if err != nil {
 		warnf("%d applied, %d adopted before the failure", len(result.Applied), len(result.Adopted))
+		warnIfPrivilege(ctx, pool, err)
 		fatalf("error: %v", err)
 	}
 
