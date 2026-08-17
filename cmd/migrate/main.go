@@ -15,7 +15,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -35,14 +34,12 @@ func main() {
 		command = flag.Arg(0)
 	}
 
-	log.SetFlags(0)
-
 	migrations, err := migrate.Load(*dir)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		fatalf("error: %v", err)
 	}
 	if len(migrations) == 0 {
-		log.Fatalf("error: no .sql files found in %s", *dir)
+		fatalf("error: no .sql files found in %s", *dir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
@@ -50,7 +47,7 @@ func main() {
 
 	pool, err := connect(ctx)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		fatalf("error: %v", err)
 	}
 	defer pool.Close()
 
@@ -62,7 +59,7 @@ func main() {
 	case "baseline":
 		runBaseline(ctx, pool, migrations)
 	default:
-		log.Fatalf("error: unknown command %q (expected up, status or baseline)", command)
+		fatalf("error: unknown command %q (expected up, status or baseline)", command)
 	}
 }
 
@@ -85,49 +82,71 @@ func connect(ctx context.Context) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+// Output streams follow the usual convention: what the tool did goes to stdout,
+// so `migrate up > run.log` and `$(migrate up)` capture it; problems go to
+// stderr. Everything used to go through `log`, which writes to stderr, so
+// redirecting stdout produced an empty file and command substitution captured
+// nothing.
+// The write result is discarded deliberately in all three: if reporting itself
+// fails there is nowhere left to report it, and the command's exit status
+// already carries the outcome.
+func reportf(format string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stdout, format+"\n", args...)
+}
+
+func warnf(format string, args ...any) {
+	_, _ = fmt.Fprintf(os.Stderr, format+"\n", args...)
+}
+
+func fatalf(format string, args ...any) {
+	warnf(format, args...)
+	os.Exit(1)
+}
+
 func runUp(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
 	result, err := migrate.Run(ctx, pool, migrations)
 
 	for _, name := range result.Applied {
-		log.Printf("applied  %s", name)
+		reportf("applied  %s", name)
 	}
 	warnIfChanged(result.Changed)
 
 	if err != nil {
-		log.Printf("%d applied before the failure", len(result.Applied))
-		log.Fatalf("error: %v", err)
+		warnf("%d applied before the failure", len(result.Applied))
+		fatalf("error: %v", err)
 	}
 
-	log.Printf("ok: %d applied, %d already recorded", len(result.Applied), len(result.Skipped))
+	reportf("ok: %d applied, %d already recorded", len(result.Applied), len(result.Skipped))
 }
 
 func runStatus(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
 	pending, changed, err := migrate.Status(ctx, pool, migrations)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		fatalf("error: %v", err)
 	}
 
 	warnIfChanged(changed)
 
 	if len(pending) == 0 {
-		log.Printf("up to date: all %d migrations recorded", len(migrations))
+		reportf("up to date: all %d migrations recorded", len(migrations))
 		return
 	}
 	for _, name := range pending {
-		log.Printf("pending  %s", name)
+		reportf("pending  %s", name)
 	}
-	log.Printf("%d migration(s) pending", len(pending))
+	reportf("%d migration(s) pending", len(pending))
 
-	// A non-zero status makes this usable as a deployment gate.
+	// A non-zero exit makes this usable as a deployment gate, and as the
+	// idempotency assertion in CI, without anything having to parse the text.
 	os.Exit(1)
 }
 
 func runBaseline(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.Migration) {
 	if err := migrate.Baseline(ctx, pool, migrations); err != nil {
-		log.Fatalf("error: %v", err)
+		fatalf("error: %v", err)
 	}
-	log.Printf("ok: recorded %d migration(s) as already applied", len(migrations))
-	log.Printf("note: nothing was executed. Only use this on a database whose schema already matches the series.")
+	reportf("ok: recorded %d migration(s) as already applied", len(migrations))
+	warnf("note: nothing was executed. Only use this on a database whose schema already matches the series.")
 }
 
 // warnIfChanged reports migrations whose contents differ from what was recorded.
@@ -135,6 +154,6 @@ func runBaseline(ctx context.Context, pool *pgxpool.Pool, migrations []migrate.M
 // something a differently-seeded one never will.
 func warnIfChanged(changed []string) {
 	for _, name := range changed {
-		log.Printf("WARNING  %s has been modified since it was applied; databases may have diverged", name)
+		warnf("WARNING  %s has been modified since it was applied; databases may have diverged", name)
 	}
 }

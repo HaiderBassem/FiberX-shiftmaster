@@ -108,16 +108,23 @@ jobs:
       - name: Apply migrations to the test database
         run: go run ./cmd/migrate -dir internal/database/migrations up
 
+      # Asserted through exit codes rather than by matching log text, which was
+      # brittle in both directions: it broke when the tool wrote its report to
+      # stderr, and rewording the message would have silently disabled the check.
       - name: Verify migrations are idempotent
         run: |
-          # A second run must apply nothing. Anything else means the ledger is
-          # not recording what it applied.
-          output="$(go run ./cmd/migrate -dir internal/database/migrations up)"
-          echo "$output"
-          if ! echo "$output" | grep -q "0 applied"; then
-            echo "::error::Re-running migrations was not a no-op."
-            exit 1
-          fi
+          set -euo pipefail
+
+          # `status` exits non-zero while anything is pending. Passing here means
+          # every file is recorded in schema_migrations, which is exactly the
+          # condition under which a second `up` has nothing left to do.
+          go run ./cmd/migrate -dir internal/database/migrations status
+
+          # And running it again must genuinely succeed, not merely skip.
+          go run ./cmd/migrate -dir internal/database/migrations up
+
+          # Still nothing pending afterwards.
+          go run ./cmd/migrate -dir internal/database/migrations status
 
       - name: Test
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./cmd/... ./internal/... ./pkg/...
@@ -199,13 +206,8 @@ jobs:
       - name: Build a database from an empty schema
         run: go run ./cmd/migrate -dir internal/database/migrations up
 
+      # Uses the tool's own contract rather than querying the ledger with psql:
+      # "nothing pending" is the same assertion as "every file is recorded", and
+      # it does not depend on a client binary happening to be on the runner.
       - name: Confirm every migration was recorded
-        run: |
-          expected="$(ls internal/database/migrations/*.sql | wc -l)"
-          actual="$(psql "postgres://shiftmaster:shiftmaster@localhost:5432/shiftmaster_fresh?sslmode=disable" \
-                    -tAc 'SELECT count(*) FROM schema_migrations')"
-          echo "recorded $actual of $expected migrations"
-          if [ "$expected" != "$actual" ]; then
-            echo "::error::schema_migrations recorded $actual entries but there are $expected files."
-            exit 1
-          fi
+        run: go run ./cmd/migrate -dir internal/database/migrations status
