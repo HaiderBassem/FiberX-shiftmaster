@@ -45,14 +45,15 @@ func NewLeaveRepository(db *database.DB) LeaveRepository {
 	return &leaveRepo{db: db}
 }
 
-const leaveColumns = `l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en, l.start_date, l.end_date, l.total_days, l.reason, l.status,
+const leaveColumns = `l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en,
+	COALESCE(lt.is_hourly, false) as leave_type_is_hourly, l.start_date, l.end_date, l.total_days, l.reason, l.status,
 	l.applied_date, l.approved_by_team_leader, l.approved_by_manager, l.rejection_reason, l.attachments,
 	l.start_time, l.end_time, l.created_at, l.updated_at`
 
 func (r *leaveRepo) scanLeave(row pgx.Row) (*models.Leave, error) {
 	var l models.Leave
 	err := row.Scan(
-		&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
+		&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.LeaveTypeIsHourly, &l.StartDate, &l.EndDate, &l.TotalDays,
 		&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 		&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 	)
@@ -64,7 +65,7 @@ func (r *leaveRepo) scanLeaves(rows pgx.Rows) ([]models.Leave, error) {
 	for rows.Next() {
 		var l models.Leave
 		if err := rows.Scan(
-			&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
+			&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.LeaveTypeIsHourly, &l.StartDate, &l.EndDate, &l.TotalDays,
 			&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 			&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
@@ -151,9 +152,9 @@ func (r *leaveRepo) GetOverlappingLeavesCount(ctx context.Context, departmentID 
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 		 WHERE e.department_id = $1 
 		   AND l.status NOT IN ('rejected', 'cancelled')
-		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND COALESCE(lt.bypasses_daily_limit, false) = false
 		   AND l.start_date <= $3 
-		   AND l.end_date >= $2`, 
+		   AND l.end_date >= $2`,
 		departmentID, startDate, endDate).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count: %w", err)
@@ -172,11 +173,11 @@ func (r *leaveRepo) GetOverlappingLeavesCountByShift(ctx context.Context, depart
 		 WHERE e.department_id = $1 
 		   AND COALESCE(es.shift_id, e.default_shift_id) = $2
 		   AND l.status NOT IN ('rejected', 'cancelled')
-		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND COALESCE(lt.bypasses_daily_limit, false) = false
 		   AND l.start_date <= $3 
 		   AND l.end_date >= $3
-		   AND ($4::boolean = false OR lt.unit = 'hours')
-		   AND ($4::boolean = true OR lt.unit = 'days')`, 
+		   AND ($4::boolean = false OR COALESCE(lt.is_hourly, false) = true)
+		   AND ($4::boolean = true OR COALESCE(lt.is_hourly, false) = false)`,
 		departmentID, shiftID, date, isHourly).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count by shift: %w", err)

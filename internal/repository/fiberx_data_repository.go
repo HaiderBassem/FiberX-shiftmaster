@@ -21,7 +21,7 @@ func NewFiberxDataRepository(db *database.DB) *FiberxDataRepository {
 // Get accessible documents for an employee
 func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageFiberxData bool) ([]models.FiberxDataResponse, error) {
 	docs := []models.FiberxDataResponse{}
-	
+
 	query := `
 		SELECT 
 			d.id, d.department_id, d.title, d.content, d.created_by, d.created_at, d.updated_at,
@@ -40,12 +40,12 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 		WHERE 
 			(d.department_id = $1 OR ds.id IS NOT NULL)
 	`
-	
+
 	// If not manager/admin and doesn't have explicit manage permission, hide documents marked as 'hide'
 	if role != "manager" && role != "admin" && role != "team_leader" && !canManageFiberxData {
 		query += ` AND COALESCE(ea.access_level, 'read') != 'hide' `
 	}
-	
+
 	query += ` ORDER BY d.created_at DESC`
 
 	rows, err := r.db.Query(ctx, query, departmentID, employeeID)
@@ -65,12 +65,12 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// If manager or has can_manage_fiberx_data and it belongs to their department, grant 'write' access globally
 		if (role == "manager" || role == "admin" || role == "team_leader" || canManageFiberxData) && !d.IsShared {
 			accLevel = "write"
 		}
-		
+
 		d.AccessLevel = accLevel
 		docs = append(docs, d)
 	}
@@ -133,7 +133,7 @@ func (r *FiberxDataRepository) CreateDocument(ctx context.Context, doc *models.F
 	`
 	err := r.db.QueryRow(ctx, query, doc.DepartmentID, doc.Title, doc.Content, doc.CreatedBy).
 		Scan(&doc.ID, &doc.CreatedAt, &doc.UpdatedAt)
-		
+
 	if err != nil {
 		return nil, err
 	}

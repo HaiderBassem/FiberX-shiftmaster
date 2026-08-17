@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"shiftmaster-backend/internal/config"
+	"shiftmaster-backend/internal/middleware"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/notification"
 	"shiftmaster-backend/internal/service"
@@ -14,10 +17,44 @@ import (
 // NotificationHandler handles notification endpoints.
 type NotificationHandler struct {
 	notifSvc *service.NotificationService
+	jwtCfg   config.JWTConfig
 }
 
-func NewNotificationHandler(notifSvc *service.NotificationService) *NotificationHandler {
-	return &NotificationHandler{notifSvc: notifSvc}
+func NewNotificationHandler(notifSvc *service.NotificationService, jwtCfg config.JWTConfig) *NotificationHandler {
+	return &NotificationHandler{notifSvc: notifSvc, jwtCfg: jwtCfg}
+}
+
+// IssueWSTicket returns a short-lived, single-use credential for opening the
+// notification WebSocket.
+//
+// The caller is already authenticated by JWTAuth on this route, so this simply
+// exchanges a header-borne access token for something safe to place in a URL.
+func (h *NotificationHandler) IssueWSTicket(c *gin.Context) {
+	claimsAny, ok := c.Get("claims")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	claims, ok := claimsAny.(*middleware.Claims)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+
+	ticket, expiresAt, err := middleware.IssueWSTicket(claims, h.jwtCfg.Secret, h.jwtCfg.Issuer)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to issue websocket ticket"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"ticket":     ticket,
+			"expires_at": expiresAt.UTC().Format(time.RFC3339),
+			"expires_in": int(middleware.WSTicketTTL.Seconds()),
+		},
+	})
 }
 
 // List returns all notifications for the authenticated user.

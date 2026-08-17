@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
-	"strings"
+	"log"
+
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
+	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
@@ -34,7 +36,7 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 			creatorCanCreate = emp.CanCreateTables
 		}
 	}
-	
+
 	// Only admins, managers, team_leaders, or employees with explicit can_create_tables permission can create.
 	if creatorRole != "admin" && creatorRole != "manager" && !creatorCanCreate {
 		return nil, errors.New("unauthorized to create tables")
@@ -44,7 +46,7 @@ func (s *InfoTableService) CreateTable(ctx context.Context, table *models.InfoTa
 }
 
 func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid.UUID, role string, departmentID *uuid.UUID) ([]models.InfoTable, error) {
-		tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
+	tables, err := s.repo.GetVisibleTables(ctx, employeeID, role, departmentID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,12 +60,12 @@ func (s *InfoTableService) GetVisibleTables(ctx context.Context, employeeID uuid
 			filteredTables = append(filteredTables, tables[i])
 		}
 	}
-	
+
 	return filteredTables, nil
 }
 
 func (s *InfoTableService) GetTableByID(ctx context.Context, tableID uuid.UUID, reqEmployeeID uuid.UUID, reqRole string, reqDepID *uuid.UUID) (*models.InfoTable, error) {
-		table, err := s.repo.GetTableByID(ctx, tableID)
+	table, err := s.repo.GetTableByID(ctx, tableID)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +179,7 @@ func (s *InfoTableService) HasWriteAccess(ctx context.Context, tableID uuid.UUID
 	if table.CreatedBy != nil && *table.CreatedBy == reqEmployeeID {
 		return true
 	}
-	
+
 	// Check explicit employee access first
 	empAccesses, err := s.repo.GetEmployeeAccesses(ctx, tableID)
 	if err == nil {
@@ -331,7 +333,7 @@ func (s *InfoTableService) AddEmployeeAccess(ctx context.Context, reqEmployeeID 
 			return errors.New("cannot manage access for employees outside your department")
 		}
 	}
-	
+
 	access := &models.InfoTableEmployeeAccess{
 		TableID:     tableID,
 		EmployeeID:  targetEmployeeID,
@@ -354,7 +356,7 @@ func (s *InfoTableService) RemoveEmployeeAccess(ctx context.Context, reqEmployee
 	if !s.HasManageAccessRight(ctx, tableID, reqEmployeeID, reqRole, reqDepID) {
 		return errors.New("unauthorized to manage access for this table")
 	}
-	
+
 	if reqRole != "admin" {
 		emp, err := s.employeeRepo.GetByID(ctx, targetEmployeeID)
 		if err != nil {
@@ -394,8 +396,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 
 	// Write Headers
 	for i, col := range table.Columns {
-		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		f.SetCellValue(sheetName, cell, col.Name)
+		cell, err := excelize.CoordinatesToCellName(i+1, 1)
+		if err != nil {
+			return nil, fmt.Errorf("build header cell reference: %w", err)
+		}
+		if err := f.SetCellValue(sheetName, cell, col.Name); err != nil {
+			return nil, fmt.Errorf("write header %q: %w", col.Name, err)
+		}
 	}
 
 	// Create bold style for headers
@@ -403,8 +410,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 		Font: &excelize.Font{Bold: true},
 	})
 	if err == nil {
-		lastCell, _ := excelize.CoordinatesToCellName(len(table.Columns), 1)
-		f.SetCellStyle(sheetName, "A1", lastCell, style)
+		lastCell, cellErr := excelize.CoordinatesToCellName(len(table.Columns), 1)
+		if cellErr == nil {
+			// Styling is cosmetic: a failure here must not fail the export.
+			if styleErr := f.SetCellStyle(sheetName, "A1", lastCell, style); styleErr != nil {
+				log.Printf("info tables: could not apply header style: %v", styleErr)
+			}
+		}
 	}
 
 	// Write Rows
@@ -412,8 +424,13 @@ func (s *InfoTableService) ExportToExcel(ctx context.Context, tableID uuid.UUID)
 		for cIdx, col := range table.Columns {
 			val, ok := row.Data[col.ID]
 			if ok {
-				cell, _ := excelize.CoordinatesToCellName(cIdx+1, rIdx+2)
-				f.SetCellValue(sheetName, cell, val)
+				cell, err := excelize.CoordinatesToCellName(cIdx+1, rIdx+2)
+				if err != nil {
+					return nil, fmt.Errorf("build cell reference: %w", err)
+				}
+				if err := f.SetCellValue(sheetName, cell, val); err != nil {
+					return nil, fmt.Errorf("write cell %s: %w", cell, err)
+				}
 			}
 		}
 	}

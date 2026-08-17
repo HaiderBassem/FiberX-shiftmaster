@@ -8,16 +8,16 @@ import (
 
 // ServiceCategory is a top-level grouping card for FTTH service plans.
 type ServiceCategory struct {
-	ID          uuid.UUID `json:"id"`
-	ProvinceID  uuid.UUID `json:"province_id"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
+	ID          uuid.UUID  `json:"id"`
+	ProvinceID  uuid.UUID  `json:"province_id"`
+	Name        string     `json:"name"`
+	Description *string    `json:"description,omitempty"`
 	IsActive    bool       `json:"is_active"`
 	DisabledAt  *time.Time `json:"disabled_at,omitempty"`
 	SortOrder   int        `json:"sort_order"`
-	CreatedBy   uuid.UUID `json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	CreatedBy   uuid.UUID  `json:"created_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 
 	// Joined / computed fields
 	CreatorName  *string `json:"creator_name,omitempty" db:"-"`
@@ -27,25 +27,25 @@ type ServiceCategory struct {
 
 // ServicePlan is an FTTH internet package within a category.
 type ServicePlan struct {
-	ID              uuid.UUID `json:"id"`
-	CategoryID      uuid.UUID `json:"category_id"`
-	Name            string    `json:"name"`
-	Price           float64   `json:"price"`
-	DurationDays    int       `json:"duration_days"`
-	Speed           *string   `json:"speed,omitempty"`
-	DataCap         *string   `json:"data_cap,omitempty"`
-	ConnectionType  string    `json:"connection_type"`
-	InstallationFee float64   `json:"installation_fee"`
-	RouterIncluded  bool      `json:"router_included"`
-	Description     *string   `json:"description,omitempty"`
-	CabinetNotes    *string   `json:"cabinet_notes,omitempty"`
-	Features        *string   `json:"features,omitempty"` // JSONB as string
-	IsActive        bool      `json:"is_active"`
+	ID              uuid.UUID  `json:"id"`
+	CategoryID      uuid.UUID  `json:"category_id"`
+	Name            string     `json:"name"`
+	Price           float64    `json:"price"`
+	DurationDays    int        `json:"duration_days"`
+	Speed           *string    `json:"speed,omitempty"`
+	DataCap         *string    `json:"data_cap,omitempty"`
+	ConnectionType  string     `json:"connection_type"`
+	InstallationFee float64    `json:"installation_fee"`
+	RouterIncluded  bool       `json:"router_included"`
+	Description     *string    `json:"description,omitempty"`
+	CabinetNotes    *string    `json:"cabinet_notes,omitempty"`
+	Features        *string    `json:"features,omitempty"` // JSONB as string
+	IsActive        bool       `json:"is_active"`
 	DisabledAt      *time.Time `json:"disabled_at,omitempty"`
-	SortOrder       int       `json:"sort_order"`
-	CreatedBy       uuid.UUID `json:"created_by"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	SortOrder       int        `json:"sort_order"`
+	CreatedBy       uuid.UUID  `json:"created_by"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 
 	// Joined fields
 	CreatorName  *string `json:"creator_name,omitempty" db:"-"`

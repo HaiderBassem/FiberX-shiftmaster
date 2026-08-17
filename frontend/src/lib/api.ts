@@ -6,7 +6,30 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Uploaded files are authorised by a cookie scoped to /api/uploads, which the
+  // server sets on login and refresh. Sending credentials keeps that cookie
+  // flowing when the API is on a different origin from the SPA.
+  withCredentials: true,
 });
+
+/**
+ * Ends the session.
+ *
+ * Clearing local state is not enough on its own: the upload cookie is HttpOnly,
+ * so only the server can remove it, and leaving it behind would let the next
+ * person at the same browser fetch files from the previous session. The request
+ * is best-effort — an expired or offline session must still be able to sign out
+ * locally.
+ */
+export async function signOut(): Promise<void> {
+  try {
+    await api.post('/auth/logout');
+  } catch {
+    // Ignore: local state is cleared regardless.
+  } finally {
+    useAuthStore.getState().logout();
+  }
+}
 
 api.interceptors.request.use(
   (config) => {
@@ -61,8 +84,7 @@ api.interceptors.response.use(
 
       // If no refresh token, logout immediately
       if (!refreshToken) {
-        useAuthStore.getState().logout();
-        window.location.replace('/login');
+        void signOut().finally(() => window.location.replace('/login'));
         return Promise.reject(error);
       }
 
@@ -85,7 +107,7 @@ api.interceptors.response.use(
         const { data } = await axios.post(
           `${api.defaults.baseURL}/auth/refresh`,
           { refresh_token: refreshToken },
-          { headers: { 'Content-Type': 'application/json' } }
+          { headers: { 'Content-Type': 'application/json' }, withCredentials: true }
         );
 
         if (data.success) {
@@ -104,15 +126,13 @@ api.interceptors.response.use(
         } else {
           // Refresh failed, logout
           processQueue(error, null);
-          useAuthStore.getState().logout();
-          window.location.replace('/login');
+          void signOut().finally(() => window.location.replace('/login'));
           return Promise.reject(error);
         }
       } catch (refreshError) {
         // Refresh request failed, logout
         processQueue(refreshError, null);
-        useAuthStore.getState().logout();
-        window.location.replace('/login');
+        void signOut().finally(() => window.location.replace('/login'));
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

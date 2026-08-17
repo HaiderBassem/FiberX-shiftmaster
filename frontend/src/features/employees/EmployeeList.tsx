@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, Plus, Search, Loader2, X, Edit3, Trash2, Save, UserCircle, Key } from 'lucide-react';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
+import { assetUrl } from '@/lib/assets';
 
 interface Employee {
   id: string;
@@ -523,7 +524,7 @@ export const EmployeeList = () => {
                     <div className="flex items-center gap-3 min-w-0">
                       {emp.profile_image ? (
                         <img 
-                          src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${emp.profile_image.startsWith('/api') ? emp.profile_image : '/api' + emp.profile_image}`}
+                          src={assetUrl(emp.profile_image)}
                           alt="Profile"
                           className="w-10 h-10 rounded-xl object-cover shrink-0 border border-border"
                         />

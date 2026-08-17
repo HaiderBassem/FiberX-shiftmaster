@@ -2,7 +2,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import api from '@/lib/api';
+import api, { signOut } from '@/lib/api';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2, Database,
@@ -32,13 +32,13 @@ const navItems = [
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
   const handleLogout = () => {
-    logout();
+    void signOut();
     navigate('/login');
   };
 

@@ -28,7 +28,11 @@ func NewAuditLogRepository(db *database.DB) AuditLogRepository {
 
 const auditColumns = `id, employee_id, action, table_name, record_id, old_data, new_data, ip_address, user_agent, created_at`
 
-func (r *auditLogRepo) scanAuditLogs(rows interface{ Next() bool; Scan(...interface{}) error; Err() error }) ([]models.AuditLog, error) {
+func (r *auditLogRepo) scanAuditLogs(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+	Err() error
+}) ([]models.AuditLog, error) {
 	var logs []models.AuditLog
 	for rows.Next() {
 		var l models.AuditLog

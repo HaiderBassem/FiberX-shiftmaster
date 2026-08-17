@@ -69,7 +69,7 @@ func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.He
 	if existing.AccessLevel == nil || *existing.AccessLevel != "write" {
 		return nil, errors.New("you do not have write access to this document")
 	}
-	
+
 	existing.Title = doc.Title
 	existing.Content = doc.Content
 	return s.repo.UpdateDocument(ctx, existing)
@@ -109,7 +109,7 @@ func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID,
 	if err != nil {
 		return err
 	}
-	
+
 	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return err
@@ -141,6 +141,6 @@ func (s *HelpDocumentService) GetDocumentAccessList(ctx context.Context, documen
 	if doc == nil {
 		return nil, errors.New("document not found")
 	}
-	
+
 	return s.repo.GetDocumentAccessList(ctx, documentID)
 }

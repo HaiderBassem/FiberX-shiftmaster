@@ -3,15 +3,32 @@ import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { Sun, Moon, User, Menu, Key, Bell } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { useNotification } from '@/providers/NotificationProvider';
+import { assetUrl } from '@/lib/assets';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
   const { i18n } = useTranslation();
+  const queryClient = useQueryClient();
+
+  /**
+   * Applies a change of department context.
+   *
+   * Every request carries the selected department in an X-Department-ID header,
+   * so switching invalidates all server state. This used to call
+   * window.location.reload(), which reloaded the whole application — losing
+   * scroll position, open dialogs and unsaved input — to achieve what clearing
+   * the query cache does. Removing every query rather than invalidating avoids
+   * briefly rendering the previous department's data while refetches are in
+   * flight.
+   */
+  const switchDepartmentContext = () => {
+    queryClient.removeQueries();
+  };
   const { requestPermission, permission } = useNotification();
   const {
     user,
@@ -97,7 +114,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
               value={adminSelectedDepartmentId || ''}
               onChange={(e) => {
                 setAdminSelectedDepartmentId(e.target.value || null);
-                window.location.reload();
+                switchDepartmentContext();
               }}
             >
               <option value="">All Departments</option>
@@ -118,7 +135,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
               value={managerSelectedDepartmentId || ''}
               onChange={(e) => {
                 setManagerSelectedDepartmentId(e.target.value || null);
-                window.location.reload();
+                switchDepartmentContext();
               }}
             >
               {managedDepartments.map((d: any) => (
@@ -157,7 +174,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary/15 flex items-center justify-center overflow-hidden">
             {user?.profile_image ? (
               <img 
-                src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${user.profile_image.startsWith('/api') ? user.profile_image : '/api' + user.profile_image}`} 
+                src={assetUrl(user.profile_image)} 
                 alt="Profile" 
                 className="w-full h-full object-cover" 
               />

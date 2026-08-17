@@ -3,16 +3,18 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"time"
 
+	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
+	"shiftmaster-backend/internal/upload"
 )
 
 // EmployeeHandler handles employee CRUD endpoints.
@@ -22,6 +24,7 @@ type EmployeeHandler struct {
 	taskRepo         repository.TaskRepository
 	leaveRepo        repository.LeaveRepository
 	deptRepo         repository.DepartmentRepository
+	uploadCfg        config.UploadConfig
 }
 
 func NewEmployeeHandler(
@@ -30,6 +33,7 @@ func NewEmployeeHandler(
 	taskRepo repository.TaskRepository,
 	leaveRepo repository.LeaveRepository,
 	deptRepo repository.DepartmentRepository,
+	uploadCfg config.UploadConfig,
 ) *EmployeeHandler {
 	return &EmployeeHandler{
 		employeeService:  empSvc,
@@ -37,6 +41,7 @@ func NewEmployeeHandler(
 		taskRepo:         taskRepo,
 		leaveRepo:        leaveRepo,
 		deptRepo:         deptRepo,
+		uploadCfg:        uploadCfg,
 	}
 }
 
@@ -153,7 +158,6 @@ func (h *EmployeeHandler) GetByID(c *gin.Context) {
 		// allow an employee to always view their own profile
 		if requesterID != id {
 
-
 			scopeDeptID := getDepartmentID(c)
 
 			if scopeDeptID == nil || emp.DepartmentID == nil || *scopeDeptID != *emp.DepartmentID {
@@ -252,7 +256,7 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 					return
 				}
 			}
-			
+
 			managedDepts, err := h.deptRepo.GetByManagerID(c.Request.Context(), creatorID)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -389,17 +393,17 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			if !isManagingTargetDept && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
 				return
 			}
-			
+
 			if target.Role == "admin" || target.Role == "manager" {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "managers cannot edit admin or manager accounts"})
 				return
 			}
-			
+
 			if req.Role != "" && req.Role != "employee" && req.Role != "team_leader" {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "can only set role to employee or team_leader"})
 				return
@@ -474,16 +478,41 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		CanCoverNightShift: req.CanCoverNightShift,
 		// Preserve permissions and preferences since they are managed by separate endpoints
 		// or omitted from the update payload
-		CanManageHelpDocs:  func() bool { if req.CanManageHelpDocs != nil { return *req.CanManageHelpDocs }; return current.CanManageHelpDocs }(),
-		CanPostAnnouncements: func() bool { if req.CanPostAnnouncements != nil { return *req.CanPostAnnouncements }; return current.CanPostAnnouncements }(),
-		CanManageFiberxData:  func() bool { if req.CanManageFiberxData != nil { return *req.CanManageFiberxData }; return current.CanManageFiberxData }(),
-		CanManageServices:    func() bool { if req.CanManageServices != nil { return *req.CanManageServices }; return current.CanManageServices }(),
-		CanCreateTables:    current.CanCreateTables,
-		UIPreferences:      current.UIPreferences,
-		Status:             req.Status,
-		ProfileImage:       func() *string { if req.ProfileImage != nil { return req.ProfileImage }; return current.ProfileImage }(),
-		SecondaryPhone:     req.SecondaryPhone,
-		SecondaryEmail:     req.SecondaryEmail,
+		CanManageHelpDocs: func() bool {
+			if req.CanManageHelpDocs != nil {
+				return *req.CanManageHelpDocs
+			}
+			return current.CanManageHelpDocs
+		}(),
+		CanPostAnnouncements: func() bool {
+			if req.CanPostAnnouncements != nil {
+				return *req.CanPostAnnouncements
+			}
+			return current.CanPostAnnouncements
+		}(),
+		CanManageFiberxData: func() bool {
+			if req.CanManageFiberxData != nil {
+				return *req.CanManageFiberxData
+			}
+			return current.CanManageFiberxData
+		}(),
+		CanManageServices: func() bool {
+			if req.CanManageServices != nil {
+				return *req.CanManageServices
+			}
+			return current.CanManageServices
+		}(),
+		CanCreateTables: current.CanCreateTables,
+		UIPreferences:   current.UIPreferences,
+		Status:          req.Status,
+		ProfileImage: func() *string {
+			if req.ProfileImage != nil {
+				return req.ProfileImage
+			}
+			return current.ProfileImage
+		}(),
+		SecondaryPhone: req.SecondaryPhone,
+		SecondaryEmail: req.SecondaryEmail,
 	}
 
 	if err := h.employeeService.UpdateEmployee(c.Request.Context(), emp); err != nil {
@@ -514,7 +543,7 @@ func (h *EmployeeHandler) UpdateStatus(c *gin.Context) {
 
 	roleAny, _ := c.Get("role")
 	role, _ := roleAny.(string)
-	
+
 	if role == "team_leader" || role == "manager" {
 		requesterStr, _ := c.Get("employee_id")
 		requesterID, _ := uuid.Parse(requesterStr.(string))
@@ -536,7 +565,7 @@ func (h *EmployeeHandler) UpdateStatus(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
 			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
@@ -599,7 +628,7 @@ func (h *EmployeeHandler) Delete(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			me, _ := h.employeeService.GetByID(c.Request.Context(), requesterID)
 			if !isManagingTarget && (me.DepartmentID == nil || target.DepartmentID == nil || *me.DepartmentID != *target.DepartmentID) {
 				c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "forbidden: you do not manage this employee's department"})
@@ -670,11 +699,9 @@ func (h *EmployeeHandler) UpdatePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "password updated successfully"}})
 }
 
-
 type updateHelpPermissionRequest struct {
 	CanManageHelpDocs bool `json:"can_manage_help_docs"`
 }
-
 
 type updateFiberxPermissionRequest struct {
 	CanManageFiberxData bool `json:"can_manage_fiberx_data"`
@@ -806,7 +833,6 @@ func (h *EmployeeHandler) UpdateAnnouncementPermission(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-
 
 type updateTablePermissionRequest struct {
 	CanCreateTables bool `json:"can_create_tables"`
@@ -977,13 +1003,14 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 	leaves, err := h.leaveRepo.GetByEmployee(ctx, empID)
 	if err == nil {
 		for _, l := range leaves {
-			if l.Status == "approved" || l.Status == "approved_by_manager" {
+			switch l.Status {
+			case "approved", "approved_by_manager":
 				if l.StartTime != nil && l.EndTime != nil {
 					totalHourlyLeavesTaken++
 				} else {
 					totalLeavesTaken++
 				}
-			} else if l.Status == "pending" || l.Status == "approved_by_team_leader" {
+			case "pending", "approved_by_team_leader":
 				// Calculate pending amount and add to the corresponding balance
 				for i, b := range balances {
 					if b.LeaveTypeID == l.LeaveTypeID {
@@ -1028,31 +1055,33 @@ func (h *EmployeeHandler) UploadProfilePicture(c *gin.Context) {
 	requesterStr, _ := c.Get("employee_id")
 	requesterID, _ := uuid.Parse(requesterStr.(string))
 
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.uploadCfg.MaxSizeBytes()+maxMultipartOverhead)
+
 	file, err := c.FormFile("profile_picture")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "file missing"})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "file missing or too large"})
 		return
 	}
 
-	// Make uploads directory if it doesn't exist
-	uploadDir := "./uploads/profiles"
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "could not create upload directory"})
+	// Validated and re-encoded on the same path as every other image upload, so a
+	// profile picture cannot become active content served from this origin.
+	img, err := upload.SanitizeImage(file, upload.Options{
+		MaxBytes:     h.uploadCfg.MaxSizeBytes(),
+		AllowedTypes: h.uploadCfg.AllowedTypes,
+	})
+	if err != nil {
+		respondUploadError(c, err)
 		return
 	}
 
-	// Generate a unique file name
-	fileName := fmt.Sprintf("%s_%d_%s", requesterID.String(), time.Now().Unix(), file.Filename)
-	filePath := fmt.Sprintf("%s/%s", uploadDir, fileName)
-
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
+	if _, err := upload.Store(filepath.Join(h.uploadCfg.BasePath, "profiles"), img); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to save file"})
 		return
 	}
 
-	// Update the profile image path in the database. 
-	// We'll store it as relative URL including /api prefix to be served by the static route.
-	publicURL := fmt.Sprintf("/api/uploads/profiles/%s", fileName)
+	// Stored as a relative URL including the /api prefix so it is served by the
+	// upload route rather than the SPA fallback.
+	publicURL := fmt.Sprintf("/api/uploads/profiles/%s", img.Filename)
 	if err := h.employeeService.UpdateProfileImage(ctx, requesterID, publicURL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return

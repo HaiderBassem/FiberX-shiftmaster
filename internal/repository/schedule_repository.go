@@ -388,7 +388,7 @@ func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to 
 		WHERE es.shift_date BETWEEN $1 AND $2
 		  AND e.department_id = $3
 		ORDER BY e.first_name, e.last_name, es.shift_date`
-		
+
 	rows, err := r.db.Query(ctx, query, from, to, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get department shifts in range: %w", err)
@@ -603,7 +603,7 @@ func (r *scheduleRepo) DeleteEmployeeShift(ctx context.Context, id uuid.UUID) er
 // These are the best candidates to cover a shift today since they had rest yesterday.
 func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.Employee, error) {
 	previousDay := date.AddDate(0, 0, -1)
-	
+
 	query := `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
 				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
@@ -617,7 +617,7 @@ func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.T
 		       SELECT employee_id FROM employee_shifts
 		       WHERE shift_date = $2 AND shift_status = 'working'
 		   )`
-	
+
 	args := []interface{}{previousDay, date}
 	if departmentID != nil {
 		query += ` AND e.department_id = $3`
@@ -818,7 +818,7 @@ func (r *scheduleRepo) GetShiftCoveragePreview(ctx context.Context, shiftID uuid
 		 FROM employee_shifts 
 		 WHERE shift_date = $1 AND shift_id = $2`, date, shiftID,
 	).Scan(&coverage.TotalAssigned, &coverage.TotalWorking, &coverage.TotalOff, &coverage.TotalOnLeave)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("get shift coverage preview: %w", err)
 	}

@@ -20,14 +20,16 @@ type PushService interface {
 }
 
 type pushService struct {
-	repo   repository.NotificationRepository
-	config config.VAPIDConfig
+	repo         repository.NotificationRepository
+	employeeRepo repository.EmployeeRepository
+	config       config.VAPIDConfig
 }
 
-func NewPushService(repo repository.NotificationRepository, cfg config.VAPIDConfig) PushService {
+func NewPushService(repo repository.NotificationRepository, employeeRepo repository.EmployeeRepository, cfg config.VAPIDConfig) PushService {
 	return &pushService{
-		repo:   repo,
-		config: cfg,
+		repo:         repo,
+		employeeRepo: employeeRepo,
+		config:       cfg,
 	}
 }
 
@@ -106,12 +108,15 @@ func (s *pushService) SendToEmployee(ctx context.Context, employeeID uuid.UUID, 
 	})
 }
 
+// SendToDepartment delivers to every active member of a department.
+//
+// The two channels have deliberately different recipient sets. WebSocket delivery
+// is driven by department membership, because an employee with the app open
+// should see the notification whether or not they ever granted browser
+// notification permission. Push delivery is necessarily limited to the employees
+// who do have a subscription. Deriving both from the subscription table, as this
+// did before, meant anyone without a subscription received nothing at all.
 func (s *pushService) SendToDepartment(ctx context.Context, departmentID uuid.UUID, title, message, url string) error {
-	subs, err := s.repo.GetPushSubscriptionsByDepartmentID(ctx, departmentID)
-	if err != nil {
-		return fmt.Errorf("fetch subscriptions: %w", err)
-	}
-
 	payload := PushPayload{
 		Title: title,
 		Body:  message,
@@ -119,19 +124,19 @@ func (s *pushService) SendToDepartment(ctx context.Context, departmentID uuid.UU
 		Url:   url,
 	}
 
-	// Trigger WS for department users
-	// We need to fetch all active employees in the department to send via WS
-	// For now, let's let the frontend fetch notifications or we broadcast.
-	// Actually, an efficient way is to broadcast to all and let frontend filter, OR just send to department.
-	// Since WSHub requires employeeID, we need employeeIDs.
-	// We can add a simple Department broadcast or just iterate over subs.
-	// For simplicity, we'll iterate over subs to get employee IDs.
-	employeeIDs := make(map[uuid.UUID]bool)
-	for _, sub := range subs {
-		if !employeeIDs[sub.EmployeeID] {
-			DefaultWSHub.SendToEmployee(sub.EmployeeID, payload)
-			employeeIDs[sub.EmployeeID] = true
+	if s.employeeRepo != nil {
+		memberIDs, err := s.employeeRepo.GetActiveIDsByDepartment(ctx, departmentID)
+		if err != nil {
+			// A failure here must not suppress push delivery.
+			log.Printf("Push: failed to resolve department %s members for websocket delivery: %v", departmentID, err)
+		} else {
+			DefaultWSHub.SendToEmployees(memberIDs, payload)
 		}
+	}
+
+	subs, err := s.repo.GetPushSubscriptionsByDepartmentID(ctx, departmentID)
+	if err != nil {
+		return fmt.Errorf("fetch subscriptions: %w", err)
 	}
 
 	return s.send(ctx, subs, payload)

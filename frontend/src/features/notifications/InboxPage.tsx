@@ -10,15 +10,10 @@ import {
   BellOff, ArrowRightLeft, CalendarClock, ClipboardCheck, RefreshCw,
   CheckCheck, Filter, X
 } from 'lucide-react';
+import { assetUrl } from '@/lib/assets';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
-const getImageUrl = (url: string) => {
-  if (url.startsWith('http')) return url;
-  const base = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace('/api', '')
-    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
-  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
-};
+const getImageUrl = (url: string) => assetUrl(url);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Notification {

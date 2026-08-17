@@ -128,7 +128,7 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 	// Calculate requested amount (days or hours)
 	requestedAmount := 0.0
 	isHourly := leaveType != nil && leaveType.Unit == "hours"
-	
+
 	if leave.StartTime != nil && leave.EndTime != nil && isHourly {
 		startTime, err1 := parseTimeStr(*leave.StartTime)
 		endTime, err2 := parseTimeStr(*leave.EndTime)
@@ -153,7 +153,7 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		}
 
 		balance, err := s.leaveBalanceRepo.GetByEmployeeLeaveTypeAndYear(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month)
-		var allocated float64 = float64(leaveType.DaysPerYear)
+		allocated := float64(leaveType.DaysPerYear)
 		var used float64 = 0
 		if err == nil && balance != nil {
 			allocated = balance.AllocatedAmount
@@ -205,19 +205,16 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 		return fmt.Errorf("employee not found: %w", err)
 	}
 
-	// Check department leave limits (if set) and not an Emergency leave
-	isEmergency := false
-	if leaveType != nil {
-		if leaveType.NameEn == "Emergency" || leaveType.NameEn == "emergency" {
-			isEmergency = true
-		}
-	}
+	// Department daily caps, unless this leave type is explicitly exempt.
+	// The exemption used to be inferred by matching the type's name against
+	// "Emergency", so renaming or translating the type silently removed it.
+	bypassesDailyLimit := leaveType != nil && leaveType.BypassesDailyLimit
 
-	if !isEmergency && emp.DepartmentID != nil {
+	if !bypassesDailyLimit && emp.DepartmentID != nil {
 		dept, err := s.departmentRepo.GetByID(ctx, *emp.DepartmentID)
 		if err == nil {
 			isHourly := false
-			if leaveType != nil && leaveType.Unit == "hours" {
+			if leaveType != nil && leaveType.IsHourly {
 				isHourly = true
 			}
 			limit := dept.MaxLeavesPerDay
@@ -292,7 +289,7 @@ func (s *LeaveService) RequestLeave(ctx context.Context, leave *models.Leave) er
 			}); err != nil {
 				fmt.Printf("Failed to send leave notification to manager: %v\n", err)
 			}
-			
+
 			// Send email to manager
 			if mgr.Email != "" {
 				s.emailService.SendEmailAsync(
@@ -578,7 +575,7 @@ func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUI
 					amountToRevert += 1.0
 				}
 			}
-			
+
 			year := start.Year()
 			month := 0
 			if leaveType.ResetCycle == "monthly" {
@@ -645,7 +642,7 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 	}
 
 	emp, _ := s.employeeRepo.GetByID(ctx, leave.EmployeeID)
-	
+
 	isHourly := false
 	if leave.LeaveTypeID != uuid.Nil {
 		if lt, err := s.leaveTypeRepo.GetByID(ctx, leave.LeaveTypeID); err == nil && lt != nil {
@@ -722,13 +719,13 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 					amountTaken += 1.0
 				}
 			}
-			
+
 			year := start.Year()
 			month := 0
 			if leaveType.ResetCycle == "monthly" {
 				month = int(start.Month())
 			}
-			
+
 			err := s.leaveBalanceRepo.IncrementUsedDays(ctx, leave.EmployeeID, leave.LeaveTypeID, year, month, amountTaken)
 			if err != nil {
 				// If not found, create it with the allocated amount based on leaveType
@@ -897,7 +894,7 @@ func (s *LeaveService) SendUpcomingLeaveReminders(ctx context.Context) error {
 		title := "Upcoming Leave Reminder"
 		msg := fmt.Sprintf("Reminder: Employee %s %s has a leave starting in 2 days (%s).", emp.FirstName, emp.LastName, leave.StartDate.Format("2006-01-02"))
 		entityType := "leave"
-		
+
 		for _, tl := range teamLeaders {
 			if tl.DepartmentID != nil && *tl.DepartmentID == *emp.DepartmentID {
 				// Send In-App notification
@@ -913,7 +910,7 @@ func (s *LeaveService) SendUpcomingLeaveReminders(ctx context.Context) error {
 
 				// Send Email
 				s.emailService.SendEmailAsync([]string{tl.Email}, title, msg)
-				
+
 				// Send Push Notification
 				_ = s.pushService.SendToEmployee(ctx, tl.ID, title, msg, "/approvals")
 			}

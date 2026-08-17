@@ -325,7 +325,7 @@ const SwapBadge = ({ swap, currentUserId }: { swap: any, currentUserId: string }
   const isRequester = swap.requester_id === currentUserId;
   const isApproved = swap.status === 'approved';
   
-  let styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+  const styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
   
   return (
     <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`Swap ${isRequester ? 'Out' : 'In'}`}>
@@ -357,7 +357,7 @@ const SupervisorShiftBadge = ({ shift }: { shift: any }) => {
 
 const SupervisorSwapBadge = ({ swap }: { swap: any }) => {
   const isApproved = swap.status === 'approved';
-  let styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+  const styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
   
   return (
     <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`${swap.requester_name} 🔄 ${swap.target_employee_name}`}>

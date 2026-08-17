@@ -89,7 +89,7 @@ func (s *ItemRequestService) SubmitRequest(ctx context.Context, employeeID, cate
 		}
 
 		subject := fmt.Sprintf("New Item Request: %s - %s %s", cat.Name, emp.FirstName, emp.LastName)
-		
+
 		body := fmt.Sprintf("Employee: %s %s (%s)\nDepartment: %s\n\nRequested Category: %s\n\nDescription:\n%s",
 			emp.FirstName, emp.LastName, emp.EmployeeCode,
 			deptName,
@@ -125,11 +125,12 @@ func (s *ItemRequestService) GetPendingRequests(ctx context.Context, departmentI
 }
 
 func (s *ItemRequestService) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
-	if status != "processed" && status != "rejected" { return fmt.Errorf("invalid status") }
+	if status != "processed" && status != "rejected" {
+		return fmt.Errorf("invalid status")
+	}
 	return s.repo.UpdateStatus(ctx, id, status)
 }
 
 func (s *ItemRequestService) CancelRequest(ctx context.Context, id uuid.UUID, employeeID uuid.UUID) error {
 	return s.repo.Cancel(ctx, id, employeeID)
 }
-

@@ -11,6 +11,7 @@ import { fmtDate } from '@/lib/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SwapRequestModal } from './SwapRequestModal';
 import { useTranslation } from 'react-i18next';
+import { assetUrl } from '@/lib/assets';
 
 export const SwapList = () => {
   const { t } = useTranslation();
@@ -166,7 +167,7 @@ export const SwapList = () => {
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {swap.requester_profile_image ? (
-                          <img src={swap.requester_profile_image} alt="" className="w-full h-full object-cover" />
+                          <img src={assetUrl(swap.requester_profile_image)} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <UserCircle className="w-6 h-6 text-amber-500" />
                         )}
@@ -244,7 +245,7 @@ export const SwapList = () => {
                               <ArrowLeftRight className="w-4 h-4 text-primary" />
                               {t('swaps.swap_with')}
                               {swap.target_profile_image && (
-                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                <img src={assetUrl(swap.target_profile_image)} alt="" className="w-5 h-5 rounded-full object-cover" />
                               )}
                               {swap.target_employee_name || t('swaps.colleague')}
                             </div>
@@ -317,7 +318,7 @@ export const SwapList = () => {
                               <ArrowLeftRight className="w-4 h-4 text-primary" />
                               {t('swaps.swap_with')}
                               {swap.target_profile_image && (
-                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                <img src={assetUrl(swap.target_profile_image)} alt="" className="w-5 h-5 rounded-full object-cover" />
                               )}
                               {swap.target_employee_name || t('swaps.colleague')}
                             </div>

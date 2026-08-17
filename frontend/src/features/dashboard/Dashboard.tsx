@@ -15,10 +15,11 @@ import { fmtDateTime } from '@/lib/dateUtils';
 import { AnnouncementBanner } from '../announcements/AnnouncementBanner';
 import { AnnouncementTicker } from '../announcements/AnnouncementTicker';
 import { motion } from 'framer-motion';
-import { 
-  ResponsiveContainer, PieChart, Pie, Cell, Tooltip, 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend 
+import {
+  ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
+import { assetUrl } from '@/lib/assets';
 
 // ───────────────────────────────────────────────────────────
 // Shared Animations
@@ -851,7 +852,7 @@ const LeaderDashboard = () => {
                        const [startH, startM] = st.split(':').map(Number);
                        const [endH, endM] = et.split(':').map(Number);
                        const startMins = startH * 60 + startM;
-                       let endMins = endH * 60 + endM;
+                       const endMins = endH * 60 + endM;
                        
                        if (endMins < startMins) {
                          isActiveNow = currentMinutes >= startMins || currentMinutes <= endMins;
@@ -871,7 +872,7 @@ const LeaderDashboard = () => {
                           : 'border-border/60 opacity-40 hover:opacity-70 grayscale'
                       }`}>
                         {emp.profile_image ? (
-                          <img src={emp.profile_image} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+                          <img src={assetUrl(emp.profile_image)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
                         ) : (
                           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${isActiveNow ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                             {emp.first_name?.[0]}{emp.last_name?.[0]}

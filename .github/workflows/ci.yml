@@ -6,49 +6,197 @@ on:
   pull_request:
     branches: [ "main", "dev" ]
 
+# Cancel superseded runs on the same ref rather than queueing them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # go.mod is authoritative. This previously pinned 1.22 while the module
+  # declared 1.26, so the toolchain refused to build and every run was
+  # meaningless.
+  GO_VERSION: '1.26.1'
+  NODE_VERSION: '20'
+
 jobs:
-  backend-ci:
-    name: Backend CI
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
-    
+
+    # The scheduling tests are real integration tests against PostgreSQL. They
+    # used to be skipped for want of a database, which meant the highest-risk
+    # area of the system had no coverage running anywhere.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shiftmaster
+          POSTGRES_PASSWORD: shiftmaster
+          POSTGRES_DB: shiftmaster_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shiftmaster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SHIFTMASTER_TEST_DB: postgres://shiftmaster:shiftmaster@localhost:5432/shiftmaster_test?sslmode=disable
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: shiftmaster
+      DB_PASSWORD: shiftmaster
+      DB_NAME: shiftmaster_test
+      DB_SSL_MODE: disable
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-    - name: Install dependencies
-      run: go mod tidy
+      # `go mod tidy` rewrites go.mod and go.sum during the build, so a run could
+      # pass against dependencies that differ from the committed ones. Download
+      # verifies instead of mutating.
+      - name: Download dependencies
+        run: go mod download
 
-    - name: Build
-      run: go build -v ./...
+      - name: Verify go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          if ! git diff --quiet go.mod go.sum; then
+            echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the result."
+            git diff go.mod go.sum
+            exit 1
+          fi
 
-    - name: Test
-      run: go test -v ./...
+      - name: Verify formatting
+        run: |
+          unformatted="$(gofmt -l ./cmd ./internal ./pkg)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
 
-  frontend-ci:
-    name: Frontend CI
+      - name: Build
+        run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./cmd/... ./internal/... ./pkg/...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
+
+      - name: Apply migrations to the test database
+        run: go run ./cmd/migrate -dir internal/database/migrations up
+
+      - name: Verify migrations are idempotent
+        run: |
+          # A second run must apply nothing. Anything else means the ledger is
+          # not recording what it applied.
+          output="$(go run ./cmd/migrate -dir internal/database/migrations up)"
+          echo "$output"
+          if ! echo "$output" | grep -q "0 applied"; then
+            echo "::error::Re-running migrations was not a no-op."
+            exit 1
+          fi
+
+      - name: Test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./cmd/... ./internal/... ./pkg/...
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
+
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./frontend
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './frontend/package-lock.json'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
 
-    - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-    - name: Build
-      run: npm run build
+      # Type errors previously only surfaced during `npm run build`, where they
+      # were easy to miss among the bundler output.
+      - name: Typecheck
+        run: npx tsc -b --force
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  migrations:
+    name: Migration series
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shiftmaster
+          POSTGRES_PASSWORD: shiftmaster
+          POSTGRES_DB: shiftmaster_fresh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shiftmaster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: shiftmaster
+      DB_PASSWORD: shiftmaster
+      DB_NAME: shiftmaster_fresh
+      DB_SSL_MODE: disable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Proves a database can still be built from zero. Two earlier migrations
+      # had broken this without anyone noticing, because nothing ever tried.
+      - name: Build a database from an empty schema
+        run: go run ./cmd/migrate -dir internal/database/migrations up
+
+      - name: Confirm every migration was recorded
+        run: |
+          expected="$(ls internal/database/migrations/*.sql | wc -l)"
+          actual="$(psql "postgres://shiftmaster:shiftmaster@localhost:5432/shiftmaster_fresh?sslmode=disable" \
+                    -tAc 'SELECT count(*) FROM schema_migrations')"
+          echo "recorded $actual of $expected migrations"
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::schema_migrations recorded $actual entries but there are $expected files."
+            exit 1
+          fi

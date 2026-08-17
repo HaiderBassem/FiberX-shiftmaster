@@ -31,8 +31,8 @@ type LinkEmployeeExclusion struct {
 
 // LinkAccessResponse is a helper struct for returning a single link's access state
 type LinkAccessResponse struct {
-	LinkID        uuid.UUID   `json:"link_id"`
-	Title         string      `json:"title"`
-	Departments   []uuid.UUID `json:"departments"` // Departments that have this link enabled
-	ExcludedEmps  []uuid.UUID `json:"excluded_employees"` // Employees who are explicitly excluded
+	LinkID       uuid.UUID   `json:"link_id"`
+	Title        string      `json:"title"`
+	Departments  []uuid.UUID `json:"departments"`        // Departments that have this link enabled
+	ExcludedEmps []uuid.UUID `json:"excluded_employees"` // Employees who are explicitly excluded
 }

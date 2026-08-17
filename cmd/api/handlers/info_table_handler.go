@@ -1,9 +1,9 @@
 package handlers
 
 import (
+	"net/http"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/service"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,7 +22,7 @@ func (h *InfoTableHandler) GetVisibleTables(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, err := uuid.Parse(depStr.(string))
@@ -82,7 +82,7 @@ func (h *InfoTableHandler) DeleteTable(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, err := uuid.Parse(depStr.(string))
@@ -111,7 +111,7 @@ func (h *InfoTableHandler) UpdateTable(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, err := uuid.Parse(depStr.(string))
@@ -147,7 +147,7 @@ func (h *InfoTableHandler) GetTableRows(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -174,7 +174,7 @@ func (h *InfoTableHandler) CreateTableRow(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -210,7 +210,7 @@ func (h *InfoTableHandler) UpdateTableRow(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -255,7 +255,7 @@ func (h *InfoTableHandler) DeleteTableRow(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -286,7 +286,7 @@ func (h *InfoTableHandler) ShareWithDepartment(c *gin.Context) {
 	role := roleStr.(string)
 
 	tableID, _ := uuid.Parse(c.Param("id"))
-	
+
 	var req struct {
 		DepartmentID uuid.UUID `json:"department_id"`
 	}
@@ -308,7 +308,7 @@ func (h *InfoTableHandler) AddEmployeeAccess(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -339,7 +339,7 @@ func (h *InfoTableHandler) RemoveEmployeeAccess(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))
@@ -371,7 +371,7 @@ func (h *InfoTableHandler) GetAccessLists(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	roleStr, _ := c.Get("role")
 	role := roleStr.(string)
-	
+
 	var depID *uuid.UUID
 	if depStr, ok := c.Get("department_id"); ok && depStr != "" {
 		id, _ := uuid.Parse(depStr.(string))

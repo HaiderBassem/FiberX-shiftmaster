@@ -1,36 +1,66 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/authStore';
 import { Login } from '../features/auth/Login';
 import { DashboardLayout } from '../components/layout/DashboardLayout';
-import { DepartmentList } from '../features/departments/DepartmentList';
-import { EmployeeList } from '../features/employees/EmployeeList';
-import { ShiftList } from '../features/shifts/ShiftList';
-import { ScheduleView } from '../features/schedules/ScheduleView';
-import { MyTasksWeekly } from '../features/tasks/TaskList';
-import { TaskHub } from '../features/tasks/TaskHub';
-import { RequestHub } from '../features/requests/RequestHub';
-import { ApprovalDashboard } from '../features/approvals/ApprovalDashboard';
-import { InboxPage } from '../features/notifications/InboxPage';
 import { Dashboard } from '../features/dashboard/Dashboard';
-import { DepartmentDetail } from '../features/departments/DepartmentDetail';
-import { EmployeeDetail } from '../features/employees/EmployeeDetail';
-import { UserProfile } from '../features/employees/UserProfile';
-import InfoTableHub from '../features/infotables/InfoTableHub';
-import InfoTableView from '../features/infotables/InfoTableView';
-import { HelpDocumentList } from '../features/help/HelpDocumentList';
-import { HelpDocumentView } from '../features/help/HelpDocumentView';
-import { HelpDocumentEditor } from '../features/help/HelpDocumentEditor';
-import { AnnouncementManager } from '../features/announcements/AnnouncementManager';
-import InteractiveCalendar from '../features/calendar/InteractiveCalendar';
-import { LeaveTypeManager } from '../features/leaves/LeaveTypeManager';
-import HandoverBoard from '../features/handovers/HandoverBoard';
-import { ModuleAccessSettings } from '../features/settings/ModuleAccessSettings';
-import { FiberxDataHub } from '../features/fiberx-data/FiberxDataHub';
-import { FiberxDataView } from '../features/fiberx-data/FiberxDataView';
-import { FiberxDataEditor } from '../features/fiberx-data/FiberxDataEditor';
-import { ExternalToolsList } from '../features/external-tools/ExternalToolsList';
-import { TicketList } from '../features/tickets/TicketList';
-import { ServiceHub } from '../features/services/ServiceHub';
+
+// Route-level code splitting. Every feature used to be imported eagerly, so a
+// user landing on the login page downloaded the entire application — around
+// 2.3MB of JavaScript — before seeing anything. Login, the shell and the
+// dashboard stay eager because they are on the path to first paint; the rest
+// load when their route is first visited.
+const AnnouncementManager = lazy(() => import('../features/announcements/AnnouncementManager').then(m => ({ default: m.AnnouncementManager })));
+const ApprovalDashboard = lazy(() => import('../features/approvals/ApprovalDashboard').then(m => ({ default: m.ApprovalDashboard })));
+const DepartmentDetail = lazy(() => import('../features/departments/DepartmentDetail').then(m => ({ default: m.DepartmentDetail })));
+const DepartmentList = lazy(() => import('../features/departments/DepartmentList').then(m => ({ default: m.DepartmentList })));
+const EmployeeDetail = lazy(() => import('../features/employees/EmployeeDetail').then(m => ({ default: m.EmployeeDetail })));
+const EmployeeList = lazy(() => import('../features/employees/EmployeeList').then(m => ({ default: m.EmployeeList })));
+const ExternalToolsList = lazy(() => import('../features/external-tools/ExternalToolsList').then(m => ({ default: m.ExternalToolsList })));
+const FiberxDataEditor = lazy(() => import('../features/fiberx-data/FiberxDataEditor').then(m => ({ default: m.FiberxDataEditor })));
+const FiberxDataHub = lazy(() => import('../features/fiberx-data/FiberxDataHub').then(m => ({ default: m.FiberxDataHub })));
+const FiberxDataView = lazy(() => import('../features/fiberx-data/FiberxDataView').then(m => ({ default: m.FiberxDataView })));
+const HandoverBoard = lazy(() => import('../features/handovers/HandoverBoard'));
+const HelpDocumentEditor = lazy(() => import('../features/help/HelpDocumentEditor').then(m => ({ default: m.HelpDocumentEditor })));
+const HelpDocumentList = lazy(() => import('../features/help/HelpDocumentList').then(m => ({ default: m.HelpDocumentList })));
+const HelpDocumentView = lazy(() => import('../features/help/HelpDocumentView').then(m => ({ default: m.HelpDocumentView })));
+const InboxPage = lazy(() => import('../features/notifications/InboxPage').then(m => ({ default: m.InboxPage })));
+const InfoTableHub = lazy(() => import('../features/infotables/InfoTableHub'));
+const InfoTableView = lazy(() => import('../features/infotables/InfoTableView'));
+const InteractiveCalendar = lazy(() => import('../features/calendar/InteractiveCalendar'));
+const LeaveTypeManager = lazy(() => import('../features/leaves/LeaveTypeManager').then(m => ({ default: m.LeaveTypeManager })));
+const ModuleAccessSettings = lazy(() => import('../features/settings/ModuleAccessSettings').then(m => ({ default: m.ModuleAccessSettings })));
+const MyTasksWeekly = lazy(() => import('../features/tasks/TaskList').then(m => ({ default: m.MyTasksWeekly })));
+const RequestHub = lazy(() => import('../features/requests/RequestHub').then(m => ({ default: m.RequestHub })));
+const ScheduleView = lazy(() => import('../features/schedules/ScheduleView').then(m => ({ default: m.ScheduleView })));
+const ServiceHub = lazy(() => import('../features/services/ServiceHub').then(m => ({ default: m.ServiceHub })));
+const ShiftList = lazy(() => import('../features/shifts/ShiftList').then(m => ({ default: m.ShiftList })));
+const TaskHub = lazy(() => import('../features/tasks/TaskHub').then(m => ({ default: m.TaskHub })));
+const TicketList = lazy(() => import('../features/tickets/TicketList').then(m => ({ default: m.TicketList })));
+const UserProfile = lazy(() => import('../features/employees/UserProfile').then(m => ({ default: m.UserProfile })));
+
+// Every user who hits a route they may not open sees this page, so it is one of
+// the more visible surfaces that was still hardcoded English.
+const Unauthorized = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold text-destructive mb-4">{t('common.unauthorized_title')}</h1>
+        <p className="text-muted-foreground">{t('common.unauthorized_message')}</p>
+      </div>
+    </div>
+  );
+};
+
+// Shown while a route chunk is being fetched.
+const RouteFallback = () => (
+  <div className="flex items-center justify-center py-24" role="status" aria-live="polite">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+    <span className="sr-only">Loading</span>
+  </div>
+);
 
 const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnnouncementsAccess }: { children: React.ReactNode, allowedRoles?: string[], allowHelpDocsAccess?: boolean, allowAnnouncementsAccess?: boolean }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -38,9 +68,9 @@ const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnno
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    if (allowHelpDocsAccess && (user as any).can_manage_help_docs) {
+    if (allowHelpDocsAccess && user.can_manage_help_docs) {
       // allow
-    } else if (allowAnnouncementsAccess && (user as any).can_post_announcements) {
+    } else if (allowAnnouncementsAccess && user.can_post_announcements) {
       // allow
     } else {
       return <Navigate to="/unauthorized" replace />;
@@ -53,6 +83,7 @@ const ProtectedRoute = ({ children, allowedRoles, allowHelpDocsAccess, allowAnno
 export const AppRoutes = () => {
   return (
     <Router>
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         
@@ -298,16 +329,10 @@ export const AppRoutes = () => {
           />
         </Route>
         
-        <Route path="/unauthorized" element={
-          <div className="min-h-screen bg-background flex items-center justify-center">
-            <div className="text-center">
-              <h1 className="text-4xl font-bold text-destructive mb-4">Unauthorized</h1>
-              <p className="text-muted-foreground">You don't have permission to access this page.</p>
-            </div>
-          </div>
-        } />
+        <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 };

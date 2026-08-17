@@ -275,8 +275,12 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 			}
 
 			shiftStatus := "leave"
-			if leave.LeaveTypeNameEn != nil && (strings.ToLower(*leave.LeaveTypeNameEn) == "hourly" || strings.ToLower(*leave.LeaveTypeNameEn) == "زمنية") {
-				leaveReason = "[hourly] " + leaveReason
+			// Driven by leave_types.is_hourly rather than by matching the type's
+			// name, which administrators can rename and translate. The previous
+			// check also compared an Arabic literal against the English column,
+			// so that half of it could never match.
+			if leave.LeaveTypeIsHourly {
+				leaveReason = models.HourlyLeaveReasonPrefix + leaveReason
 			}
 
 			es := &models.EmployeeShift{

@@ -17,11 +17,19 @@ export const DashboardLayout = () => {
         />
       )}
 
-      {/* Sidebar — always hidden by default, slides in on toggle */}
+      {/*
+        Sidebar — hidden by default, slides in on toggle.
+
+        Positioned with logical properties (start-0, and an RTL-aware translate)
+        rather than left-0 and -translate-x-full. With the physical values the
+        panel anchored to the left and slid out to the left in Arabic too, so in
+        RTL it opened from the wrong edge and covered the content it was meant to
+        sit beside.
+      */}
       <div className={`
-        fixed inset-y-0 left-0 z-50
+        fixed inset-y-0 start-0 z-50
         transform transition-all duration-300 ease-in-out
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}
       `}>
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>

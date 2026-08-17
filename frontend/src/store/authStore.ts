@@ -1,18 +1,28 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { EmployeeRole } from '@/types/domain';
 
-interface User {
+/**
+ * The authenticated user.
+ *
+ * A subset of the Employee domain type: the login response carries only what the
+ * shell needs. The capability flags matter to route guards, so they are declared
+ * here rather than reached for with a cast.
+ */
+export interface User {
   id: string;
   employee_code: string;
   first_name: string;
   last_name: string;
   email: string;
-  role: 'employee' | 'team_leader' | 'manager' | 'admin';
+  role: EmployeeRole;
   department_id: string | null;
   can_create_tables?: boolean;
   can_manage_help_docs?: boolean;
+  can_post_announcements?: boolean;
+  can_manage_fiberx_data?: boolean;
   can_manage_services?: boolean;
-  ui_preferences?: Record<string, any>;
+  ui_preferences?: Record<string, unknown>;
   profile_image?: string;
 }
 
@@ -27,7 +37,7 @@ interface AuthState {
   setTokens: (token: string, refreshToken: string) => void;
   setAdminSelectedDepartmentId: (id: string | null) => void;
   setManagerSelectedDepartmentId: (id: string | null) => void;
-  updateUserPreferences: (prefs: Record<string, any>) => void;
+  updateUserPreferences: (prefs: Record<string, unknown>) => void;
   updateProfileImage: (url: string) => void;
   logout: () => void;
 }
