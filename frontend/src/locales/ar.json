@@ -637,7 +637,17 @@
     "tool_get_service_plan": "دا أتحقق من الخطة…",
     "tool_get_announcements": "دا أراجع الإعلانات…",
     "tool_get_my_notifications": "دا أشوف إشعاراتك…",
-    "tool_get_my_department": "دا أراجع قسمك…"
+    "tool_get_my_department": "دا أراجع قسمك…",
+    "tool_get_leave_types": "دا أشوف أنواع الإجازات…",
+    "tool_get_my_swaps": "دا أراجع تبديلاتك…",
+    "tool_get_my_item_requests": "دا أشوف طلباتك…",
+    "tool_list_departments": "دا أشوف الأقسام…",
+    "tool_get_info_table_rows": "دا أقرأ الجدول…",
+    "tool_propose_task_action": "دا أجهّز تحديث المهمة…",
+    "tool_propose_check_in": "دا أجهّز تسجيل الحضور…",
+    "tool_propose_check_out": "دا أجهّز تسجيل الانصراف…",
+    "tool_propose_create_ticket": "دا أجهّز التذكرة…",
+    "tool_propose_leave_decision": "دا أجهّز القرار…"
   },
   "inbox": {
     "title": "صندوق الوارد",

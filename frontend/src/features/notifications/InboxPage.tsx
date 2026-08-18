@@ -95,7 +95,7 @@ const AnnouncementCard = ({ a, onImageClick }: { a: Announcement; onImageClick: 
     >
       {/* Active badge */}
       {a.is_active && (
-        <span className="absolute top-3 right-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 sm:px-2.5 py-0.5">
+        <span className="absolute top-3 end-3 flex items-center gap-1.5 text-xs font-semibold text-emerald-500 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 sm:px-2.5 py-0.5">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
           {t('inbox.active')}
         </span>
@@ -187,9 +187,9 @@ const NotifCard = ({ n, onMarkRead }: { n: Notification; onMarkRead: (id: string
       } ${n.is_read ? 'bg-card border-border' : `${style.bg} border-border`}`}
     >
       {!n.is_read && (
-        <span className="absolute top-3 sm:top-4 right-3 sm:right-4 w-2 h-2 rounded-full bg-primary shadow-[0_0_6px_2px_rgba(12,204,204,0.4)]" />
+        <span className="absolute top-3 sm:top-4 end-3 sm:end-4 w-2 h-2 rounded-full bg-primary shadow-[0_0_6px_2px_rgba(12,204,204,0.4)]" />
       )}
-      <div className="flex items-start gap-3 sm:gap-4 pr-6 sm:pr-8">
+      <div className="flex items-start gap-3 sm:gap-4 pe-6 sm:pe-8">
         <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
           n.is_read ? 'bg-muted border border-border' : `${style.bg} border border-border`
         }`}>

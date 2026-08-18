@@ -637,7 +637,17 @@
     "tool_get_service_plan": "Checking the plan…",
     "tool_get_announcements": "Checking announcements…",
     "tool_get_my_notifications": "Checking your notifications…",
-    "tool_get_my_department": "Checking your department…"
+    "tool_get_my_department": "Checking your department…",
+    "tool_get_leave_types": "Checking the leave types…",
+    "tool_get_my_swaps": "Checking your swaps…",
+    "tool_get_my_item_requests": "Checking your requests…",
+    "tool_list_departments": "Listing the departments…",
+    "tool_get_info_table_rows": "Reading the table…",
+    "tool_propose_task_action": "Preparing the task update…",
+    "tool_propose_check_in": "Preparing the check-in…",
+    "tool_propose_check_out": "Preparing the check-out…",
+    "tool_propose_create_ticket": "Preparing the ticket…",
+    "tool_propose_leave_decision": "Preparing the decision…"
   },
   "inbox": {
     "title": "Inbox",
