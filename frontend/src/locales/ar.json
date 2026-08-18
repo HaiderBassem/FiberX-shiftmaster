@@ -93,7 +93,8 @@
     "shift_starts_at": "يبدأ",
     "shift_ends_at": "ينتهي",
     "pending": "قيد الانتظار",
-    "task_action_failed": "ما كدرنا نحدّث المهمة، جرب مرة ثانية."
+    "task_action_failed": "ما كدرنا نحدّث المهمة، جرب مرة ثانية.",
+    "hourly_leave_today": "عندك زمنية اليوم"
   },
   "leaves": {
     "remaining": "متبقي",
@@ -675,5 +676,30 @@
     "posted_by": "نُشر بواسطة {{name}} بتاريخ {{date}}",
     "management": "الإدارة",
     "dismiss": "إغلاق"
+  },
+  "profile": {
+    "loading": "جاري تحميل الملف الشخصي...",
+    "upload_failed": "فشل رفع الصورة. يرجى المحاولة مرة أخرى.",
+    "photo_alt": "الصورة الشخصية",
+    "uploading": "جاري الرفع...",
+    "change_photo": "تغيير الصورة",
+    "role_manager": "مدير",
+    "role_team_leader": "قائد فريق",
+    "role_employee": "موظف",
+    "tasks_completed": "المهام المنجزة",
+    "tasks_active": "مهمة نشطة حالياً",
+    "total_leaves": "إجمالي الإجازات المأخوذة",
+    "approved_this_year": "الطلبات الموافق عليها هذا العام",
+    "hourly_leaves": "الزمنيات المأخوذة",
+    "approved_hourly": "طلبات الزمنيات الموافق عليها",
+    "leave_balances": "رصيد الإجازات ({{year}})",
+    "leave_balances_desc": "حصصك المتاحة من مختلف أنواع الإجازات.",
+    "this_month": "هذا الشهر",
+    "pending": "قيد الانتظار",
+    "days_used": "يوم مستخدم",
+    "days_remaining": "يوم متبقي",
+    "hours_used": "ساعة مستخدمة",
+    "hours_remaining": "ساعة متبقية",
+    "no_balances": "لا يوجد رصيد إجازات مُعدّ لهذا العام."
   }
 }

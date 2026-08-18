@@ -93,7 +93,8 @@
     "shift_starts_at": "Starts",
     "shift_ends_at": "Ends",
     "pending": "Pending",
-    "task_action_failed": "Could not update the task. Please try again."
+    "task_action_failed": "Could not update the task. Please try again.",
+    "hourly_leave_today": "Hourly leave today"
   },
   "leaves": {
     "remaining": "remaining",
@@ -675,5 +676,30 @@
     "posted_by": "Posted by {{name}} on {{date}}",
     "management": "Management",
     "dismiss": "Dismiss"
+  },
+  "profile": {
+    "loading": "Loading profile...",
+    "upload_failed": "Failed to upload image. Please try again.",
+    "photo_alt": "Profile photo",
+    "uploading": "Uploading...",
+    "change_photo": "Change Photo",
+    "role_manager": "Manager",
+    "role_team_leader": "Team Leader",
+    "role_employee": "Employee",
+    "tasks_completed": "Tasks Completed",
+    "tasks_active": "tasks currently active",
+    "total_leaves": "Total Leaves Taken",
+    "approved_this_year": "Approved requests this year",
+    "hourly_leaves": "Hourly Leaves Taken",
+    "approved_hourly": "Approved hourly requests",
+    "leave_balances": "Leave Balances ({{year}})",
+    "leave_balances_desc": "Your available quotas for different types of leave.",
+    "this_month": "This Month",
+    "pending": "pending",
+    "days_used": "days used",
+    "days_remaining": "days remaining",
+    "hours_used": "hours used",
+    "hours_remaining": "hours remaining",
+    "no_balances": "No leave balances configured for this year."
   }
 }
