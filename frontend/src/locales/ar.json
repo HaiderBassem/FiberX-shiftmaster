@@ -24,7 +24,15 @@
   "topbar": {
     "welcome": "مرحباً",
     "language": "اللغة",
-    "search": "بحث..."
+    "search": "بحث...",
+    "all_departments": "كل الأقسام",
+    "enable_notifications": "تفعيل الإشعارات",
+    "enable_push_notifications": "تفعيل الإشعارات الفورية",
+    "open_menu": "فتح القائمة",
+    "close_menu": "إغلاق القائمة",
+    "my_profile": "ملفي الشخصي",
+    "change_password": "تغيير كلمة المرور",
+    "switch_language": "تغيير اللغة"
   },
   "dashboard": {
     "welcome_back": "أهلاً بك مجدداً",
@@ -83,7 +91,9 @@
     "inactive": "غير نشط",
     "currently_active": "نشط الآن",
     "shift_starts_at": "يبدأ",
-    "shift_ends_at": "ينتهي"
+    "shift_ends_at": "ينتهي",
+    "pending": "قيد الانتظار",
+    "task_action_failed": "ما كدرنا نحدّث المهمة، جرب مرة ثانية."
   },
   "leaves": {
     "remaining": "متبقي",
@@ -603,6 +613,67 @@
       "شنو الطلبات المنتظرة للموافقة؟",
       "منو موجود بالشفت هسه؟",
       "أرخص باقة إنترنت شكد؟"
-    ]
+    ],
+    "valid_until": "صالح لحد الساعة {{time}}",
+    "tool_get_current_shift": "دا أراجع شفتك…",
+    "tool_get_my_schedule": "دا أشوف جدولك…",
+    "tool_get_my_tasks": "دا أراجع تاسكاتك…",
+    "tool_get_my_leave_balance": "دا أتحقق من رصيدك…",
+    "tool_get_my_leave_requests": "دا أشوف طلبات إجازتك…",
+    "tool_propose_hourly_leave": "دا أجهّز الزمنية…",
+    "tool_propose_leave_request": "دا أجهّز طلب الإجازة…",
+    "tool_propose_cancel_leave": "دا أجهّز الإلغاء…",
+    "tool_get_team_status": "دا أتحقق من التيم…",
+    "tool_get_department_overview": "دا أراجع الأقسام…",
+    "tool_get_pending_approvals": "دا أشوف الطلبات المعلقة…",
+    "tool_get_shift_coverage": "دا أتحقق من التغطية…",
+    "tool_search_knowledge": "دا أدوّر بالمعلومات…",
+    "tool_get_knowledge_document": "دا أقرأ المستند…",
+    "tool_search_service_plans": "دا أدوّر بالخطط…",
+    "tool_get_service_plan": "دا أتحقق من الخطة…",
+    "tool_get_announcements": "دا أراجع الإعلانات…",
+    "tool_get_my_notifications": "دا أشوف إشعاراتك…",
+    "tool_get_my_department": "دا أراجع قسمك…"
+  },
+  "inbox": {
+    "title": "صندوق الوارد",
+    "unread_one": "إشعار واحد غير مقروء",
+    "unread_many": "{{count}} إشعارات غير مقروءة",
+    "all_caught_up": "ماكو شي جديد!",
+    "tab_notifications": "الإشعارات",
+    "tab_notifications_short": "إشعارات",
+    "tab_announcements": "الإعلانات",
+    "tab_announcements_short": "إعلانات",
+    "filter_all": "الكل",
+    "filter_unread": "غير مقروء ({{count}})",
+    "mark_all_read": "تحديد الكل كمقروء",
+    "all_read": "قرأت الكل",
+    "mark_read": "تحديد كمقروء",
+    "notification": "إشعار",
+    "priority_critical": "عاجل",
+    "priority_important": "مهم",
+    "priority_normal": "عادي",
+    "priority_info": "للعلم",
+    "active": "فعّال",
+    "by_name": "بواسطة {{name}}",
+    "read_more": "قراءة المزيد",
+    "show_less": "عرض أقل",
+    "attachment_alt": "مرفق {{num}}",
+    "full_size": "الحجم الكامل",
+    "loading": "جارٍ التحميل...",
+    "no_unread": "لا توجد إشعارات غير مقروءة",
+    "no_notifications": "لا توجد إشعارات بعد",
+    "empty_hint": "راح ننبهك إذا صار شي جديد.",
+    "no_announcements": "لا توجد إعلانات",
+    "no_announcements_hint": "بعد ماكو إعلانات لقسمك."
+  },
+  "announcements": {
+    "priority_critical": "إعلان عاجل",
+    "priority_important": "إعلان مهم",
+    "priority_normal": "إعلان",
+    "priority_info": "إعلان للعلم",
+    "posted_by": "نُشر بواسطة {{name}} بتاريخ {{date}}",
+    "management": "الإدارة",
+    "dismiss": "إغلاق"
   }
 }

@@ -54,7 +54,7 @@ export function ApprovalCard({
       </dl>
 
       {state === 'pending' && (
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           <Button size="sm" onClick={() => onDecide(true)}>
             {t('assistant.approve')}
           </Button>
@@ -66,6 +66,11 @@ export function ApprovalCard({
           >
             {t('assistant.reject')}
           </Button>
+          {card.expires_at && (
+            <span className="ms-auto text-xs text-muted-foreground" dir="auto">
+              {t('assistant.valid_until', { time: card.expires_at })}
+            </span>
+          )}
         </div>
       )}
 

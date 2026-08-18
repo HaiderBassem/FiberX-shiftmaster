@@ -55,9 +55,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // The single response to any inbound signal. React Query matches by key
   // prefix, so ['notifications'] also refreshes the watcher's own query; the
   // unread badge uses a separate root key and has to be named explicitly.
+  // Announcements ride the same wire: their broadcast creates no notification
+  // row, so without this a visible tab never learned a new announcement
+  // existed until reload.
   const refreshNotifications = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
     queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+    queryClient.invalidateQueries({ queryKey: ['announcements'] });
+    queryClient.invalidateQueries({ queryKey: ['announcements-inbox'] });
   }, [queryClient]);
 
   const subscribeToPush = useCallback(async () => {

@@ -43,7 +43,7 @@ function ToastCard({
       className={`
         relative flex items-start gap-3
         w-[340px] max-w-[calc(100vw-2rem)]
-        rounded-2xl border-l-4 ${accentColor(toast.priority)}
+        rounded-2xl border-s-4 ${accentColor(toast.priority)}
         bg-card/95 backdrop-blur-xl
         border border-border/60
         shadow-2xl shadow-black/30
@@ -72,7 +72,7 @@ function ToastCard({
       {/* Close */}
       <button
         onClick={() => onClose(toast.toastId)}
-        className="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg flex items-center justify-center
+        className="absolute top-2.5 end-2.5 w-6 h-6 rounded-lg flex items-center justify-center
                    text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
       >
         <X className="w-3.5 h-3.5" />
@@ -131,7 +131,7 @@ export function NotificationToastContainer() {
 
   return (
     <div
-      className="fixed top-20 right-4 z-[100] flex flex-col gap-3 pointer-events-none"
+      className="fixed top-20 end-4 z-[100] flex flex-col gap-3 pointer-events-none"
       aria-live="polite"
       aria-atomic="false"
     >

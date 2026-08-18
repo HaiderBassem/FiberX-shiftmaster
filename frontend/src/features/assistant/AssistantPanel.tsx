@@ -48,10 +48,12 @@ function EntryView({
       );
     case 'tool': {
       if (!entry.ok) {
+        // The server's failure detail is internal English diagnostics; users
+        // get the translated generic line and the model's own follow-up text.
         return (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground ps-1">
             <Wrench className="h-3 w-3" />
-            <span dir="auto">{entry.message || t('assistant.tool_failed')}</span>
+            <span dir="auto">{t('assistant.tool_failed')}</span>
           </div>
         );
       }
@@ -92,6 +94,12 @@ export default function AssistantPanel() {
       return res.data?.data as { enabled: boolean } | undefined;
     },
     staleTime: 5 * 60 * 1000,
+    // A transient failure here makes the whole assistant vanish with no way
+    // back (the panel renders null and nothing remounts it), so keep trying
+    // quietly until an answer arrives.
+    retry: 3,
+    refetchOnWindowFocus: true,
+    refetchInterval: query => (query.state.data === undefined ? 60 * 1000 : false),
   });
 
   const suggestions = useMemo(() => {

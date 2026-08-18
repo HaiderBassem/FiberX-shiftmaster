@@ -24,7 +24,15 @@
   "topbar": {
     "welcome": "Welcome",
     "language": "Language",
-    "search": "Search..."
+    "search": "Search...",
+    "all_departments": "All Departments",
+    "enable_notifications": "Enable Notifications",
+    "enable_push_notifications": "Enable Push Notifications",
+    "open_menu": "Open menu",
+    "close_menu": "Close menu",
+    "my_profile": "My Profile",
+    "change_password": "Change Password",
+    "switch_language": "Switch Language"
   },
   "dashboard": {
     "welcome_back": "Welcome back",
@@ -83,7 +91,9 @@
     "inactive": "Inactive",
     "currently_active": "Currently Active",
     "shift_starts_at": "Starts",
-    "shift_ends_at": "Ends"
+    "shift_ends_at": "Ends",
+    "pending": "Pending",
+    "task_action_failed": "Could not update the task. Please try again."
   },
   "leaves": {
     "remaining": "remaining",
@@ -587,22 +597,83 @@
     "err_network": "Connection lost — please try again.",
     "err_assistant_error": "Something went wrong. Please try again.",
     "suggestions_employee": [
-      "شنو شفتي اليوم؟",
-      "شنو المهام مالتي هذا الأسبوع؟",
-      "شكد باقي من رصيد إجازاتي؟",
-      "أريد زمنية آخر ساعة من دوامي"
+      "What's my shift today?",
+      "What are my tasks this week?",
+      "How much leave do I have left?",
+      "I need the last hour of my shift off"
     ],
     "suggestions_team_leader": [
-      "منو موجود بالشفت هسه؟",
-      "شنو الطلبات المنتظرة للموافقة؟",
-      "شنو شفتي اليوم؟",
-      "وضع الفريق اليوم"
+      "Who's on shift right now?",
+      "What requests are waiting for approval?",
+      "What's my shift today?",
+      "Team status today"
     ],
     "suggestions_manager": [
-      "وضع الأقسام اليوم",
-      "شنو الطلبات المنتظرة للموافقة؟",
-      "منو موجود بالشفت هسه؟",
-      "أرخص باقة إنترنت شكد؟"
-    ]
+      "My departments' status today",
+      "What requests are waiting for approval?",
+      "Who's on shift right now?",
+      "How much is the cheapest internet plan?"
+    ],
+    "valid_until": "Valid until {{time}}",
+    "tool_get_current_shift": "Checking your shift…",
+    "tool_get_my_schedule": "Looking at your schedule…",
+    "tool_get_my_tasks": "Checking your tasks…",
+    "tool_get_my_leave_balance": "Checking your leave balance…",
+    "tool_get_my_leave_requests": "Looking at your leave requests…",
+    "tool_propose_hourly_leave": "Preparing the hourly leave…",
+    "tool_propose_leave_request": "Preparing the leave request…",
+    "tool_propose_cancel_leave": "Preparing the cancellation…",
+    "tool_get_team_status": "Checking the team…",
+    "tool_get_department_overview": "Checking the departments…",
+    "tool_get_pending_approvals": "Checking pending approvals…",
+    "tool_get_shift_coverage": "Checking coverage…",
+    "tool_search_knowledge": "Searching the Info Bank…",
+    "tool_get_knowledge_document": "Reading the document…",
+    "tool_search_service_plans": "Searching the plans…",
+    "tool_get_service_plan": "Checking the plan…",
+    "tool_get_announcements": "Checking announcements…",
+    "tool_get_my_notifications": "Checking your notifications…",
+    "tool_get_my_department": "Checking your department…"
+  },
+  "inbox": {
+    "title": "Inbox",
+    "unread_one": "1 unread notification",
+    "unread_many": "{{count}} unread notifications",
+    "all_caught_up": "All caught up!",
+    "tab_notifications": "Notifications",
+    "tab_notifications_short": "Notifs",
+    "tab_announcements": "Announcements",
+    "tab_announcements_short": "Announce",
+    "filter_all": "All",
+    "filter_unread": "Unread ({{count}})",
+    "mark_all_read": "Mark all read",
+    "all_read": "All read",
+    "mark_read": "Mark read",
+    "notification": "Notification",
+    "priority_critical": "Critical",
+    "priority_important": "Important",
+    "priority_normal": "Normal",
+    "priority_info": "Info",
+    "active": "Active",
+    "by_name": "By {{name}}",
+    "read_more": "Read more",
+    "show_less": "Show less",
+    "attachment_alt": "Attachment {{num}}",
+    "full_size": "Full size",
+    "loading": "Loading...",
+    "no_unread": "No unread notifications",
+    "no_notifications": "No notifications yet",
+    "empty_hint": "We'll notify you when something happens.",
+    "no_announcements": "No announcements",
+    "no_announcements_hint": "Your department has no announcements yet."
+  },
+  "announcements": {
+    "priority_critical": "Critical Announcement",
+    "priority_important": "Important Announcement",
+    "priority_normal": "Announcement",
+    "priority_info": "Informational Announcement",
+    "posted_by": "Posted by {{name}} on {{date}}",
+    "management": "Management",
+    "dismiss": "Dismiss"
   }
 }

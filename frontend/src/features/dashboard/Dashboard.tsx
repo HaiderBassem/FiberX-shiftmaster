@@ -14,6 +14,8 @@ import {
   CheckSquare, TrendingUp, Briefcase, AlertCircle, X, AlertTriangle, Sun
 } from 'lucide-react';
 import { format, startOfWeek } from 'date-fns';
+import { ar as arLocale, enUS } from 'date-fns/locale';
+import { toast } from 'sonner';
 import { fmtDateTime } from '@/lib/dateUtils';
 import { AnnouncementBanner } from '../announcements/AnnouncementBanner';
 import { AnnouncementTicker } from '../announcements/AnnouncementTicker';
@@ -146,7 +148,8 @@ function parseShiftTime(raw: string | undefined | null): string {
 
 const EmployeeDashboard = () => {
   const { user } = useAuthStore();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language?.startsWith('ar') ? arLocale : enUS;
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
@@ -211,6 +214,10 @@ const EmployeeDashboard = () => {
   const startTask = useMutation({
     mutationFn: async (executionId: string) => { await api.post(`/tasks/executions/${executionId}/start`); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] }),
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(detail || t('dashboard.task_action_failed'));
+    },
   });
 
   const completeTask = useMutation({
@@ -223,6 +230,10 @@ const EmployeeDashboard = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] });
       setCompletingTask(null);
+    },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(detail || t('dashboard.task_action_failed'));
     },
   });
 
@@ -302,10 +313,10 @@ const EmployeeDashboard = () => {
       )}
 
       <motion.div variants={itemVariants}>
-        <h2 className="text-2xl sm:text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mb-1">
           {t('dashboard.welcome_back')}, {user?.first_name?.split(' ')[0]} 👋
         </h2>
-        <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+        <p className="text-sm sm:text-base text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy', { locale: dateLocale })}</p>
       </motion.div>
 
       <motion.div variants={itemVariants}>
@@ -424,7 +435,7 @@ const EmployeeDashboard = () => {
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }}
                         itemStyle={{ color: '#fff' }}
                       />
                       <Legend verticalAlign="bottom" height={36} />
@@ -558,7 +569,8 @@ const EmployeeDashboard = () => {
 
 const LeaderDashboard = () => {
   const user = useAuthStore(s => s.user);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language?.startsWith('ar') ? arLocale : enUS;
   const [selectedShiftFilter, setSelectedShiftFilter] = useState<string>('all');
 
   const { data: employees } = useQuery({
@@ -650,7 +662,7 @@ const LeaderDashboard = () => {
             {t('dashboard.analytics')}
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')} • {t('topbar.welcome')}, {user?.first_name?.split(' ')[0]}
+          {format(new Date(), 'EEEE, MMMM d, yyyy', { locale: dateLocale })} • {t('topbar.welcome')}, {user?.first_name?.split(' ')[0]}
           </p>
         </motion.div>
 
@@ -700,7 +712,7 @@ const LeaderDashboard = () => {
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }}
                         itemStyle={{ color: '#fff' }}
                         formatter={(value, name) => [`${value} ${t('dashboard.employees')}`, name]}
                       />
@@ -737,17 +749,17 @@ const LeaderDashboard = () => {
                       data={boardBarData}
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.2)' }}
                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       />
                       <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                      <Bar dataKey="Completed" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} barSize={40} />
-                      <Bar dataKey="Active" stackId="a" fill="#f59e0b" />
-                      <Bar dataKey="Pending" stackId="a" fill="#334155" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="Completed" name={t('dashboard.completed')} stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} barSize={40} />
+                      <Bar dataKey="Active" name={t('dashboard.active')} stackId="a" fill="#f59e0b" />
+                      <Bar dataKey="Pending" name={t('dashboard.pending')} stackId="a" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

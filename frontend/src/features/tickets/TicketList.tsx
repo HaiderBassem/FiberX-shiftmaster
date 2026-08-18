@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 import api from '@/lib/api';
+import { assetUrl } from '@/lib/assets';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/authStore';
 
@@ -189,7 +190,7 @@ export const TicketList = () => {
                   <div className="flex gap-2 mt-2">
                     {images.map((img, i) => (
                       <div key={i} className="relative w-16 h-16">
-                        <img src={img} alt="attachment" className="w-full h-full object-cover rounded-lg border border-border" />
+                        <img src={assetUrl(img)} alt="attachment" className="w-full h-full object-cover rounded-lg border border-border" />
                         <button
                           type="button"
                           onClick={() => setImages(images.filter((_, idx) => idx !== i))}
@@ -285,8 +286,8 @@ export const TicketList = () => {
                     {ticket.attachments && JSON.parse(ticket.attachments).length > 0 && (
                       <div className="flex gap-3 mt-4 overflow-x-auto pb-2">
                         {JSON.parse(ticket.attachments).map((url: string, i: number) => (
-                          <a key={i} href={url} target="_blank" rel="noreferrer" className="shrink-0">
-                            <img src={url} alt="Attachment" className="h-24 w-24 object-cover rounded-xl border border-white/10 shadow-sm hover:opacity-80 transition-opacity" />
+                          <a key={i} href={assetUrl(url)} target="_blank" rel="noreferrer" className="shrink-0">
+                            <img src={assetUrl(url)} alt="Attachment" className="h-24 w-24 object-cover rounded-xl border border-white/10 shadow-sm hover:opacity-80 transition-opacity" />
                           </a>
                         ))}
                       </div>
@@ -379,8 +380,8 @@ const TicketComments = ({ ticket }: { ticket: any }) => {
             {c.attachments && JSON.parse(c.attachments).length > 0 && (
               <div className="flex gap-2 mt-2 pl-8 overflow-x-auto">
                 {JSON.parse(c.attachments).map((url: string, i: number) => (
-                  <a key={i} href={url} target="_blank" rel="noreferrer">
-                    <img src={url} alt="Attachment" className="h-16 w-16 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
+                  <a key={i} href={assetUrl(url)} target="_blank" rel="noreferrer">
+                    <img src={assetUrl(url)} alt="Attachment" className="h-16 w-16 object-cover rounded-lg border border-white/10 hover:opacity-80 transition-opacity" />
                   </a>
                 ))}
               </div>
@@ -403,7 +404,7 @@ const TicketComments = ({ ticket }: { ticket: any }) => {
               <div className="flex gap-2">
                 {commentImages.map((img, i) => (
                   <div key={i} className="relative w-12 h-12">
-                    <img src={img} alt="preview" className="w-full h-full object-cover rounded-lg border border-border" />
+                    <img src={assetUrl(img)} alt="preview" className="w-full h-full object-cover rounded-lg border border-border" />
                     <button onClick={() => setCommentImages(commentImages.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-destructive text-white rounded-full p-0.5">
                       <X className="w-3 h-3" />
                     </button>

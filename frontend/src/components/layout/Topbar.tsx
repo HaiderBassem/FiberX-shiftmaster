@@ -12,7 +12,7 @@ import { useNotification } from '@/providers/NotificationProvider';
 import { assetUrl } from '@/lib/assets';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
   /**
@@ -97,7 +97,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={onMenuClick}
           className="text-muted-foreground hover:text-foreground"
-          title={sidebarOpen ? 'Close menu' : 'Open menu'}
+          title={sidebarOpen ? t('topbar.close_menu') : t('topbar.open_menu')}
         >
           <Menu className="w-5 h-5" />
         </Button>
@@ -108,7 +108,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
 
         {/* ── Admin department selector ── */}
         {user?.role === 'admin' && allDepartments && allDepartments.length > 0 && (
-          <div className="ml-4 hidden md:flex items-center">
+          <div className="ms-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               value={adminSelectedDepartmentId || ''}
@@ -117,7 +117,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
                 switchDepartmentContext();
               }}
             >
-              <option value="">All Departments</option>
+              <option value="">{t('topbar.all_departments')}</option>
               {allDepartments.map((d: any) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
@@ -129,7 +129,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
 
         {/* ── Manager department selector ── */}
         {user?.role === 'manager' && managedDepartments && managedDepartments.length > 0 && (
-          <div className="ml-4 hidden md:flex items-center">
+          <div className="ms-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               value={managerSelectedDepartmentId || ''}
@@ -169,7 +169,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         <div 
           onClick={() => navigate('/profile')}
           className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
-          title="My Profile"
+          title={t('topbar.my_profile')}
         >
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary/15 flex items-center justify-center overflow-hidden">
             {user?.profile_image ? (
@@ -194,9 +194,9 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             size="sm"
             onClick={requestPermission}
             className="flex text-primary bg-primary/10 hover:bg-primary/20 rounded-lg h-8 sm:h-9 text-xs sm:text-sm animate-pulse px-2 sm:px-3"
-            title="Enable Push Notifications"
+            title={t('topbar.enable_push_notifications')}
           >
-            Enable Notifications
+            {t('topbar.enable_notifications')}
           </Button>
         )}
         <Button
@@ -208,7 +208,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         >
           <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 sm:min-w-[18px] sm:h-[18px] px-1 text-[9px] sm:text-[10px] font-bold text-white bg-destructive rounded-full border border-card shadow-sm">
+            <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 sm:min-w-[18px] sm:h-[18px] px-1 text-[9px] sm:text-[10px] font-bold text-white bg-destructive rounded-full border border-card shadow-sm">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -220,7 +220,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={() => setShowChangePassword(true)}
           className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
-          title="Change Password"
+          title={t('topbar.change_password')}
         >
           <Key className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </Button>
@@ -231,7 +231,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="sm"
           onClick={() => i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
           className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg font-medium w-8 h-8 sm:w-9 sm:h-9"
-          title="Switch Language"
+          title={t('topbar.switch_language')}
         >
           {i18n.language === 'ar' ? 'EN' : 'عربي'}
         </Button>

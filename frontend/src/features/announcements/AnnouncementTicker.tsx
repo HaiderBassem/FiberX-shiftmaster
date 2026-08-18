@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { announcementService } from '../../services/announcementService';
-import type { Announcement } from '../../services/announcementService';
 
 /** Returns true if the string contains Arabic characters. */
 function isArabic(text: string): boolean {
@@ -8,23 +8,13 @@ function isArabic(text: string): boolean {
 }
 
 export const AnnouncementTicker: React.FC = () => {
-  const [ticker, setTicker] = useState<Announcement | null>(null);
-
-  useEffect(() => {
-    const fetchTicker = async () => {
-      try {
-        const data = await announcementService.getActiveTicker();
-        setTicker(data);
-      } catch (err) {
-        console.error('Failed to fetch ticker:', err);
-      }
-    };
-    fetchTicker();
-
-    // Refresh every 5 minutes
-    const interval = setInterval(fetchTicker, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
+  // Under the ['announcements'] prefix so a WebSocket announcement signal
+  // refreshes the ticker on the spot; the interval only covers a dead socket.
+  const { data: ticker } = useQuery({
+    queryKey: ['announcements', 'ticker'],
+    queryFn: () => announcementService.getActiveTicker(),
+    refetchInterval: 5 * 60 * 1000,
+  });
 
   if (!ticker) return null;
 
