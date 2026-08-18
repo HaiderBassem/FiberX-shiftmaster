@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -24,6 +25,7 @@ interface Notification {
   type: string;
   is_read: boolean;
   related_entity_type?: string;
+  action_url?: string | null;
   created_at: string;
 }
 
@@ -161,13 +163,29 @@ const AnnouncementCard = ({ a, onImageClick }: { a: Announcement; onImageClick: 
 // ─── Notification Card ────────────────────────────────────────────────────────
 const NotifCard = ({ n, onMarkRead }: { n: Notification; onMarkRead: (id: string) => void }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const style = getNotifStyle(n);
   const { Icon } = style;
 
+  // A notification that carries a destination is itself the way there:
+  // clicking it marks it read and opens the screen it is about.
+  const open = n.action_url
+    ? () => {
+        if (!n.is_read) onMarkRead(n.id);
+        navigate(n.action_url!);
+      }
+    : undefined;
+
   return (
-    <div className={`relative rounded-2xl border transition-all duration-300 hover:border-primary/20 p-4 sm:p-5 ${
-      n.is_read ? 'bg-card border-border' : `${style.bg} border-border`
-    }`}>
+    <div
+      onClick={open}
+      role={open ? 'link' : undefined}
+      tabIndex={open ? 0 : undefined}
+      onKeyDown={open ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } } : undefined}
+      className={`relative rounded-2xl border transition-all duration-300 hover:border-primary/20 p-4 sm:p-5 ${
+        open ? 'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50' : ''
+      } ${n.is_read ? 'bg-card border-border' : `${style.bg} border-border`}`}
+    >
       {!n.is_read && (
         <span className="absolute top-3 sm:top-4 right-3 sm:right-4 w-2 h-2 rounded-full bg-primary shadow-[0_0_6px_2px_rgba(12,204,204,0.4)]" />
       )}
@@ -188,7 +206,7 @@ const NotifCard = ({ n, onMarkRead }: { n: Notification; onMarkRead: (id: string
             <span className="text-[10px] sm:text-xs text-muted-foreground">{fmtDateTime(n.created_at)}</span>
             {!n.is_read && (
               <button
-                onClick={() => onMarkRead(n.id)}
+                onClick={e => { e.stopPropagation(); onMarkRead(n.id); }}
                 className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-medium text-primary hover:text-primary/80 transition-colors bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg px-2 sm:px-2.5 py-0.5 sm:py-1"
               >
                 <CheckCircle2 className="w-3 h-3" />
@@ -286,7 +304,7 @@ export const InboxPage = () => {
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
+            onClick={() => setActiveTab(tab.id as 'notifications' | 'announcements')}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex-1 sm:flex-initial justify-center sm:justify-start whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
