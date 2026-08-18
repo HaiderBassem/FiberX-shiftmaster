@@ -396,7 +396,10 @@
     "to": "إلى",
     "unauthorized_title": "غير مصرح",
     "unauthorized_message": "ليس لديك إذن للوصول إلى هذه الصفحة.",
-    "loading": "جارٍ التحميل"
+    "loading": "جارٍ التحميل",
+    "failed_upload": "فشل الرفع، جرب مرة ثانية.",
+    "success": "تم بنجاح.",
+    "cancel": "إلغاء"
   },
   "auth": {
     "welcome_back": "أهلاً بك مجدداً",

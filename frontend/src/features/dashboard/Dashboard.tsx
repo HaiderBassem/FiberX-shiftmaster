@@ -453,7 +453,7 @@ const EmployeeDashboard = () => {
                       </Pie>
                       <Tooltip 
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }}
-                        itemStyle={{ color: '#fff' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
                       />
                       <Legend verticalAlign="bottom" height={36} />
                     </PieChart>
@@ -730,7 +730,7 @@ const LeaderDashboard = () => {
                       </Pie>
                       <Tooltip 
                         contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '12px', color: 'hsl(var(--foreground))' }}
-                        itemStyle={{ color: '#fff' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
                         formatter={(value, name) => [`${value} ${t('dashboard.employees')}`, name]}
                       />
                       <Legend verticalAlign="bottom" height={36} />

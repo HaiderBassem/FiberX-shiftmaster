@@ -8,8 +8,11 @@ import { assetUrl } from '@/lib/assets';
 const getImageUrl = (url: string) => assetUrl(url);
 
 export const AnnouncementBanner: React.FC = () => {
-  const { t } = useTranslation();
-  const [isVisible, setIsVisible] = useState(true);
+  const { t, i18n } = useTranslation();
+  // Dismissal is per announcement: with the banner now refreshing live over
+  // the WebSocket signal, a plain boolean would keep hiding every future
+  // announcement after one dismiss.
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   // Under the ['announcements'] prefix so the WebSocket announcement signal
@@ -20,7 +23,7 @@ export const AnnouncementBanner: React.FC = () => {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  if (loading || !announcement || !isVisible) return null;
+  if (loading || !announcement || announcement.id === dismissedId) return null;
 
   const getPriorityStyles = (priority: string) => {
     switch (priority) {
@@ -91,7 +94,7 @@ export const AnnouncementBanner: React.FC = () => {
                   >
                     <img
                       src={getImageUrl(img)}
-                      alt={`Attachment ${idx + 1}`}
+                      alt={t('inbox.attachment_alt', { num: idx + 1 })}
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover transition-transform group-hover:scale-105"
                     />
                   </button>
@@ -102,12 +105,12 @@ export const AnnouncementBanner: React.FC = () => {
             <div className="mt-3 text-xs opacity-70">
               {t('announcements.posted_by', {
                 name: announcement.creator_name || t('announcements.management'),
-                date: new Date(announcement.created_at).toLocaleDateString(),
+                date: new Date(announcement.created_at).toLocaleDateString(i18n.language?.startsWith('ar') ? 'ar-IQ' : 'en-US'),
               })}
             </div>
           </div>
           <button
-            onClick={() => setIsVisible(false)}
+            onClick={() => setDismissedId(announcement.id)}
             className="ms-auto -mx-1.5 -my-1.5 bg-transparent p-1.5 rounded-lg inline-flex h-8 w-8 hover:bg-black/5 dark:hover:bg-white/10 focus:ring-2 focus:ring-black/10 dark:focus:ring-white/20"
           >
             <span className="sr-only">{t('announcements.dismiss')}</span>
@@ -138,7 +141,7 @@ export const AnnouncementBanner: React.FC = () => {
           </button>
           <img
             src={lightboxImg}
-            alt="Full size"
+            alt={t('inbox.full_size')}
             className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           />

@@ -396,7 +396,10 @@
     "to": "to",
     "unauthorized_title": "Unauthorized",
     "unauthorized_message": "You don't have permission to access this page.",
-    "loading": "Loading"
+    "loading": "Loading",
+    "failed_upload": "Upload failed. Please try again.",
+    "success": "Done successfully.",
+    "cancel": "Cancel"
   },
   "auth": {
     "welcome_back": "Welcome back",

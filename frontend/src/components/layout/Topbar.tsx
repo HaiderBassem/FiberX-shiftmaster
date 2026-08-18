@@ -175,7 +175,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             {user?.profile_image ? (
               <img 
                 src={assetUrl(user.profile_image)} 
-                alt="Profile" 
+                alt={t('topbar.my_profile')} 
                 className="w-full h-full object-cover" 
               />
             ) : (
@@ -204,7 +204,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={() => navigate('/notifications')}
           className="relative text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
-          title="Notifications"
+          title={t('inbox.title')}
         >
           <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           {unreadCount > 0 && (
