@@ -139,7 +139,14 @@ func main() {
 	})
 
 	// --- Initialize Handlers ---
-	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT, cfg.Server.IsProduction())
+	// Cookie security must follow the scheme users actually connect with, not
+	// the environment name: a Secure cookie over plain HTTP is silently
+	// discarded by the browser, which took every protected image down with it.
+	secureCookies := cfg.CookieSecure()
+	if cfg.Server.IsProduction() && !secureCookies {
+		log.Printf("WARN: cookies are issued without the Secure attribute because the deployment serves plain HTTP; put the site behind HTTPS when possible")
+	}
+	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT, secureCookies)
 	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo, cfg.Upload)
 	deptHandler := handlers.NewDepartmentHandler(departmentRepo, employeeRepo)
 	shiftHandler := handlers.NewShiftHandler(shiftRepo)

@@ -209,3 +209,24 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// The entropy guard must accept what its own error message tells operators to
+// run: `openssl rand -hex 32` draws from 16 symbols and a 64-character sample
+// frequently contains only 14–15 distinct ones. A ≥16 threshold rejected
+// genuinely random secrets at random; this pins the fixed threshold from both
+// sides.
+func TestProductionSecretEntropyAcceptsHexOutput(t *testing.T) {
+	// 64 hex chars using exactly 15 distinct symbols (no 'f'): must pass.
+	hex15 := "0123456789abcde0123456789abcde0123456789abcde0123456789abcde0123"
+	cfg := JWTConfig{Secret: hex15, Issuer: "i", AccessExpireMin: 15, RefreshExpireDays: 7, BcryptCost: 12}
+	if err := cfg.Validate(true); err != nil {
+		t.Fatalf("hex-alphabet secret rejected: %v", err)
+	}
+
+	// Patterned junk of the same length still fails.
+	junk := "abcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabcabca"
+	cfg.Secret = junk
+	if err := cfg.Validate(true); err == nil {
+		t.Fatal("3-symbol pattern accepted as a production secret")
+	}
+}

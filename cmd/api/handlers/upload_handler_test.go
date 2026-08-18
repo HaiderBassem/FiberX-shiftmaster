@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -263,5 +264,49 @@ func TestServeUploadMissingFileIsNotFound(t *testing.T) {
 
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", w.Code)
+	}
+}
+
+// Announcement images have always been written to uploads/announcements, but
+// the serving whitelist initially omitted that directory, so every
+// announcement image 404ed once serving became authenticated. Legacy filenames
+// (original client names with spaces, uppercase extensions) must also serve.
+func TestServeUploadCoversEveryHistoricalSubdirectory(t *testing.T) {
+	r, base := newUploadRig(t)
+
+	cases := []struct {
+		subdir, name string
+	}{
+		{"announcements", "ab12cd34_1699999999_Poster image.PNG"},
+		{"profiles", "9f0e-uuid_1699999999_صورة الملف.png"},
+		{"images", "plain.png"},
+	}
+	for _, c := range cases {
+		dir := filepath.Join(base, c.subdir)
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, c.name), realPNG(t), 0o640); err != nil {
+			t.Fatal(err)
+		}
+
+		url := "/api/uploads/" + c.subdir + "/" + strings.ReplaceAll(neturl.PathEscape(c.name), "%2F", "")
+		req := httptest.NewRequest(http.MethodGet, url, nil)
+		got := httptest.NewRecorder()
+		r.ServeHTTP(got, req)
+		if got.Code != http.StatusOK {
+			t.Errorf("%s/%s: status %d, want 200", c.subdir, c.name, got.Code)
+		}
+		if ct := got.Header().Get("Content-Type"); got.Code == http.StatusOK && ct != "image/png" {
+			t.Errorf("%s/%s: Content-Type %q", c.subdir, c.name, ct)
+		}
+	}
+
+	// Directories that never held uploads stay unreachable.
+	req := httptest.NewRequest(http.MethodGet, "/api/uploads/secrets/x.png", nil)
+	got := httptest.NewRecorder()
+	r.ServeHTTP(got, req)
+	if got.Code != http.StatusNotFound {
+		t.Errorf("unknown subdir served: %d", got.Code)
 	}
 }

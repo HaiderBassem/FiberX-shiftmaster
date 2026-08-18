@@ -57,6 +57,10 @@ type ServerConfig struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
+	// CookieSecure overrides the automatic Secure-attribute decision for
+	// issued cookies. Unset means: derive it from the deployment (see
+	// Config.CookieSecure).
+	CookieSecure *bool
 }
 
 // JWTConfig holds JWT authentication settings.
@@ -252,6 +256,7 @@ func loadServerConfig() ServerConfig {
 		Port:         getEnv("SERVER_PORT", "8080"),
 		Env:          getEnv("ENV", "development"),
 		AppSecretKey: getEnv("APP_SECRET_KEY", ""),
+		CookieSecure: getEnvBoolPtr("COOKIE_SECURE"),
 		ReadTimeout:  getEnvSeconds("SERVER_READ_TIMEOUT", 60),
 		WriteTimeout: getEnvSeconds("SERVER_WRITE_TIMEOUT", 60),
 		IdleTimeout:  getEnvSeconds("SERVER_IDLE_TIMEOUT", 120),
@@ -356,6 +361,34 @@ func loadAssistantConfig() AssistantConfig {
 		MaxConversationMsgs: getEnvInt("ASSISTANT_MAX_CONVERSATION_MESSAGES", 200),
 		PendingActionTTL:    getEnvSeconds("ASSISTANT_PENDING_ACTION_TTL_SECONDS", 300),
 	}
+}
+
+// CookieSecure decides whether cookies issued by the API carry the Secure
+// attribute. A browser silently refuses to store a Secure cookie received over
+// plain HTTP, so tying the flag to ENV=production alone broke every upload
+// cookie on an HTTP-only deployment: images 404ed because the credential the
+// <img> requests depend on was never kept.
+//
+// The COOKIE_SECURE environment variable wins when set. Otherwise the flag is
+// derived from what the deployment says about itself: Secure only when running
+// in production AND every allowed CORS origin is https — the origins list is
+// the one place the configuration states the scheme users actually browse on.
+func (c *Config) CookieSecure() bool {
+	if c.Server.CookieSecure != nil {
+		return *c.Server.CookieSecure
+	}
+	if !c.Server.IsProduction() {
+		return false
+	}
+	if len(c.CORS.AllowedOrigins) == 0 {
+		return false
+	}
+	for _, origin := range c.CORS.AllowedOrigins {
+		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(origin)), "https://") {
+			return false
+		}
+	}
+	return true
 }
 
 // Validate checks all configuration values.
@@ -476,7 +509,13 @@ func (j *JWTConfig) Validate(isProduction bool) error {
 		if len(j.Secret) < 48 {
 			return fmt.Errorf("secret must be at least 48 characters in production")
 		}
-		if distinctRunes(j.Secret) < 16 {
+		// The threshold must be satisfiable by the very command the error
+		// recommends: `openssl rand -hex 32` draws from only 16 symbols, and a
+		// 64-character sample regularly contains 14–15 distinct ones. A ≥16
+		// requirement therefore rejected genuinely random hex secrets at
+		// random. 12 is unreachable for repeated/patterned junk of this length
+		// but essentially guaranteed for anything actually random.
+		if distinctRunes(j.Secret) < 12 {
 			return fmt.Errorf("secret has too little entropy (%d distinct characters); generate one with: openssl rand -hex 32", distinctRunes(j.Secret))
 		}
 	}
@@ -704,6 +743,20 @@ func getEnvInt(key string, defaultValue int) int {
 		}
 	}
 	return defaultValue
+}
+
+// getEnvBoolPtr parses an optional boolean: nil when the variable is unset or
+// unparsable, so callers can distinguish "not configured" from "false".
+func getEnvBoolPtr(key string) *bool {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return nil
+	}
+	v, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		return nil
+	}
+	return &v
 }
 
 func getEnvBool(key string, defaultValue bool) bool {

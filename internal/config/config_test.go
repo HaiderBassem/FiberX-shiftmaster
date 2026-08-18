@@ -134,3 +134,35 @@ func TestGetEnvHelpers(t *testing.T) {
 	})
 
 }
+
+// The Secure cookie attribute must follow the scheme users actually browse on.
+// Tying it to ENV=production alone made browsers on an HTTP-only deployment
+// silently drop the upload cookie, taking every protected image with it.
+func TestCookieSecureFollowsDeploymentScheme(t *testing.T) {
+	boolPtr := func(v bool) *bool { return &v }
+	build := func(env string, override *bool, origins ...string) *Config {
+		return &Config{
+			Server: ServerConfig{Env: env, CookieSecure: override},
+			CORS:   CORSConfig{AllowedOrigins: origins},
+		}
+	}
+
+	cases := []struct {
+		name string
+		cfg  *Config
+		want bool
+	}{
+		{"development is never Secure", build("development", nil, "http://localhost:3000"), false},
+		{"production over http", build("production", nil, "http://192.168.1.10"), false},
+		{"production over https", build("production", nil, "https://shift.example.com"), true},
+		{"production with mixed schemes", build("production", nil, "https://a.example", "http://b.example"), false},
+		{"production with no origins", build("production", nil), false},
+		{"explicit override wins over https", build("production", boolPtr(false), "https://a.example"), false},
+		{"explicit override wins over http", build("production", boolPtr(true), "http://a.example"), true},
+	}
+	for _, c := range cases {
+		if got := c.cfg.CookieSecure(); got != c.want {
+			t.Errorf("%s: CookieSecure() = %v, want %v", c.name, got, c.want)
+		}
+	}
+}

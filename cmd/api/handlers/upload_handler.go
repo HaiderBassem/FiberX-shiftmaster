@@ -185,7 +185,11 @@ func splitUploadPath(p string) (subdir string, name string) {
 	}
 
 	switch sub {
-	case "images", "profiles", "documents", "assignments":
+	// Every directory uploads have ever been written to. "announcements" was
+	// missing at first, which made every announcement image 404 after the
+	// switch to authenticated serving — the write path had been storing them
+	// there all along.
+	case "images", "profiles", "announcements", "documents", "assignments":
 		return sub, file
 	default:
 		return "", ""
