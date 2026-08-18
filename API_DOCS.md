@@ -283,23 +283,74 @@ file exists.
 
 ## AI assistant
 
-All routes require a normal access token. The assistant runs entirely over
-the domain services documented above: the model can only call read tools and
-stage *pending actions*; every state change requires the user to approve the
-staged action through the endpoints below. Without ASSISTANT_API_KEY the
-status endpoint reports `enabled: false` and chat returns 503.
+The assistant runs a language model **on the ShiftMaster server itself** — a
+llama.cpp process bound to loopback. No request, message or retrieved document
+reaches a hosted AI service; there is no OpenAI, Anthropic or Gemini key, and
+the API refuses to start if the runtime URL is not loopback or a Unix socket.
+Provision it once with `deploy/provision-ai.sh`.
+
+All routes require a normal access token. The model can only call read tools
+and *stage* actions; every state change requires the user to approve the staged
+action through the endpoints below.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/api/assistant/status` | `{enabled}` — whether a model is configured |
-| POST | `/api/assistant/chat` | Body `{message, conversation_id?}`. Streams SSE events: `status`, `text`, `tool`, `approval`, `error`, `done`. 429 on rate limit, 409 while a previous turn is running |
+| GET | `/api/assistant/status` | `{state, ready, enabled, detail?}` — see below. Never exposes model paths, ports or errors |
+| POST | `/api/assistant/chat` | Body `{message, conversation_id?}`. Streams SSE events: `status`, `text`, `tool`, `approval`, `error`, `done`. 429 on rate limit, 409 while a previous turn is running, 503 while the model is unavailable |
 | GET | `/api/assistant/actions/:id` | Current state of one of the caller's staged actions |
 | POST | `/api/assistant/actions/:id/approve` | Executes the exact frozen action after re-validation. Single-use: replays, double clicks and other users get 409 with the action's real state |
 | POST | `/api/assistant/actions/:id/reject` | Marks the staged action rejected; nothing executes |
 
-Staged actions expire after ASSISTANT_PENDING_ACTION_TTL_SECONDS (default
-5 minutes) and are superseded when a newer action is staged in the same
-conversation.
+### Status states
+
+`state` is coarse on purpose — enough for the UI to be honest, never enough to
+describe the deployment:
+
+| state | Meaning | UI |
+|---|---|---|
+| `disabled` | An operator set `AI_ENABLED=false` | Panel hidden |
+| `starting` | The model is loading | Panel shown, input disabled, "starting up" |
+| `ready` | Answering | Panel shown and usable |
+| `degraded` | Reachable but recently failing, or restarting | Panel shown with a warning |
+| `unavailable` | Configured but not reachable | Panel shown, input disabled |
+
+The panel is rendered in every state except `disabled`. This is deliberate: the
+previous version hid the assistant whenever no AI provider key was configured,
+which meant a deployment without one had no assistant and no explanation.
+
+### The security boundary
+
+The model plans; the application decides. Concretely:
+
+- **Identity is never model-supplied.** No tool schema has an employee id, role
+  or permission field, so "act as an admin" has nothing to attach to. The actor
+  is loaded fresh from the database on every request and every approval, so a
+  deactivation or role change takes effect on the next call.
+- **No SQL tool exists**, and no tool takes a query. The one place the
+  assistant issues its own SQL is ranked knowledge search, whose access
+  predicates are the same as the Info Bank list endpoints.
+- **Reads answer immediately; writes only stage.** A `propose_*` tool validates
+  against live state and freezes exact parameters plus a server-rendered
+  summary card. Approving re-validates and executes only those frozen
+  parameters. There is no tool that approves and no tool that executes, and the
+  approval endpoint needs the person's own token.
+- **A "yes" in chat is not approval.** Only the approve endpoint executes.
+- **Retrieved content is data.** Documents, tasks, tickets and announcements
+  are user-authored; instruction-shaped text inside them is ignored and
+  reported, not followed.
+
+Staged actions expire after `AI_PENDING_ACTION_TTL_SECONDS` (default 5 minutes)
+and are superseded when a newer action is staged in the same conversation.
+Executed and failed actions are written to the normal audit log as
+`assistant.<action_type>`.
+
+### Observability
+
+`assistant_requests` records one row per turn: latencies (model, tools, total),
+tool call count, rounds, token counts, outcome, and `tool_free` — whether the
+model answered having decided it needed no ShiftMaster data. No message content
+is stored there; transcripts live in `assistant_messages` under their owner's
+access.
 
 ## Health
 

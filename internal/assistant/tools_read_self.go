@@ -3,6 +3,7 @@ package assistant
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,6 +30,38 @@ type shiftView struct {
 	CheckedIn  *string `json:"checked_in_at,omitempty"`
 	CheckedOut *string `json:"checked_out_at,omitempty"`
 	RowID      string  `json:"shift_row_id,omitempty"`
+	// Relative says which day this shift belongs to in plain words —
+	// "today", "tomorrow", "yesterday" — because the model otherwise has to
+	// compare two dates to know, and gets it wrong often enough to matter. The
+	// first thing a person asks is "what's my shift today", and answering
+	// "that's tomorrow" about a shift starting this afternoon is the kind of
+	// mistake that costs all the trust the rest of the system earns.
+	Relative string `json:"day,omitempty"`
+	// StartsIn / EndedAgo place the shift relative to now.
+	StartsIn string `json:"starts_in,omitempty"`
+	EndedAgo string `json:"ended_ago,omitempty"`
+}
+
+// relativeDay names a business date against today, in the words the model
+// should be reasoning with.
+func relativeDay(date, today time.Time) string {
+	switch days := int(date.Sub(today).Hours() / 24); days {
+	case 0:
+		return "today"
+	case 1:
+		return "tomorrow"
+	case -1:
+		return "yesterday"
+	case 2:
+		return "day_after_tomorrow"
+	case -2:
+		return "day_before_yesterday"
+	default:
+		if days > 0 {
+			return fmt.Sprintf("in_%d_days", days)
+		}
+		return fmt.Sprintf("%d_days_ago", -days)
+	}
 }
 
 func viewOfInstance(in *temporal.Instance) *shiftView {
@@ -76,9 +109,12 @@ func parseDateArg(d *Deps, s string) (time.Time, error) {
 func toolGetCurrentShift() Tool {
 	return Tool{
 		Name: "get_current_shift",
-		Description: "Resolve the caller's shift situation at this exact moment: the active shift instance " +
-			"(which may have STARTED YESTERDAY and still be running past midnight), the next upcoming shift, and the last finished one. " +
-			"Always use this — never date arithmetic — for questions about 'my shift now/today', time remaining, or windows like 'the last hour of my shift'.",
+		Description: "Resolve the caller's shift situation at this exact moment. Returns the shift they are inside right now if any " +
+			"(which may have STARTED YESTERDAY and still be running past midnight), the next upcoming one, and the last finished one — " +
+			"each labelled with the day it belongs to ('today', 'tomorrow', 'yesterday') and how far away it is, plus a 'state' field " +
+			"summarising the situation. Read those labels rather than comparing dates yourself: being off duty at this moment but " +
+			"working later today is 'off_duty_now_but_working_later_today', and calling that shift 'tomorrow' would be wrong. " +
+			"Always use this — never date arithmetic — for 'my shift now/today', time remaining, and windows like 'the last hour of my shift'.",
 		InputSchema: schema(`{"type":"object","properties":{},"additionalProperties":false}`),
 		Run: func(ctx context.Context, d *Deps, actor *Actor, input json.RawMessage) (any, error) {
 			res, err := d.resolveCurrent(ctx, actor.Employee)
@@ -86,16 +122,46 @@ func toolGetCurrentShift() Tool {
 				return nil, err
 			}
 			now := d.Clock.Now()
+			today := temporal.BusinessDate(now)
+
+			active := viewOfInstance(res.Active)
+			upcoming := viewOfInstance(res.Upcoming)
+			ended := viewOfInstance(res.LastEnded)
+			for view, in := range map[*shiftView]*temporal.Instance{
+				active: res.Active, upcoming: res.Upcoming, ended: res.LastEnded,
+			} {
+				if view == nil || in == nil {
+					continue
+				}
+				view.Relative = relativeDay(in.BusinessDate, today)
+			}
+			if upcoming != nil && res.Upcoming != nil {
+				upcoming.StartsIn = temporal.FormatDuration(res.Upcoming.StartAt.Sub(now))
+			}
+			if ended != nil && res.LastEnded != nil {
+				ended.EndedAgo = temporal.FormatDuration(now.Sub(res.LastEnded.EndAt))
+			}
+
 			out := map[string]any{
 				"now":           now.Format("2006-01-02 15:04"),
-				"business_date": temporal.DateString(temporal.BusinessDate(now)),
-				"active":        viewOfInstance(res.Active),
-				"upcoming":      viewOfInstance(res.Upcoming),
-				"last_ended":    viewOfInstance(res.LastEnded),
+				"business_date": temporal.DateString(today),
+				"weekday":       today.Weekday().String(),
+				"active":        active,
+				"upcoming":      upcoming,
+				"last_ended":    ended,
 			}
 			if res.Active != nil {
 				out["remaining_until_end"] = temporal.FormatDuration(res.Active.EndAt.Sub(now))
 				out["elapsed_since_start"] = temporal.FormatDuration(now.Sub(res.Active.StartAt))
+				out["state"] = "on_shift_now"
+			} else if upcoming != nil && upcoming.Relative == "today" {
+				// The common case that reads wrong without saying it out loud:
+				// off duty at this moment, but working later today.
+				out["state"] = "off_duty_now_but_working_later_today"
+			} else if upcoming != nil {
+				out["state"] = "off_duty_now"
+			} else {
+				out["state"] = "no_upcoming_shift_found"
 			}
 			return out, nil
 		},
@@ -175,6 +241,7 @@ func toolGetMyTasks() Tool {
 	return Tool{
 		Name: "get_my_tasks",
 		Description: "The caller's assigned tasks for one week, with status (pending/in_progress/completed), board and shift. " +
+			"Use it for تاسكات / التاسكات / تسكات / مهام / شغلي / شنو عندي أسويه, and for tasks, to-dos and 'what do I have to do'. " +
 			"Use execution_id with propose_task_action to start or complete one.",
 		InputSchema: schema(`{
 			"type":"object",
@@ -276,7 +343,8 @@ func toolGetMyLeaveBalances() Tool {
 	return Tool{
 		Name: "get_my_leave_balance",
 		Description: "The caller's leave balances for a year: allocated, used and remaining per leave type " +
-			"(hours for hourly types, days otherwise). month=0 rows are annual; month>0 rows are that month's allowance.",
+			"(hours for hourly types, days otherwise). month=0 rows are annual; month>0 rows are that month's allowance. " +
+			"Use it for رصيد / رصيدي / رصيد اجازاتي / شكد باقي عندي إجازات, and for 'how much leave do I have left'.",
 		InputSchema: schema(`{
 			"type":"object",
 			"properties":{"year":{"type":"integer","description":"defaults to the current year"}},

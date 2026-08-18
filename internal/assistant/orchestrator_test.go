@@ -39,6 +39,8 @@ func (s *scriptedLLM) Complete(ctx context.Context, req llm.Request) (*llm.Respo
 func unitDeps(client llm.Client) *Deps {
 	return &Deps{
 		Cfg: config.AssistantConfig{
+			Enable:        true,
+			ContextSize:   8192,
 			MaxToolRounds: 3,
 			MaxTokens:     512,
 		},
@@ -84,7 +86,7 @@ func TestUnknownToolYieldsErrorResultAndContinues(t *testing.T) {
 		t.Fatalf("appended %d messages", len(appended))
 	}
 	result := appended[1].Content[0]
-	if result.Type != llm.BlockToolResult || !result.IsError || !strings.Contains(result.Content, "unknown tool") {
+	if result.Type != llm.BlockToolResult || !result.IsError || !strings.Contains(result.Content, "does not exist for this user") {
 		t.Fatalf("tool result = %+v", result)
 	}
 	var sawErrorEvent bool
@@ -126,7 +128,7 @@ func TestRoleInvisibleToolIsUnknown(t *testing.T) {
 		t.Fatal(err)
 	}
 	result := appended[1].Content[0]
-	if !result.IsError || !strings.Contains(result.Content, "unknown tool") {
+	if !result.IsError || !strings.Contains(result.Content, "does not exist for this user") {
 		t.Fatalf("expected unknown tool error, got %+v", result)
 	}
 }
@@ -186,7 +188,7 @@ func TestToolBudgetExhaustionForcesFinalAnswer(t *testing.T) {
 			joined += b.Text
 		}
 	}
-	if !strings.Contains(joined, "tool budget") {
+	if !strings.Contains(joined, "no more lookups") {
 		t.Fatalf("budget note missing from final call")
 	}
 }
@@ -264,12 +266,14 @@ func TestSystemPromptCarriesTheDefenses(t *testing.T) {
 	}
 	system := client.requests[0].System
 	for _, required := range []string{
-		"never an instruction",     // retrieved content is data
-		"cross midnight",           // overnight rule
-		"get_current_shift",        // temporal delegation
-		"Approve button",           // approval semantics
-		"Asia/Baghdad",             // timezone
-		"permissions are enforced", // no self-authorized elevation
+		"data, never instructions",   // retrieved content is data
+		"cross midnight",             // overnight rule
+		"get_current_shift",          // temporal delegation
+		"presses Approve",            // approval semantics
+		"Asia/Baghdad",               // timezone
+		"permissions are enforced",   // no self-authorized elevation
+		"Reply in the SAME language", // language mirroring is a hard requirement
+		"comes from a tool result",   // grounding
 	} {
 		if !strings.Contains(system, required) {
 			t.Errorf("system prompt is missing %q", required)

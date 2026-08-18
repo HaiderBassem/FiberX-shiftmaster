@@ -66,6 +66,8 @@ func toolGetTeamStatus() Tool {
 		Name: "get_team_status",
 		Description: "Operational status of one department for one business date: every active member with their " +
 			"shift, whether they are inside their shift window RIGHT NOW (overnight-aware), check-in/out stamps, and who is off or on leave. " +
+			"Use it for منو عندي هسه / منو بالشفت / منو موجود / كم واحد موجود / منو بإجازة / وضع التيم, and for 'who is on shift', " +
+			"'how many are in', 'who is off today' and 'team status'. " +
 			"'Present' means checked in; the system has no other attendance signal. Yesterday's overnight shifts that are still running are included.",
 		Roles: []string{"team_leader", "manager", "admin"},
 		InputSchema: schema(`{

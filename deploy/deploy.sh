@@ -7,6 +7,10 @@
 # Prerequisites:
 #   - PostgreSQL installed and running
 #   - Caddy installed (sudo apt install caddy)
+#   - For the AI assistant: ./deploy/provision-ai.sh, run once. It installs a
+#     local inference server and a model sized to this machine. The assistant
+#     needs no cloud AI service and no API key; without it, every other part of
+#     ShiftMaster still works and the assistant reports itself unavailable.
 #   - Go 1.26+ installed (only for building from source)
 #   - Node.js 20+ (only for building frontend from source)
 #
@@ -122,6 +126,28 @@ if ! sudo -E -u "$SERVICE_USER" "$APP_DIR/shiftmaster-migrate" \
         -dir "$PROJECT_DIR/internal/database/migrations" adopt
 fi
 echo "  [OK] Migrations applied"
+
+# ── 5b. Local AI assistant (optional but on by default) ──
+# The assistant runs its language model on this machine. deploy.sh does not
+# download it — that is a one-time, network-bound step with its own script, and
+# a redeploy must never re-fetch several gigabytes. Say plainly whether it is
+# provisioned so an operator is not left wondering why the panel says the
+# assistant is unavailable.
+echo "[INFO] Checking the local AI assistant..."
+AI_ENABLED_VALUE="${AI_ENABLED:-true}"
+if [ "$AI_ENABLED_VALUE" = "false" ]; then
+    echo "  [OK] assistant disabled by AI_ENABLED=false"
+elif [ -n "${AI_MODEL_PATH:-}" ] && [ -f "${AI_MODEL_PATH}" ]; then
+    echo "  [OK] model present: ${AI_MODEL_PATH}"
+    if ! command -v "${AI_SERVER_BIN:-llama-server}" >/dev/null 2>&1 && [ ! -x "${AI_SERVER_BIN:-}" ]; then
+        echo "  [WARN] the inference server (${AI_SERVER_BIN:-llama-server}) is not installed;" >&2
+        echo "         run: sudo ./deploy/provision-ai.sh" >&2
+    fi
+else
+    echo "  [WARN] no local model provisioned — the assistant will show as unavailable." >&2
+    echo "         Everything else in ShiftMaster works normally." >&2
+    echo "         To enable it: sudo ./deploy/provision-ai.sh" >&2
+fi
 
 # ── 6. Install systemd service ──
 echo "[INFO] Setting up systemd service..."

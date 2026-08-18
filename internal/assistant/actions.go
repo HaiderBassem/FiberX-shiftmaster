@@ -72,6 +72,10 @@ func actionDefs() map[string]actionDef {
 		ActionCheckIn:       {validateCheck(true), executeCheckIn},
 		ActionCheckOut:      {validateCheck(false), executeCheckOut},
 		ActionCreateTicket:  {validateCreateTicket, executeCreateTicket},
+		ActionSwapRequest:   {validateSwapRequest, executeSwapRequest},
+		ActionSwapRespond:   {validateSwapRespond, executeSwapRespond},
+		ActionItemRequest:   {validateItemRequest, executeItemRequest},
+		ActionNotifsRead:    {validateNotifsRead, executeNotifsRead},
 	}
 }
 

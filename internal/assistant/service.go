@@ -35,13 +35,86 @@ func NewService(deps *Deps) *Service {
 	}
 }
 
-// Enabled reports whether a model is configured. Everything else in the
-// application works without it.
+// Enabled reports whether the operator switched the feature on. It is
+// deliberately NOT the same question as "can it answer right now" — see
+// Status. The assistant is rendered whenever it is enabled, so a model that is
+// still loading shows as loading rather than as an absent feature.
 func (s *Service) Enabled() bool { return s.deps.Cfg.Enabled() }
+
+// Status is the safe public view of the assistant for the frontend. It carries
+// no model path, port, credential or error detail — only a coarse state and
+// what the UI needs to render itself honestly.
+type Status struct {
+	// State is one of llm.StateDisabled/Starting/Ready/Degraded/Unavailable.
+	State string `json:"state"`
+	// Detail is a short reason code for the UI's message, never a diagnostic.
+	Detail string `json:"detail,omitempty"`
+	// Ready is the single boolean the input box disables itself on.
+	Ready bool `json:"ready"`
+	// Enabled preserves the original field so an older frontend build keeps
+	// behaving exactly as before against a newer API.
+	Enabled bool `json:"enabled"`
+}
+
+// Status resolves the current state from configuration and live runtime health.
+func (s *Service) Status() Status {
+	if !s.deps.Cfg.Enabled() {
+		return Status{State: llm.StateDisabled, Ready: false, Enabled: false}
+	}
+	if s.deps.Runtime == nil {
+		// No supervisor: either a test harness with a scripted client, or an
+		// operator pointing at a runtime we do not manage and cannot probe.
+		return Status{State: llm.StateReady, Ready: s.deps.LLM != nil, Enabled: true}
+	}
+	h := s.deps.Runtime.Health()
+	return Status{State: h.State, Detail: h.Detail, Ready: h.State == llm.StateReady, Enabled: true}
+}
+
+// WarmCatalogue primes the runtime's prompt cache with the tool catalogue the
+// model will actually be shown.
+//
+// This is worth a paragraph because the effect is large and non-obvious. The
+// chat template renders the tool definitions FIRST, ahead of the standing
+// instructions and the conversation, so the catalogue is a stable prefix of
+// every single request. Processing it costs about twelve seconds on a CPU-class
+// machine — and exactly once, because llama.cpp keeps the KV cache of a shared
+// prefix per slot. Without this call the first employee to open the assistant
+// each morning pays that twelve seconds; with it, they get an answer in about
+// one, and so does everyone after them.
+//
+// Only the two catalogues that matter are warmed, one per slot: the employee
+// one, which most people see, and the supervisor one. The generated text is
+// discarded — the point is the cache, not the answer.
+func (s *Service) WarmCatalogue(ctx context.Context) {
+	if s.deps.LLM == nil || !s.deps.Cfg.Enabled() {
+		return
+	}
+	roles := []string{"employee"}
+	if s.deps.Cfg.Parallel > 1 {
+		roles = append(roles, "team_leader")
+	}
+	for _, role := range roles {
+		started := time.Now()
+		_, err := s.deps.LLM.Complete(ctx, llm.Request{
+			System:    "You are the ShiftMaster assistant.",
+			Messages:  []llm.Message{{Role: llm.RoleUser, Content: []llm.ContentBlock{llm.TextBlock("ok")}}},
+			Tools:     s.registry.ForRole(role),
+			MaxTokens: 1,
+			Round:     1, // not the forced-choice round; nothing is being decided
+			Warmup:    true,
+		})
+		if err != nil {
+			log.Printf("assistant: warm %s catalogue: %v", role, err)
+			return
+		}
+		log.Printf("assistant: %s tool catalogue warm in %dms", role, time.Since(started).Milliseconds())
+	}
+}
 
 // Typed failures the handler maps to HTTP statuses.
 var (
 	ErrDisabled     = errors.New("assistant is not configured")
+	ErrUnavailable  = errors.New("assistant model is not available right now")
 	ErrRateLimited  = errors.New("too many assistant requests; slow down")
 	ErrBusy         = errors.New("a previous assistant request is still running")
 	ErrInputTooLong = errors.New("message too long")
@@ -117,9 +190,19 @@ func (r *rateLimiter) acquire(id uuid.UUID) (func(), error) {
 
 // ─── chat ───────────────────────────────────────────────────────────────────
 
-// ChatResult reports how a turn ended, for the handler's final event.
+// ChatResult reports how a turn ended, for the handler's final event and for
+// the evaluation harness. Stats is observability only — no user-facing surface
+// reads it — but it is what makes "did the model actually look this up" an
+// answerable question rather than a matter of reading the reply and guessing.
 type ChatResult struct {
 	ConversationID uuid.UUID
+	ToolCalls      int
+	Rounds         int
+	// ToolFree records that the model explicitly declared this turn needed no
+	// system data.
+	ToolFree bool
+	ModelMs  int
+	ToolsMs  int
 }
 
 // Begin validates a chat request and reserves the caller's rate-limit slot
@@ -129,6 +212,12 @@ type ChatResult struct {
 func (s *Service) Begin(employeeID uuid.UUID, text string) (func(), error) {
 	if !s.Enabled() {
 		return nil, ErrDisabled
+	}
+	// Refuse cleanly while the model is loading or down, rather than opening a
+	// stream that can only end in an error event. The UI shows the state it
+	// already knows from GET /assistant/status.
+	if st := s.Status(); !st.Ready {
+		return nil, fmt.Errorf("%w: %s", ErrUnavailable, st.State)
 	}
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
@@ -216,10 +305,23 @@ func (s *Service) HandleMessage(ctx context.Context, employeeID uuid.UUID, conve
 	}
 	s.logRequest(actor, conv, stats, len(text), int(time.Since(started).Milliseconds()), status, errKind)
 
-	if turnErr != nil {
-		return &ChatResult{ConversationID: conv.ID}, turnErr
+	// Refresh the conversation's memory of what has scrolled out of the
+	// replayed window. Detached and after the fact: the person has their answer
+	// already, and a failed recap must never fail a turn that succeeded.
+	if turnErr == nil {
+		conv.MessageCount += len(appended) + 1
+		s.maybeSummarize(actor, conv)
 	}
-	return &ChatResult{ConversationID: conv.ID}, nil
+
+	result := &ChatResult{ConversationID: conv.ID}
+	if stats != nil {
+		result.ToolCalls = stats.ToolCalls
+		result.Rounds = stats.Rounds
+		result.ToolFree = stats.ToolFree
+		result.ModelMs = stats.ModelMs
+		result.ToolsMs = stats.ToolsMs
+	}
+	return result, turnErr
 }
 
 // resolveConversation loads (with ownership enforced in SQL) or creates the
@@ -293,6 +395,8 @@ func (s *Service) logRequest(actor *Actor, conv *models.AssistantConversation, s
 		entry.ToolsMs = stats.ToolsMs
 		entry.InputTokens = stats.InputTokens
 		entry.OutputTokens = stats.OutputTokens
+		entry.Rounds = stats.Rounds
+		entry.ToolFree = stats.ToolFree
 	}
 	// Best effort on a fresh context: observability must not fail the turn,
 	// and the turn's context may already be cancelled by a disconnect.

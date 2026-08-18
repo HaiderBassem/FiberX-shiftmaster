@@ -224,9 +224,89 @@ func toolListDepartments() Tool {
 	}
 }
 
+func toolProposeSwapRequest() Tool {
+	return proposeTool(
+		"propose_swap_request",
+		"Stage asking a colleague to take one of the CALLER'S OWN shifts. Call get_swap_candidates for that date first — "+
+			"only the colleagues it lists can be asked, and the swap still needs their acceptance and then a supervisor's approval "+
+			"after this card is approved.",
+		nil,
+		`{
+			"type":"object",
+			"properties":{
+				"target_employee_id":{"type":"string","description":"from get_swap_candidates"},
+				"date":{"type":"string","description":"business date of the shift to give away, YYYY-MM-DD"},
+				"reason":{"type":"string"}
+			},
+			"required":["target_employee_id","date"],
+			"additionalProperties":false
+		}`,
+		ActionSwapRequest,
+	)
+}
+
+func toolProposeSwapResponse() Tool {
+	return proposeTool(
+		"propose_swap_response",
+		"Stage the caller's answer to a swap request ADDRESSED TO THEM (swap_id from get_my_swaps). "+
+			"Accepting sends it on to a supervisor for final approval; declining ends it.",
+		nil,
+		`{
+			"type":"object",
+			"properties":{
+				"swap_id":{"type":"string"},
+				"accept":{"type":"boolean"}
+			},
+			"required":["swap_id","accept"],
+			"additionalProperties":false
+		}`,
+		ActionSwapRespond,
+	)
+}
+
+func toolProposeItemRequest() Tool {
+	return proposeTool(
+		"propose_item_request",
+		"Stage a request for equipment or supplies from the caller's own department (category_id from "+
+			"get_item_request_categories). Use it when someone says they need a thing — a router, a SIM, a headset.",
+		nil,
+		`{
+			"type":"object",
+			"properties":{
+				"category_id":{"type":"string"},
+				"description":{"type":"string","description":"what exactly is needed, in the user's own words"}
+			},
+			"required":["category_id","description"],
+			"additionalProperties":false
+		}`,
+		ActionItemRequest,
+	)
+}
+
+func toolProposeMarkNotificationsRead() Tool {
+	return proposeTool(
+		"propose_mark_notifications_read",
+		"Stage marking the caller's OWN notifications as read: one by notification_id (from get_my_notifications), "+
+			"or all of them with all=true. Nothing is marked until the user approves the card.",
+		nil,
+		`{
+			"type":"object",
+			"properties":{
+				"notification_id":{"type":"string"},
+				"all":{"type":"boolean"}
+			},
+			"additionalProperties":false
+		}`,
+		ActionNotifsRead,
+	)
+}
+
 // AllTools is the complete catalogue in presentation order.
 func AllTools() []Tool {
 	return []Tool{
+		// grounding: identity and authoritative time
+		toolResolveDate(),
+		toolGetMyProfile(),
 		// self-service reads
 		toolGetCurrentShift(),
 		toolGetSchedule(),
@@ -240,6 +320,13 @@ func AllTools() []Tool {
 		toolGetAnnouncements(),
 		toolGetMyDepartment(),
 		toolListDepartments(),
+		// operations
+		toolGetTeamMembers(),
+		toolGetHandovers(),
+		toolGetTickets(),
+		toolGetItemCategories(),
+		toolGetSwapCandidates(),
+		toolCheckLeaveEligibility(),
 		// supervisor reads
 		toolGetTeamStatus(),
 		toolGetDepartmentOverview(),
@@ -261,5 +348,9 @@ func AllTools() []Tool {
 		toolProposeCheckIn(),
 		toolProposeCheckOut(),
 		toolProposeCreateTicket(),
+		toolProposeSwapRequest(),
+		toolProposeSwapResponse(),
+		toolProposeItemRequest(),
+		toolProposeMarkNotificationsRead(),
 	}
 }

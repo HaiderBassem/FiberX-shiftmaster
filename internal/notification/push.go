@@ -77,7 +77,7 @@ func (s *pushService) send(ctx context.Context, subs []models.PushSubscription, 
 			Urgency:         webpush.UrgencyHigh,
 			// The library's default client has no timeout; a hung push
 			// endpoint would pin a delivery goroutine forever.
-			HTTPClient:      pushHTTPClient,
+			HTTPClient: pushHTTPClient,
 		})
 
 		if err != nil {

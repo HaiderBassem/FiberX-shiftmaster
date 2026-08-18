@@ -95,18 +95,49 @@ func main() {
 	itemReqService := service.NewItemRequestService(itemReqRepo, employeeRepo, departmentRepo, emailService)
 	provinceService := service.NewProvinceService(provinceRepo)
 
-	// The AI assistant runs entirely over the services above; without an API
-	// key it stays dormant and its endpoints report themselves unavailable.
+	// The AI assistant runs entirely over the services above, driven by a
+	// language model hosted on this machine. Bringing the runtime up is
+	// asynchronous and never blocks startup: if the model fails to load, every
+	// other part of ShiftMaster is unaffected and the assistant reports an
+	// honest state instead of disappearing.
+	var assistantRuntime *llm.Runtime
+	var assistantLLM llm.Client
+	if cfg.Assistant.Enabled() {
+		assistantRuntime = llm.NewRuntime(llm.RuntimeConfig{
+			BaseURL:        cfg.Assistant.BaseURL,
+			APIKey:         cfg.Assistant.RuntimeKey,
+			Managed:        cfg.Assistant.Managed,
+			ServerBin:      cfg.Assistant.ServerBin,
+			ModelPath:      cfg.Assistant.ModelPath,
+			ModelName:      cfg.Assistant.Model,
+			ContextSize:    cfg.Assistant.ContextSize,
+			GPULayers:      cfg.Assistant.GPULayers,
+			Threads:        cfg.Assistant.Threads,
+			Parallel:       cfg.Assistant.Parallel,
+			LogPath:        cfg.Assistant.RuntimeLogPath,
+			StartupTimeout: cfg.Assistant.StartupTimeout,
+			QueueWait:      cfg.Assistant.QueueWait,
+			Warm:           cfg.Assistant.Warm,
+		})
+		assistantRuntime.Start(context.Background())
+		assistantLLM = llm.NewLocal(llm.LocalConfig{
+			BaseURL:        cfg.Assistant.BaseURL,
+			Model:          cfg.Assistant.Model,
+			APIKey:         cfg.Assistant.RuntimeKey,
+			Temperature:    cfg.Assistant.Temperature,
+			TopP:           cfg.Assistant.TopP,
+			MaxTokens:      cfg.Assistant.MaxTokens,
+			Timeout:        cfg.Assistant.Timeout,
+			MaxRetries:     cfg.Assistant.MaxRetries,
+			GroundingRetry: cfg.Assistant.GroundingRetry,
+		}, assistantRuntime)
+	}
+
 	assistantService := assistant.NewService(&assistant.Deps{
-		Cfg: cfg.Assistant,
-		LLM: llm.NewAnthropic(llm.AnthropicConfig{
-			APIKey:     cfg.Assistant.APIKey,
-			Model:      cfg.Assistant.Model,
-			BaseURL:    cfg.Assistant.BaseURL,
-			MaxTokens:  cfg.Assistant.MaxTokens,
-			Timeout:    cfg.Assistant.Timeout,
-			MaxRetries: cfg.Assistant.MaxRetries,
-		}),
+		Cfg:              cfg.Assistant,
+		LLM:              assistantLLM,
+		Runtime:          assistantRuntime,
+		DB:               db,
 		AssistantRepo:    assistantRepo,
 		EmployeeRepo:     employeeRepo,
 		DepartmentRepo:   departmentRepo,
@@ -138,6 +169,19 @@ func main() {
 		ProvinceService:  provinceService,
 		AuditService:     auditService,
 	})
+
+	// Once the model is up, prime its prompt cache with the real tool
+	// catalogue so the first person to ask something does not wait for it.
+	// Detached: this must never delay or fail startup.
+	if assistantRuntime != nil {
+		go func() {
+			warmCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			defer cancel()
+			if assistantRuntime.WaitReady(warmCtx) {
+				assistantService.WarmCatalogue(warmCtx)
+			}
+		}()
+	}
 
 	// --- Initialize Handlers ---
 	// Cookie security must follow the scheme users actually connect with, not
@@ -265,6 +309,13 @@ func main() {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	// Stop the model runtime after the HTTP server so in-flight turns finish
+	// first. A managed model server is terminated with its whole process group;
+	// an externally managed one is simply left alone.
+	if assistantRuntime != nil {
+		_ = assistantRuntime.Close()
 	}
 
 	log.Println("Server stopped")

@@ -14,8 +14,10 @@ export default defineConfig({
     // cookie to a cross-origin <img> request — without this proxy, images would
     // load in production but silently 404 in development.
     proxy: {
+      // The backend port is configurable so a developer can run the API
+      // beside another service without editing this file.
       '/api': {
-        target: 'http://localhost:8080',
+        target: process.env.VITE_API_PROXY || 'http://localhost:8080',
         changeOrigin: false,
         ws: true,
       },

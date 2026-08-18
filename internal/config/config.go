@@ -128,31 +128,84 @@ type VAPIDConfig struct {
 	Subject    string
 }
 
-// AssistantConfig holds the AI assistant settings. The assistant is an
-// optional feature: without an API key every other part of the application
-// runs unchanged and the assistant endpoints report themselves unavailable.
+// AssistantConfig holds the AI assistant settings.
+//
+// The assistant runs a language model on this infrastructure — a llama.cpp
+// server on loopback or a Unix socket — and never calls a hosted AI service.
+// There is consequently no API key to obtain and no per-request cost, so the
+// feature is ON by default: an operator turns it off deliberately with
+// AI_ENABLED=false, rather than accidentally by not having a credential.
+//
+// That inversion is the point. The previous design gated the whole feature on
+// an API key being present, which meant a deployment without one silently had
+// no assistant at all and no way to tell why.
 type AssistantConfig struct {
-	APIKey    string
-	Model     string
-	BaseURL   string
-	MaxTokens int
+	// Enable is the operator's explicit switch. When false the endpoints report
+	// state "disabled" and nothing else in the application changes.
+	Enable bool
+
+	// ── local runtime ──
+	// BaseURL is where the local model server listens:
+	// http://127.0.0.1:8081 or unix:///run/shiftmaster/llm.sock.
+	BaseURL string
+	// RuntimeKey is an optional shared secret for that listener. It guards
+	// against other processes on the same host; it is never an external
+	// credential and is never sent off the machine.
+	RuntimeKey string
+	// Managed makes the API process supervise the model server itself. When
+	// false a separate unit owns it and we only probe and use it.
+	Managed bool
+	// ServerBin is the llama.cpp server executable.
+	ServerBin string
+	// ModelPath is the local GGUF file. Never exposed to any client.
+	ModelPath string
+	// Model is the label recorded in request logs.
+	Model string
+	// ContextSize is the per-slot context window in tokens.
+	ContextSize int
+	// GPULayers offloads N layers to the accelerator; -1 means "as many as
+	// fit", 0 means pure CPU.
+	GPULayers int
+	// Threads for CPU inference; 0 lets llama.cpp decide.
+	Threads int
+	// Parallel is the number of inference slots, i.e. how many employees can be
+	// mid-turn simultaneously.
+	Parallel int
+	// RuntimeLogPath receives the model server's own output when managed.
+	RuntimeLogPath string
+	// StartupTimeout bounds model loading.
+	StartupTimeout time.Duration
+	// Warm issues a token after load so the first real turn is not cold.
+	Warm bool
+	// GroundingRetry asks the model to reconsider once when it opens a turn
+	// with an answer it did not look up (see llm.LocalConfig).
+	GroundingRetry bool
+
+	// ── generation ──
+	Temperature float64
+	TopP        float64
+	MaxTokens   int
 	// Timeout bounds a single model call; a whole conversation turn is capped
 	// at roughly Timeout × (MaxToolRounds + retries).
 	Timeout    time.Duration
 	MaxRetries int
 
-	// Abuse and cost limits.
-	RequestsPerMinute   int // per employee
-	MaxToolRounds       int // model↔tool iterations per turn
-	MaxInputChars       int // one user message
-	MaxContextMsgs      int // transcript window replayed to the model
-	MaxConversationMsgs int // hard cap per conversation before a new one is required
+	// ── abuse, cost and context limits ──
+	RequestsPerMinute   int           // per employee
+	MaxToolRounds       int           // model↔tool iterations per turn
+	MaxInputChars       int           // one user message
+	MaxContextMsgs      int           // transcript window replayed to the model
+	MaxConversationMsgs int           // hard cap per conversation before a new one is required
+	QueueWait           time.Duration // how long a turn may wait for a free slot
 
 	PendingActionTTL time.Duration
 }
 
-// Enabled reports whether the assistant can actually reach a model.
-func (a AssistantConfig) Enabled() bool { return a.APIKey != "" }
+// Enabled reports whether the assistant feature is switched on. It says
+// nothing about whether the model is currently loaded — that is runtime state,
+// reported separately, so the UI can show an honest "starting"/"unavailable"
+// instead of vanishing.
+func (a AssistantConfig) Enabled() bool { return a.Enable }
 
 // Load reads configuration from environment variables.
 func Load() (*Config, error) {
@@ -345,26 +398,91 @@ func loadVAPIDConfig() VAPIDConfig {
 	}
 }
 
+// defaultModelPath is where provisioning installs the model on a deployed
+// host. It is a default, not a requirement: AI_MODEL_PATH overrides it.
+const defaultModelPath = "/opt/shiftmaster/models/model.gguf"
+
+// DefaultContextSize is the per-slot context window, in tokens.
+//
+// It is sized from measurement, not taste. The tool catalogue the model is
+// shown costs roughly 5,000 tokens once rendered by the chat template, and the
+// standing instructions another 1,100; with a 700-token reply budget, an 8k
+// window would leave a few hundred tokens for the actual conversation — enough
+// for one question and nothing more. 16k leaves around 9,000, which carries a
+// long multi-turn dialogue with its tool results.
+//
+// The cost of the larger window is small: on a 9B model at Q4, two 16k slots
+// add well under a gigabyte on top of the weights. The assistant's own
+// evaluation suite fails the build if the catalogue ever grows past what this
+// window can carry.
+const DefaultContextSize = 16384
+
 func loadAssistantConfig() AssistantConfig {
-	// ANTHROPIC_API_KEY is accepted as a fallback because it is the
-	// conventional variable name; ASSISTANT_API_KEY wins when both are set.
-	key := getEnv("ASSISTANT_API_KEY", "")
-	if key == "" {
-		key = getEnv("ANTHROPIC_API_KEY", "")
+	// AI_* is the current naming; the ASSISTANT_* names that already shipped
+	// keep working for the limits they configured, so an existing .env does not
+	// need rewriting.
+	envAny := func(def string, names ...string) string {
+		for _, n := range names {
+			if v := getEnv(n, ""); v != "" {
+				return v
+			}
+		}
+		return def
 	}
+	intAny := func(def int, names ...string) int {
+		for _, n := range names {
+			if v := getEnv(n, ""); v != "" {
+				if i, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+					return i
+				}
+				log.Printf("config: %s is not a number, using %d", n, def)
+			}
+		}
+		return def
+	}
+	secondsAny := func(def int, names ...string) time.Duration {
+		return time.Duration(intAny(def, names...)) * time.Second
+	}
+
+	modelPath := envAny(defaultModelPath, "AI_MODEL_PATH")
+	// Managed supervision is the right default only when we actually have a
+	// model file to supervise; otherwise assume an external runtime and just
+	// probe it, so a misconfigured path degrades to "unavailable" rather than
+	// a restart loop.
+	managed := getEnvBool("AI_MANAGED", modelPath != "")
+
 	return AssistantConfig{
-		APIKey:              key,
-		Model:               getEnv("ASSISTANT_MODEL", "claude-sonnet-5"),
-		BaseURL:             getEnv("ASSISTANT_BASE_URL", "https://api.anthropic.com"),
-		MaxTokens:           getEnvInt("ASSISTANT_MAX_TOKENS", 1500),
-		Timeout:             getEnvSeconds("ASSISTANT_TIMEOUT_SECONDS", 45),
-		MaxRetries:          getEnvInt("ASSISTANT_MAX_RETRIES", 2),
-		RequestsPerMinute:   getEnvInt("ASSISTANT_REQUESTS_PER_MINUTE", 8),
-		MaxToolRounds:       getEnvInt("ASSISTANT_MAX_TOOL_ROUNDS", 6),
-		MaxInputChars:       getEnvInt("ASSISTANT_MAX_INPUT_CHARS", 4000),
-		MaxContextMsgs:      getEnvInt("ASSISTANT_MAX_CONTEXT_MESSAGES", 24),
-		MaxConversationMsgs: getEnvInt("ASSISTANT_MAX_CONVERSATION_MESSAGES", 200),
-		PendingActionTTL:    getEnvSeconds("ASSISTANT_PENDING_ACTION_TTL_SECONDS", 300),
+		Enable: getEnvBool("AI_ENABLED", true),
+
+		BaseURL:        envAny("http://127.0.0.1:8081", "AI_BASE_URL", "ASSISTANT_BASE_URL"),
+		RuntimeKey:     getEnv("AI_RUNTIME_KEY", ""),
+		Managed:        managed,
+		ServerBin:      envAny("llama-server", "AI_SERVER_BIN"),
+		ModelPath:      modelPath,
+		Model:          envAny("local-gguf", "AI_MODEL_NAME", "ASSISTANT_MODEL"),
+		ContextSize:    intAny(DefaultContextSize, "AI_CONTEXT_SIZE"),
+		GPULayers:      intAny(-1, "AI_GPU_LAYERS"),
+		Threads:        intAny(0, "AI_THREADS"),
+		Parallel:       intAny(2, "AI_PARALLEL"),
+		RuntimeLogPath: getEnv("AI_RUNTIME_LOG", ""),
+		StartupTimeout: secondsAny(300, "AI_STARTUP_TIMEOUT_SECONDS"),
+		Warm:           getEnvBool("AI_WARM", true),
+		GroundingRetry: getEnvBool("AI_GROUNDING_RETRY", true),
+
+		Temperature: getEnvFloat("AI_TEMPERATURE", 0.3),
+		TopP:        getEnvFloat("AI_TOP_P", 0.9),
+		MaxTokens:   intAny(700, "AI_MAX_TOKENS", "ASSISTANT_MAX_TOKENS"),
+		Timeout:     secondsAny(120, "AI_TIMEOUT_SECONDS", "ASSISTANT_TIMEOUT_SECONDS"),
+		MaxRetries:  intAny(1, "AI_MAX_RETRIES", "ASSISTANT_MAX_RETRIES"),
+
+		RequestsPerMinute:   intAny(10, "AI_REQUESTS_PER_MINUTE", "ASSISTANT_REQUESTS_PER_MINUTE"),
+		MaxToolRounds:       intAny(6, "AI_MAX_TOOL_ROUNDS", "ASSISTANT_MAX_TOOL_ROUNDS"),
+		MaxInputChars:       intAny(4000, "AI_MAX_INPUT_CHARS", "ASSISTANT_MAX_INPUT_CHARS"),
+		MaxContextMsgs:      intAny(24, "AI_MAX_CONTEXT_MESSAGES", "ASSISTANT_MAX_CONTEXT_MESSAGES"),
+		MaxConversationMsgs: intAny(200, "AI_MAX_CONVERSATION_MESSAGES", "ASSISTANT_MAX_CONVERSATION_MESSAGES"),
+		QueueWait:           secondsAny(25, "AI_QUEUE_WAIT_SECONDS"),
+
+		PendingActionTTL: secondsAny(300, "AI_PENDING_ACTION_TTL_SECONDS", "ASSISTANT_PENDING_ACTION_TTL_SECONDS"),
 	}
 }
 
@@ -464,10 +582,55 @@ func (a *AssistantConfig) Validate() error {
 	if a.PendingActionTTL < 30*time.Second || a.PendingActionTTL > time.Hour {
 		return fmt.Errorf("pending_action_ttl must be between 30s and 1h")
 	}
-	if a.Enabled() && a.Model == "" {
-		return fmt.Errorf("model is required when an API key is set")
+	if a.ContextSize < 2048 || a.ContextSize > 262144 {
+		return fmt.Errorf("context_size must be between 2048 and 262144")
+	}
+	if a.Parallel < 1 || a.Parallel > 32 {
+		return fmt.Errorf("parallel must be between 1 and 32")
+	}
+	if a.Temperature < 0 || a.Temperature > 2 {
+		return fmt.Errorf("temperature must be between 0 and 2")
+	}
+	if a.QueueWait < time.Second || a.QueueWait > 2*time.Minute {
+		return fmt.Errorf("queue_wait must be between 1s and 2m")
+	}
+	if a.StartupTimeout < 10*time.Second || a.StartupTimeout > 30*time.Minute {
+		return fmt.Errorf("startup_timeout must be between 10s and 30m")
+	}
+	if a.Enable && a.BaseURL == "" {
+		return fmt.Errorf("base_url is required when the assistant is enabled")
+	}
+	// A hosted AI endpoint is not a supported configuration: the assistant is
+	// local by design, and pointing it at a public host would send employee
+	// data and internal documents off the premises. Refusing to boot is the
+	// only place this can be enforced once and for all.
+	if a.Enable && !isLocalEndpoint(a.BaseURL) {
+		return fmt.Errorf("base_url must be a loopback address or unix socket; the assistant runs its model locally and must not call a remote inference service")
 	}
 	return nil
+}
+
+// isLocalEndpoint reports whether a runtime URL stays on this machine.
+func isLocalEndpoint(raw string) bool {
+	if strings.HasPrefix(raw, "unix://") {
+		return true
+	}
+	host := raw
+	for _, prefix := range []string{"http://", "https://"} {
+		host = strings.TrimPrefix(host, prefix)
+	}
+	if i := strings.IndexAny(host, "/?"); i >= 0 {
+		host = host[:i]
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(strings.ToLower(host), "[]")
+	if host == "localhost" || host == "::1" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // Validate checks database configuration.
@@ -807,4 +970,16 @@ func getEnvSlice(key, defaultValue string) []string {
 		}
 	}
 	return result
+}
+
+// getEnvFloat reads a float setting, falling back on anything unparseable so a
+// typo cannot silently become 0.
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+			return f
+		}
+		log.Printf("config: %s is not a number, using %v", key, defaultValue)
+	}
+	return defaultValue
 }

@@ -158,8 +158,9 @@ func (h *harness) buildDeps(clock temporal.Clock) *Deps {
 
 	return &Deps{
 		Cfg: config.AssistantConfig{
-			APIKey:              "test",
+			Enable:              true,
 			Model:               "test-model",
+			ContextSize:         config.DefaultContextSize,
 			MaxTokens:           512,
 			Timeout:             10 * time.Second,
 			RequestsPerMinute:   30,
@@ -170,6 +171,7 @@ func (h *harness) buildDeps(clock temporal.Clock) *Deps {
 			PendingActionTTL:    5 * time.Minute,
 		},
 		Clock:            clock,
+		DB:               db,
 		AssistantRepo:    repository.NewAssistantRepository(db),
 		EmployeeRepo:     employeeRepo,
 		DepartmentRepo:   departmentRepo,

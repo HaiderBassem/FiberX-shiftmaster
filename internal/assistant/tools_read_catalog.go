@@ -83,9 +83,14 @@ type planView struct {
 func toolSearchPlans() Tool {
 	return Tool{
 		Name: "search_service_plans",
-		Description: "Search the FTTH internet plan catalog visible to the caller's department. Filters: text, province, " +
-			"max price (IQD), minimum speed (Mbps). Sorted by price ascending unless sort='speed'. Returns at most 12 plans — " +
-			"every price/speed answer must come from this data, never from memory.",
+		Description: "The internet plan catalogue for the provinces the caller's department can see: names, prices in IQD, " +
+			"speeds, durations and what is included. THE ONLY source of any price or speed — you do not know a single plan price " +
+			"until this returns one, and stating one you have not fetched is a serious error. " +
+			"Use it for every question about باقة / باقات / اشتراك / سعر / أسعار / شكد سعر / أرخص / ارخص شي / سرعة / ميگا / إنترنت, " +
+			"and for plans, packages, prices, speeds and 'what do you offer'. " +
+			"Filters: free text, province, max price, minimum speed in Mbps; sorted cheapest first unless sort='speed'. " +
+			"For 'the cheapest' just call it with no filters and read the first row; for 'cheap but at least 50 Mbps' set min_speed_mbps. " +
+			"Returns at most 12 plans. If it returns none, say there are none rather than naming a price.",
 		InputSchema: schema(`{
 			"type":"object",
 			"properties":{

@@ -23,10 +23,13 @@ func NewAssistantHandler(svc *assistant.Service) *AssistantHandler {
 	return &AssistantHandler{svc: svc}
 }
 
-// Status lets the frontend decide whether to render the assistant at all.
-// Nothing sensitive: enabled yes/no only.
+// Status tells the frontend how to render the assistant. It reports a coarse
+// lifecycle state — disabled, starting, ready, degraded, unavailable — and
+// nothing else: no model path, no port, no runtime error text. The panel is
+// rendered for every state except "disabled", so an employee sees "the
+// assistant is starting up" rather than a feature that silently vanished.
 func (h *AssistantHandler) Status(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"enabled": h.svc.Enabled()}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": h.svc.Status()})
 }
 
 type chatRequest struct {
@@ -54,7 +57,7 @@ func (h *AssistantHandler) Chat(c *gin.Context) {
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
-		case errors.Is(err, assistant.ErrDisabled):
+		case errors.Is(err, assistant.ErrDisabled), errors.Is(err, assistant.ErrUnavailable):
 			status = http.StatusServiceUnavailable
 		case errors.Is(err, assistant.ErrRateLimited):
 			status = http.StatusTooManyRequests

@@ -29,12 +29,21 @@ type AssistantRepository interface {
 	AppendMessages(ctx context.Context, conversationID, employeeID uuid.UUID, roles []string, contents []json.RawMessage) error
 	// RecentMessages returns the last `limit` messages in ascending order.
 	RecentMessages(ctx context.Context, conversationID, employeeID uuid.UUID, limit int) ([]models.AssistantMessage, error)
+	// SaveSummary stores the recap of turns that have scrolled out of the
+	// model's context window. throughSeq only ever moves forward, so a slow
+	// background summarisation that finishes after a newer one cannot rewind
+	// the conversation's memory.
+	SaveSummary(ctx context.Context, conversationID, employeeID uuid.UUID, summary string, throughSeq int) error
 
 	CreatePendingAction(ctx context.Context, a *models.AssistantPendingAction) error
 	// SupersedePending marks every other pending action in the conversation as
 	// superseded, so at most one approval card is live per dialogue.
 	SupersedePending(ctx context.Context, conversationID, employeeID, exceptID uuid.UUID) error
 	GetPendingAction(ctx context.Context, id, employeeID uuid.UUID) (*models.AssistantPendingAction, error)
+	// LivePendingAction returns the conversation's one still-undecided action,
+	// if any. The prompt builder re-injects it every turn so an approval that
+	// scrolled out of the replayed window is never forgotten mid-dialogue.
+	LivePendingAction(ctx context.Context, conversationID, employeeID uuid.UUID) (*models.AssistantPendingAction, error)
 	// ClaimForExecution atomically moves pending → approved. Exactly one caller
 	// can win regardless of replicas or double clicks; losers get
 	// ErrActionNotPending.
@@ -74,15 +83,51 @@ func (r *assistantRepo) CreateConversation(ctx context.Context, employeeID uuid.
 func (r *assistantRepo) GetConversation(ctx context.Context, id, employeeID uuid.UUID) (*models.AssistantConversation, error) {
 	c := &models.AssistantConversation{}
 	err := r.db.QueryRow(ctx,
-		`SELECT id, employee_id, role, department_id, message_count, created_at, updated_at
+		`SELECT id, employee_id, role, department_id, message_count, summary, summarized_seq, created_at, updated_at
 		 FROM assistant_conversations
 		 WHERE id = $1 AND employee_id = $2`,
 		id, employeeID,
-	).Scan(&c.ID, &c.EmployeeID, &c.Role, &c.DepartmentID, &c.MessageCount, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.EmployeeID, &c.Role, &c.DepartmentID, &c.MessageCount, &c.Summary, &c.SummarizedSeq, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("get conversation: %w", err)
 	}
 	return c, nil
+}
+
+func (r *assistantRepo) LivePendingAction(ctx context.Context, conversationID, employeeID uuid.UUID) (*models.AssistantPendingAction, error) {
+	a := &models.AssistantPendingAction{}
+	err := r.db.QueryRow(ctx,
+		`SELECT id, employee_id, conversation_id, action_type, params, summary, status,
+		        result, error, created_at, expires_at, decided_at
+		 FROM assistant_pending_actions
+		 WHERE conversation_id = $1 AND employee_id = $2
+		   AND status = 'pending' AND expires_at > now()
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
+		conversationID, employeeID,
+	).Scan(&a.ID, &a.EmployeeID, &a.ConversationID, &a.ActionType, &a.Params, &a.Summary, &a.Status,
+		&a.Result, &a.Error, &a.CreatedAt, &a.ExpiresAt, &a.DecidedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (r *assistantRepo) SaveSummary(ctx context.Context, conversationID, employeeID uuid.UUID, summary string, throughSeq int) error {
+	// Bound what one recap may occupy in the next prompt; the generator is also
+	// capped, so exceeding this means the model ignored its instruction.
+	if len(summary) > 4000 {
+		summary = summary[:4000]
+	}
+	_, err := r.db.Exec(ctx,
+		`UPDATE assistant_conversations
+		 SET summary = $3, summarized_seq = $4, updated_at = now()
+		 WHERE id = $1 AND employee_id = $2 AND summarized_seq < $4`,
+		conversationID, employeeID, summary, throughSeq)
+	if err != nil {
+		return fmt.Errorf("save conversation summary: %w", err)
+	}
+	return nil
 }
 
 func (r *assistantRepo) AppendMessages(ctx context.Context, conversationID, employeeID uuid.UUID, roles []string, contents []json.RawMessage) error {
@@ -284,10 +329,12 @@ func (r *assistantRepo) LogRequest(ctx context.Context, l *models.AssistantReque
 	_, err := r.db.Exec(ctx,
 		`INSERT INTO assistant_requests
 		     (id, employee_id, conversation_id, model, tool_calls, input_chars,
-		      model_ms, tools_ms, total_ms, input_tokens, output_tokens, status, error_kind)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''))`,
+		      model_ms, tools_ms, total_ms, input_tokens, output_tokens, status, error_kind,
+		      rounds, tool_free)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NULLIF($13,''),$14,$15)`,
 		l.ID, l.EmployeeID, l.ConversationID, l.Model, l.ToolCalls, l.InputChars,
 		l.ModelMs, l.ToolsMs, l.TotalMs, l.InputTokens, l.OutputTokens, l.Status, l.ErrorKind,
+		l.Rounds, l.ToolFree,
 	)
 	if err != nil {
 		return fmt.Errorf("log assistant request: %w", err)

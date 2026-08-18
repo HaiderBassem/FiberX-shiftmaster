@@ -55,6 +55,21 @@ export type Entry =
     }
   | { kind: 'error'; id: string; code: string };
 
+/**
+ * GET /assistant/status. `state` is a coarse lifecycle value; the assistant is
+ * rendered for every one of them except `disabled`, so a model that is still
+ * loading shows as loading rather than as a feature that vanished.
+ */
+export type AssistantState = 'disabled' | 'starting' | 'ready' | 'degraded' | 'unavailable';
+
+export interface AssistantStatus {
+  state: AssistantState;
+  detail?: string;
+  ready: boolean;
+  /** Kept for compatibility with the previous status shape. */
+  enabled: boolean;
+}
+
 /** Server row shape returned by the decide/get endpoints. */
 export interface PendingActionRow {
   id: string;

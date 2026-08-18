@@ -25,6 +25,7 @@ import (
 	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
 	"shiftmaster-backend/internal/temporal"
+	"shiftmaster-backend/pkg/database"
 )
 
 // Deps carries every domain dependency the assistant's tools and executors
@@ -33,8 +34,18 @@ import (
 type Deps struct {
 	Cfg config.AssistantConfig
 	LLM llm.Client
+	// Runtime reports the local model's lifecycle state for GET
+	// /assistant/status. Nil when the feature is switched off, or in tests
+	// that drive a scripted client directly.
+	Runtime llm.Prober
 
 	Clock temporal.Clock
+
+	// DB is used for exactly one thing: the assistant's ranked knowledge
+	// search, which needs a different query shape from the list endpoints while
+	// applying identical access rules. There is no general query path here and
+	// the model has no tool that reaches SQL.
+	DB *database.DB
 
 	AssistantRepo repository.AssistantRepository
 

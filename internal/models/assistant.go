@@ -17,8 +17,13 @@ type AssistantConversation struct {
 	Role         string     `json:"role"`
 	DepartmentID *uuid.UUID `json:"department_id"`
 	MessageCount int        `json:"message_count"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	// Summary is a short recap of turns that have scrolled out of the model's
+	// context window, and SummarizedSeq is how far it reaches. Conversational
+	// memory only — never a source of facts, and never the basis of an action.
+	Summary       string    `json:"-"`
+	SummarizedSeq int       `json:"-"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // AssistantMessage is one stored turn. Content is the provider-format block
@@ -78,6 +83,13 @@ type AssistantRequestLog struct {
 	TotalMs        int
 	InputTokens    int
 	OutputTokens   int
-	Status         string
-	ErrorKind      string
+	// Rounds is how many model↔tool iterations the turn took.
+	Rounds int
+	// ToolFree records that the model answered having explicitly decided the
+	// turn needed no ShiftMaster data. Correct for small talk, wrong for a
+	// question about real state — and indistinguishable in the reply itself,
+	// which is why it is recorded here.
+	ToolFree  bool
+	Status    string
+	ErrorKind string
 }

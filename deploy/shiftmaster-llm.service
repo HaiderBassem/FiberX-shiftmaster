@@ -1,0 +1,82 @@
+[Unit]
+# The local language model that powers the ShiftMaster assistant.
+#
+# This unit is OPTIONAL. By default the API supervises the model itself
+# (AI_MANAGED=true), which is one less thing to deploy. Install this unit and
+# set AI_MANAGED=false when you would rather the model:
+#
+#   - survive API restarts and redeploys, so nobody waits for it to reload;
+#   - be restartable on its own when it misbehaves;
+#   - run under its own resource limits.
+#
+# Either way the model listens on loopback only and is never reachable from
+# outside this machine.
+Description=ShiftMaster local language model (llama.cpp)
+After=network.target
+Before=shiftmaster.service
+
+[Service]
+Type=simple
+User=techsupport
+Group=techsupport
+WorkingDirectory=/opt/shiftmaster
+
+# The same values you put in /opt/shiftmaster/.env; provision-ai.sh prints
+# them. Keeping them in one file means the API and the model cannot disagree
+# about the port, the model file or the context size.
+EnvironmentFile=/opt/shiftmaster/.env
+
+# llama.cpp reads most of its settings from LLAMA_ARG_* variables, so the
+# command line stays short and the .env stays the single source of truth.
+Environment=LLAMA_ARG_HOST=127.0.0.1
+Environment=LLAMA_ARG_PORT=8081
+Environment=LLAMA_ARG_JINJA=1
+Environment=LLAMA_ARG_ENDPOINT_METRICS=1
+
+ExecStart=/bin/sh -c '\
+  exec "$${AI_SERVER_BIN:-llama-server}" \
+    --model "$${AI_MODEL_PATH}" \
+    --alias "$${AI_MODEL_NAME:-shiftmaster-local}" \
+    --host 127.0.0.1 --port 8081 \
+    --ctx-size $$(( $${AI_CONTEXT_SIZE:-16384} * $${AI_PARALLEL:-2} )) \
+    --parallel "$${AI_PARALLEL:-2}" \
+    --gpu-layers "$${AI_GPU_LAYERS:--1}" \
+    --jinja --reasoning off --reasoning-budget 0 \
+    --no-webui --cont-batching --metrics'
+
+Restart=always
+RestartSec=10
+# A large model on a cold page cache genuinely takes minutes to load; systemd
+# must not conclude it failed.
+TimeoutStartSec=600
+
+StandardOutput=append:/var/log/shiftmaster/ai-runtime.log
+StandardError=append:/var/log/shiftmaster/ai-runtime.log
+
+# Security hardening. The model process needs to read exactly one directory
+# (the weights) and speak to exactly one socket family.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/shiftmaster
+ReadOnlyPaths=/opt/shiftmaster/models
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# Loopback only. No reason for this process to reach anything else, ever —
+# and this is the line that makes "the model never phones home" a property of
+# the system rather than a promise.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressAllow=localhost
+IPAddressDeny=any
+
+# Keep one runaway generation from taking the database down with it. Tune to
+# the model: roughly the weights plus a gigabyte per 16k of context per slot.
+# MemoryMax=12G
+
+[Install]
+WantedBy=multi-user.target

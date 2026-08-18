@@ -8,11 +8,17 @@ import { Button } from '@/components/ui/button';
 import { useAssistantChat } from './useAssistantChat';
 import { ToolResultCard } from './ResultCards';
 import { ApprovalCard } from './ApprovalCard';
-import type { Entry } from './types';
+import type { AssistantStatus, Entry } from './types';
 
-// The Home-page assistant. Renders nothing at all when the backend reports
-// the feature unconfigured, so the dashboard is byte-identical to before in
-// that case.
+// The Home-page assistant.
+//
+// Visibility rule: the panel is rendered whenever the feature is enabled, in
+// every runtime state. Previously it returned null unless the backend reported
+// `enabled`, and `enabled` meant "an AI provider API key is present" — so a
+// deployment without a key had no assistant and no explanation, which is
+// exactly how it came to be missing in production. The model now runs on the
+// server itself, and a model that is loading, degraded or down is a state to
+// show honestly, not a reason to remove the feature from the page.
 
 function EntryView({
   entry,
@@ -87,19 +93,22 @@ export default function AssistantPanel() {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: status } = useQuery({
+  const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ['assistant-status'],
     queryFn: async () => {
       const res = await api.get('/assistant/status');
-      return res.data?.data as { enabled: boolean } | undefined;
+      return res.data?.data as AssistantStatus | undefined;
     },
-    staleTime: 5 * 60 * 1000,
-    // A transient failure here makes the whole assistant vanish with no way
-    // back (the panel renders null and nothing remounts it), so keep trying
-    // quietly until an answer arrives.
+    staleTime: 30 * 1000,
     retry: 3,
     refetchOnWindowFocus: true,
-    refetchInterval: query => (query.state.data === undefined ? 60 * 1000 : false),
+    // While the model is loading, poll so the panel becomes usable on its own
+    // rather than needing a page reload.
+    refetchInterval: query => {
+      const state = query.state.data?.state;
+      if (query.state.data === undefined) return 60 * 1000;
+      return state === 'starting' || state === 'degraded' || state === 'unavailable' ? 15 * 1000 : false;
+    },
   });
 
   const suggestions = useMemo(() => {
@@ -118,11 +127,18 @@ export default function AssistantPanel() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [entries, phase]);
 
-  if (!status?.enabled) return null;
+  // Only two things hide the panel: the operator switched the feature off, and
+  // the very first status request not having answered yet.
+  if (statusLoading && !status) return null;
+  if (status && status.state === 'disabled') return null;
+  if (!status && !statusLoading) return null;
+
+  const state = status?.state ?? 'unavailable';
+  const ready = status?.ready === true;
 
   const submit = () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if (!text || busy || !ready) return;
     setInput('');
     void send(text);
   };
@@ -160,7 +176,29 @@ export default function AssistantPanel() {
         className="px-4 py-3 space-y-3 overflow-y-auto"
         style={{ maxHeight: entries.length > 0 ? '26rem' : undefined }}
       >
-        {entries.length === 0 && (
+        {!ready && (
+          <div
+            className="rounded-xl border border-border bg-muted/40 px-3.5 py-3 text-sm"
+            role="status"
+            dir="auto"
+          >
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              {state === 'starting' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {state === 'starting'
+                ? t('assistant.state_starting_title')
+                : t('assistant.state_unavailable_title')}
+            </div>
+            <p className="mt-1 text-muted-foreground">
+              {state === 'starting'
+                ? t('assistant.state_starting_body')
+                : state === 'degraded'
+                  ? t('assistant.state_degraded_body')
+                  : t('assistant.state_unavailable_body')}
+            </p>
+          </div>
+        )}
+
+        {ready && entries.length === 0 && (
           <div className="py-2 space-y-3">
             <p className="text-sm text-muted-foreground" dir="auto">
               {t('assistant.greeting', { name: user?.first_name?.split(' ')[0] ?? '' })}
@@ -207,10 +245,11 @@ export default function AssistantPanel() {
             rows={1}
             dir="auto"
             maxLength={4000}
+            disabled={!ready}
             placeholder={t('assistant.placeholder')}
-            className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none max-h-28"
+            className="flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none max-h-28 disabled:cursor-not-allowed"
           />
-          <Button size="icon" className="h-8 w-8 shrink-0" disabled={busy || !input.trim()} onClick={submit}>
+          <Button size="icon" className="h-8 w-8 shrink-0" disabled={!ready || busy || !input.trim()} onClick={submit}>
             <Send className="h-4 w-4 rtl:-scale-x-100" />
           </Button>
         </div>

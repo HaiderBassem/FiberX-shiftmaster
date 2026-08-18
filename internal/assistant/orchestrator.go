@@ -2,8 +2,11 @@ package assistant
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"shiftmaster-backend/internal/assistant/llm"
@@ -16,6 +19,18 @@ type turnStats struct {
 	ToolsMs      int
 	InputTokens  int
 	OutputTokens int
+	Rounds       int
+	// ToolFree records that the model explicitly declared the turn needed no
+	// system data. The evaluation harness asserts on this to catch answers
+	// invented from the model's priors.
+	ToolFree bool
+	// Dropped counts transcript messages the token budget forced out.
+	Dropped int
+	// FirstTokenMs is how long the first model round took, which is what the
+	// person actually experiences as "did it hear me".
+	FirstTokenMs int
+	// TokensPerSec is the generation rate the runtime last reported.
+	TokensPerSec float64
 }
 
 // runTurn drives one user message to completion: model → tools → model …
@@ -32,6 +47,9 @@ type turnStats struct {
 //   - Every round appends BOTH the assistant tool_use message and the paired
 //     tool_result message, so the stored transcript is always well-formed for
 //     the next call.
+//   - The prompt is fitted to the model's real context window before every
+//     round, after the fixed cost of the system prompt and tool catalogue is
+//     known.
 func (d *Deps) runTurn(
 	ctx context.Context,
 	actor *Actor,
@@ -40,37 +58,62 @@ func (d *Deps) runTurn(
 	emit Emit,
 ) ([]llm.Message, *turnStats, error) {
 	stats := &turnStats{}
-	system := buildSystemPrompt(ctx, d, actor)
+	system := buildSystemPrompt(ctx, d, actor, latestUserText(history))
 	tools := registry.ForRole(actor.Role())
+
+	// What is left of the context window for conversation, once the standing
+	// instructions, the catalogue and the reply have taken their share.
+	transcriptBudget := d.Cfg.ContextSize -
+		estimateTokens(system) -
+		toolCatalogueTokens(tools) -
+		d.Cfg.MaxTokens -
+		256 // template scaffolding and rounding
 
 	messages := history
 	var appended []llm.Message
+	// repeats detects a model looping on one call; see below.
+	repeats := map[string]int{}
 
 	for round := 0; ; round++ {
+		stats.Rounds = round + 1
 		if round >= d.Cfg.MaxToolRounds {
 			// Budget exhausted: make the model produce a final answer with the
 			// tools it has already run, rather than looping forever.
 			note := llm.Message{Role: llm.RoleUser, Content: []llm.ContentBlock{
-				llm.TextBlock("[system: tool budget for this turn is exhausted — answer now with what you have]"),
+				llm.TextBlock("[system: no more lookups are possible this turn — answer now with what you already have, and say plainly if something is still missing]"),
 			}}
 			messages = append(messages, note)
 			appended = append(appended, note)
 			tools = nil
 		}
 
+		fitted, dropped := fitWindow(messages, transcriptBudget)
+		stats.Dropped += dropped
+
 		emit(Event{Type: "status", Text: "thinking"})
 		modelStart := time.Now()
 		resp, err := d.LLM.Complete(ctx, llm.Request{
 			System:   system,
-			Messages: messages,
+			Messages: fitted,
 			Tools:    tools,
+			Round:    round,
 		})
-		stats.ModelMs += int(time.Since(modelStart).Milliseconds())
+		elapsed := int(time.Since(modelStart).Milliseconds())
+		stats.ModelMs += elapsed
+		if round == 0 {
+			stats.FirstTokenMs = elapsed
+		}
 		if err != nil {
 			return appended, stats, err
 		}
 		stats.InputTokens += resp.Usage.InputTokens
 		stats.OutputTokens += resp.Usage.OutputTokens
+		if resp.Timings.TokensPerSec > 0 {
+			stats.TokensPerSec = resp.Timings.TokensPerSec
+		}
+		if resp.ToolFree && round == 0 {
+			stats.ToolFree = true
+		}
 
 		assistantMsg := llm.Message{Role: llm.RoleAssistant, Content: resp.Content}
 		messages = append(messages, assistantMsg)
@@ -98,18 +141,59 @@ func (d *Deps) runTurn(
 				continue
 			}
 			stats.ToolCalls++
+
+			// A model that asks the same question twice will ask it forever;
+			// answering the repeat with a nudge instead of the same payload
+			// costs one round and breaks the loop. This is a deterministic
+			// safety rail around the model, not a substitute for its judgement.
+			key := callKey(block)
+			repeats[key]++
+			if repeats[key] > 1 {
+				const msg = "you already called this tool with these exact arguments in this turn; the earlier result above is still current — use it, or call a different tool"
+				body, _ := json.Marshal(map[string]string{"error": msg})
+				// Reported like any other tool failure so a model stuck in a
+				// loop is visible in the request log and to the evaluation
+				// suite, rather than looking like a turn that never called
+				// anything.
+				emit(Event{Type: "tool", Tool: block.Name, OK: false, Message: msg})
+				results = append(results, llm.ToolResultBlock(block.ID, string(body), true))
+				continue
+			}
+
 			payload, ok := d.execTool(ctx, actor, registry, block, emit, stats)
 			results = append(results, llm.ToolResultBlock(block.ID, payload, !ok))
 		}
 		if len(results) == 0 {
-			// stop_reason said tool_use but no tool blocks arrived: treat as a
-			// provider inconsistency and end the turn safely.
+			// The provider said tool_use but no tool blocks arrived: treat as
+			// a provider inconsistency and end the turn safely.
 			return appended, stats, fmt.Errorf("%w: tool_use stop without tool blocks", llm.ErrUnavailable)
 		}
 		resultMsg := llm.Message{Role: llm.RoleUser, Content: results}
 		messages = append(messages, resultMsg)
 		appended = append(appended, resultMsg)
 	}
+}
+
+// latestUserText is the message this turn is answering, used only to decide
+// which language the reply must be written in.
+func latestUserText(history []llm.Message) string {
+	for i := len(history) - 1; i >= 0; i-- {
+		if history[i].Role != llm.RoleUser {
+			continue
+		}
+		for _, block := range history[i].Content {
+			if block.Type == llm.BlockText && block.Text != "" {
+				return block.Text
+			}
+		}
+	}
+	return ""
+}
+
+// callKey identifies one tool call by name and arguments.
+func callKey(block llm.ContentBlock) string {
+	sum := sha256.Sum256(append([]byte(block.Name+"\x00"), block.Input...))
+	return hex.EncodeToString(sum[:8])
 }
 
 // execTool runs one tool call defensively: role-filtered lookup, strict
@@ -132,7 +216,11 @@ func (d *Deps) execTool(
 
 	tool, found := registry.Lookup(call.Name, actor.Role())
 	if !found {
-		return fail("unknown tool")
+		// Either a name the grammar should have made impossible, or a tool the
+		// caller's role cannot see. Both answer identically, so the model
+		// cannot probe for capabilities above the caller's authority.
+		log.Printf("assistant: %s called unavailable tool %q", actor.Role(), call.Name)
+		return fail("that tool does not exist for this user")
 	}
 
 	emit(Event{Type: "status", Text: "tool:" + tool.Name})
