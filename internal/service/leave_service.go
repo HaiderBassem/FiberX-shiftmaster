@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -781,12 +782,20 @@ func (s *LeaveService) applyLeaveToShifts(ctx context.Context, leave *models.Lea
 			shiftID = emp.DefaultShiftID
 		}
 
-		var shiftStatus = "leave"
-		if isHourly {
-			shiftStatus = "hourly"
+		// Hourly leave uses the wire contract every reader already decodes:
+		// status 'leave' with the "[hourly] " reason prefix (see
+		// models.HourlyLeaveReasonPrefix). Writing the 'hourly' enum literal
+		// here hard-fails on deployed databases whose shift_status_type
+		// predates that value — and the schedule service's own leave
+		// application would overwrite it with the prefix form on the next
+		// materialisation anyway, so the two writers used to disagree.
+		shiftStatus := "leave"
+		dayReason := leaveReason
+		if isHourly && !strings.HasPrefix(dayReason, models.HourlyLeaveReasonPrefix) {
+			dayReason = models.HourlyLeaveReasonPrefix + dayReason
 		}
 
-		leaveReasonPtr := &leaveReason
+		leaveReasonPtr := &dayReason
 		es := &models.EmployeeShift{
 			ScheduleID:  ws.ID,
 			EmployeeID:  leave.EmployeeID,

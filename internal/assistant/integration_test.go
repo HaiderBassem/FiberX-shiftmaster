@@ -775,3 +775,51 @@ func TestConversationRefusedAfterRoleChange(t *testing.T) {
 		t.Fatalf("stale-authority conversation accepted: %v", err)
 	}
 }
+
+// A one-hour زمنية must not make the assistant lose the whole day's shift.
+// Applied hourly leave is stored — by the wire contract every deployed
+// database supports — as shift_status 'leave' with the "[hourly] " reason
+// prefix. The materialiser must still treat that row as on duty; before this,
+// resolveCurrent skipped the day and a second hourly-leave ask anchored to
+// the wrong (next) shift.
+func TestHourlyLeaveRowStaysOnDuty(t *testing.T) {
+	h := newHarness(t)
+	today := todayBaghdad()
+	ctx := context.Background()
+
+	// Materialise today's rows, then apply the wire-contract form to empA.
+	deps := h.buildDeps(temporal.FixedClock{T: atBaghdad(today, 23, 40)})
+	if _, err := deps.resolveCurrent(ctx, h.actor(t, h.empA).Employee); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.db.Exec(ctx,
+		`UPDATE employee_shifts SET shift_status='leave', leave_reason='[hourly] leave', source='leave'
+		 WHERE employee_id=$1 AND shift_date=$2`, h.empA, today); err != nil {
+		t.Fatalf("apply hourly-leave row: %v", err)
+	}
+
+	res, err := deps.resolveCurrent(ctx, h.actor(t, h.empA).Employee)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Active == nil {
+		t.Fatal("the active overnight shift disappeared behind a partial-day leave")
+	}
+	if !res.Active.BusinessDate.Equal(today) {
+		t.Fatalf("active business date = %v, want today", res.Active.BusinessDate)
+	}
+
+	// A full-day leave, by contrast, must still take the day out.
+	if _, err := h.db.Exec(ctx,
+		`UPDATE employee_shifts SET shift_status='leave', leave_reason='vacation', source='leave'
+		 WHERE employee_id=$1 AND shift_date=$2`, h.empA, today); err != nil {
+		t.Fatal(err)
+	}
+	res, err = deps.resolveCurrent(ctx, h.actor(t, h.empA).Employee)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Active != nil && res.Active.BusinessDate.Equal(today) {
+		t.Fatal("a full-day leave still materialised as an active shift")
+	}
+}

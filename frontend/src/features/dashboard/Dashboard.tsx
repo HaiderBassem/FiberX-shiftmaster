@@ -26,6 +26,17 @@ import {
 } from 'recharts';
 import { assetUrl } from '@/lib/assets';
 
+// An hourly leave occupies part of the day, not the day: it is stored as
+// 'leave' with a '[hourly] ' reason prefix (or as 'hourly' directly) — the
+// same wire contract the schedule and calendar views decode. Without this,
+// a one-hour زمنية painted the whole day as "on leave" and hid the employee
+// from the leader's Active Staff list.
+const isHourlyLeaveRow = (row: any): boolean => {
+  const raw = String(row?.shift_status || '').toLowerCase();
+  if (raw === 'hourly') return true;
+  return raw === 'leave' && !!row?.leave_reason && String(row.leave_reason).startsWith('[hourly]');
+};
+
 // ───────────────────────────────────────────────────────────
 // Shared Animations
 // ───────────────────────────────────────────────────────────
@@ -252,7 +263,8 @@ const EmployeeDashboard = () => {
     if (!shiftId) return null;
     return (allShifts || []).find((s: any) => s.id === shiftId) || null;
   })();
-  const myTodayStatus = myTodayRow?.shift_status || 'working';
+  const myTodayStatus = isHourlyLeaveRow(myTodayRow) ? 'working' : myTodayRow?.shift_status || 'working';
+  const myTodayHasHourlyLeave = isHourlyLeaveRow(myTodayRow);
 
   // Is shift currently active?
   const now = new Date();
@@ -377,6 +389,11 @@ const EmployeeDashboard = () => {
                   {parseShiftTime(myTodayShift.start_time)}
                   <span className="text-muted-foreground/40">—</span>
                   {parseShiftTime(myTodayShift.end_time)}
+                  {myTodayHasHourlyLeave && (
+                    <span className="ms-1 rounded-full bg-sky-500/15 text-sky-500 px-2 py-0.5 text-[10px] font-semibold">
+                      {t('dashboard.hourly_leave_today')}
+                    </span>
+                  )}
                 </p>
               </>
             ) : (
@@ -831,7 +848,7 @@ const LeaderDashboard = () => {
                 // Check for OFF schedules today
                 const todaySched = todaySchedules?.find((s: any) => s.employee_id === e.id && s.shift_date?.startsWith(todayStr));
                 if (todaySched) {
-                    if (todaySched.shift_status === 'off' || todaySched.shift_status === 'leave' || todaySched.shift_status === 'vacation') {
+                    if (!isHourlyLeaveRow(todaySched) && (todaySched.shift_status === 'off' || todaySched.shift_status === 'leave' || todaySched.shift_status === 'vacation')) {
                         return false;
                     }
                     if (todaySched.shift_id) {

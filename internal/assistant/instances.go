@@ -3,6 +3,7 @@ package assistant
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,11 +13,19 @@ import (
 )
 
 // onDutyStatus reports whether a day row means the employee is expected to
-// work that shift. 'hourly' is on duty with a partial-day leave carved out;
-// every other non-working status (off, leave, vacation, sick, training,
-// business_trip) means the shift is not held that day.
-func onDutyStatus(status string) bool {
-	return status == "working" || status == "hourly"
+// work that shift. A partial-day (hourly) leave is on duty: it appears either
+// as the 'hourly' enum value or — the wire contract every deployed database
+// supports — as 'leave' with the "[hourly] " reason prefix
+// (models.HourlyLeaveReasonPrefix). Every other non-working status (off,
+// leave, vacation, sick, training, business_trip) means the shift is not held
+// that day. Without the prefix branch, one approved زمنية made the assistant
+// lose the whole day's shift: "what's my shift" skipped it and a second
+// hourly-leave request anchored to the wrong (next) shift.
+func onDutyStatus(status string, leaveReason *string) bool {
+	if status == "working" || status == "hourly" {
+		return true
+	}
+	return status == "leave" && leaveReason != nil && strings.HasPrefix(*leaveReason, models.HourlyLeaveReasonPrefix)
 }
 
 // shiftClocks caches shift-type rows for one request.
@@ -58,7 +67,7 @@ func (d *Deps) instancesForRange(ctx context.Context, emp *models.Employee, from
 	var out []temporal.Instance
 	for i := range rows {
 		row := rows[i]
-		if !onDutyStatus(row.ShiftStatus) {
+		if !onDutyStatus(row.ShiftStatus, row.LeaveReason) {
 			continue
 		}
 		shiftID := row.ShiftID

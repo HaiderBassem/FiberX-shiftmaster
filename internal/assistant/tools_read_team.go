@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -118,7 +119,7 @@ func toolGetTeamStatus() Tool {
 				if shiftID == nil {
 					shiftID = row.DefaultShiftID
 				}
-				if onDutyStatus(row.ShiftStatus) && shiftID != nil {
+				if onDutyStatus(row.ShiftStatus, row.LeaveReason) && shiftID != nil {
 					if sh, err := clocks.get(ctx, *shiftID); err == nil && sh != nil {
 						start, end, overnight := temporal.Materialize(row.ShiftDate, sh.StartTime, sh.EndTime)
 						inst = &temporal.Instance{
@@ -149,6 +150,11 @@ func toolGetTeamStatus() Tool {
 
 				if isTarget || !exists {
 					m.Status = row.ShiftStatus
+					// Normalise the wire-contract form so the model reads a
+					// partial-day زمنية as 'hourly', not as a day on leave.
+					if row.ShiftStatus == "leave" && row.LeaveReason != nil && strings.HasPrefix(*row.LeaveReason, models.HourlyLeaveReasonPrefix) {
+						m.Status = "hourly"
+					}
 					if inst != nil {
 						m.Shift = inst.ShiftName
 						m.StartsAt = inst.StartAt.Format("2006-01-02 15:04")
@@ -252,7 +258,7 @@ func toolGetDepartmentOverview() Tool {
 					row := rows[i]
 					isToday := row.ShiftDate.Equal(today)
 
-					if onDutyStatus(row.ShiftStatus) {
+					if onDutyStatus(row.ShiftStatus, row.LeaveReason) {
 						shiftID := row.ShiftID
 						if shiftID == nil {
 							shiftID = row.DefaultShiftID
@@ -270,12 +276,13 @@ func toolGetDepartmentOverview() Tool {
 					if !isToday {
 						continue
 					}
-					switch row.ShiftStatus {
-					case "working":
+					switch {
+					case row.ShiftStatus == "working":
 						working++
-					case "hourly":
+					case row.ShiftStatus == "hourly",
+						row.ShiftStatus == "leave" && row.LeaveReason != nil && strings.HasPrefix(*row.LeaveReason, models.HourlyLeaveReasonPrefix):
 						hourly++
-					case "off":
+					case row.ShiftStatus == "off":
 						off++
 					default:
 						leave++
