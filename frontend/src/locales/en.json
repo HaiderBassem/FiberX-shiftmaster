@@ -651,8 +651,6 @@
   },
   "inbox": {
     "title": "Inbox",
-    "unread_one": "1 unread notification",
-    "unread_many": "{{count}} unread notifications",
     "all_caught_up": "All caught up!",
     "tab_notifications": "Notifications",
     "tab_notifications_short": "Notifs",
@@ -679,7 +677,9 @@
     "no_notifications": "No notifications yet",
     "empty_hint": "We'll notify you when something happens.",
     "no_announcements": "No announcements",
-    "no_announcements_hint": "Your department has no announcements yet."
+    "no_announcements_hint": "Your department has no announcements yet.",
+    "unread_one": "1 unread notification",
+    "unread_other": "{{count}} unread notifications"
   },
   "announcements": {
     "priority_critical": "Critical Announcement",

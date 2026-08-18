@@ -66,7 +66,7 @@ const ImageLightbox = ({ src, onClose }: { src: string; onClose: () => void }) =
       onClick={onClose}
     >
       <button
-        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
+        className="absolute top-4 end-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors z-10"
         onClick={onClose}
       >
         <X className="w-5 h-5" />
@@ -289,7 +289,7 @@ export const InboxPage = () => {
             <h1 className="text-xl sm:text-2xl font-bold text-foreground">{t('inbox.title')}</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">
               {unreadCount > 0
-                ? (unreadCount === 1 ? t('inbox.unread_one') : t('inbox.unread_many', { count: unreadCount }))
+                ? t('inbox.unread', { count: unreadCount })
                 : t('inbox.all_caught_up')}
             </p>
           </div>

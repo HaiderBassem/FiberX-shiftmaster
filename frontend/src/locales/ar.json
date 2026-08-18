@@ -651,8 +651,6 @@
   },
   "inbox": {
     "title": "صندوق الوارد",
-    "unread_one": "إشعار واحد غير مقروء",
-    "unread_many": "{{count}} إشعارات غير مقروءة",
     "all_caught_up": "ماكو شي جديد!",
     "tab_notifications": "الإشعارات",
     "tab_notifications_short": "إشعارات",
@@ -679,7 +677,13 @@
     "no_notifications": "لا توجد إشعارات بعد",
     "empty_hint": "راح ننبهك إذا صار شي جديد.",
     "no_announcements": "لا توجد إعلانات",
-    "no_announcements_hint": "بعد ماكو إعلانات لقسمك."
+    "no_announcements_hint": "بعد ماكو إعلانات لقسمك.",
+    "unread_zero": "ماكو إشعارات غير مقروءة",
+    "unread_one": "إشعار واحد غير مقروء",
+    "unread_two": "إشعاران غير مقروءين",
+    "unread_few": "{{count}} إشعارات غير مقروءة",
+    "unread_many": "{{count}} إشعاراً غير مقروء",
+    "unread_other": "{{count}} إشعار غير مقروء"
   },
   "announcements": {
     "priority_critical": "إعلان عاجل",
