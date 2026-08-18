@@ -3,6 +3,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strconv"
@@ -293,10 +294,14 @@ func loadLoggingConfig() LoggingConfig {
 }
 
 func loadCORSConfig() CORSConfig {
+	// The defaults must cover everything the frontend actually sends: it sets
+	// X-Department-ID on every request from an admin or manager, and several
+	// routes are PATCH. A deployment that relied on these defaults used to lose
+	// exactly those requests to preflight failures while everything else worked.
 	return CORSConfig{
-		AllowedOrigins:   getEnvSlice("CORS_ALLOWED_ORIGINS", "http://localhost:3000"),
-		AllowedHeaders:   getEnvSlice("CORS_ALLOWED_HEADERS", "Content-Type,Authorization,X-Request-ID"),
-		AllowedMethods:   getEnvSlice("CORS_ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS"),
+		AllowedOrigins:   getEnvSlice("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"),
+		AllowedHeaders:   getEnvSlice("CORS_ALLOWED_HEADERS", "Content-Type,Authorization,X-Request-ID,X-Department-ID"),
+		AllowedMethods:   getEnvSlice("CORS_ALLOWED_METHODS", "GET,POST,PUT,PATCH,DELETE,OPTIONS"),
 		AllowCredentials: getEnvBool("CORS_ALLOW_CREDENTIALS", true),
 		MaxAge:           getEnvInt("CORS_MAX_AGE", 86400),
 	}
@@ -746,7 +751,9 @@ func getEnvInt(key string, defaultValue int) int {
 }
 
 // getEnvBoolPtr parses an optional boolean: nil when the variable is unset or
-// unparsable, so callers can distinguish "not configured" from "false".
+// unparsable, so callers can distinguish "not configured" from "false". An
+// unparsable value is reported rather than silently ignored — a typo like
+// COOKIE_SECURE=yes must not quietly fall back to automatic behaviour.
 func getEnvBoolPtr(key string) *bool {
 	raw, ok := os.LookupEnv(key)
 	if !ok {
@@ -754,6 +761,7 @@ func getEnvBoolPtr(key string) *bool {
 	}
 	v, err := strconv.ParseBool(strings.TrimSpace(raw))
 	if err != nil {
+		log.Printf("WARN: %s=%q is not a valid boolean (true/false); treating it as unset", key, raw)
 		return nil
 	}
 	return &v

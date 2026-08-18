@@ -34,9 +34,9 @@ func (f *fixture) newLeaveService(t *testing.T, now time.Time) *LeaveService {
 		repository.NewShiftRepository(f.db),
 		repository.NewLeaveBalanceRepository(f.db),
 		repository.NewLeaveTypeRepository(f.db),
-		NewNotificationService(repository.NewNotificationRepository(f.db)),
+		// push: nil is a supported configuration and must never panic
+		NewNotificationService(repository.NewNotificationRepository(f.db), nil),
 		NewEmailService(config.GraphAPIConfig{}),
-		nil, // push: nil is a supported configuration and must never panic
 	)
 	svc.now = func() time.Time { return now }
 	return svc

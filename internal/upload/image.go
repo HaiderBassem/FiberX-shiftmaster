@@ -252,19 +252,31 @@ func decodeAndReencode(data []byte, format Format) ([]byte, int, int, error) {
 	return nil, 0, 0, fmt.Errorf("%w: %s", ErrFormatBlocked, format.Name)
 }
 
+// legacyServeTypes are extensions the sanitizer never produces but that the
+// pre-validation uploaders accepted and stored. They are passive raster
+// formats with no script capability, so serving them with a pinned type,
+// nosniff and the sandbox CSP is safe — refusing them would strand legacy
+// files for no security gain. This table must never grow a type a browser can
+// execute (svg, html, xml, pdf).
+var legacyServeTypes = map[string]string{
+	"webp": "image/webp",
+	"bmp":  "image/bmp",
+}
+
 // ContentTypeForExt returns the Content-Type an already-stored file should be
-// served with, and whether the extension is one this package produces. Serving
-// code uses it instead of inferring a type from the filename, so a file that
-// predates this validation can never be served as text/html.
+// served with, and whether the extension is one this package produces (or a
+// harmless legacy type it once accepted). Serving code uses it instead of
+// inferring a type from the filename, so a file that predates this validation
+// can never be served as text/html.
 func ContentTypeForExt(ext string) (string, bool) {
 	ext = strings.ToLower(strings.TrimPrefix(ext, "."))
-	canonical, ok := extAliases[ext]
-	if !ok {
-		return "", false
+	if canonical, ok := extAliases[ext]; ok {
+		if format, ok := supportedFormats[canonical]; ok {
+			return format.ContentType, true
+		}
 	}
-	format, ok := supportedFormats[canonical]
-	if !ok {
-		return "", false
+	if ct, ok := legacyServeTypes[ext]; ok {
+		return ct, true
 	}
-	return format.ContentType, true
+	return "", false
 }

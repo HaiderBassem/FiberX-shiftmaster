@@ -61,6 +61,8 @@
 					replace token REDACTED
 					replace access_token REDACTED
 					replace refresh_token REDACTED
+					# Signed upload URLs carry their credential in "sig".
+					replace sig REDACTED
 				}
 			}
 		}

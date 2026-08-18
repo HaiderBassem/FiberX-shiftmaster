@@ -147,12 +147,12 @@ func (h *harness) buildDeps(clock temporal.Clock) *Deps {
 	notifRepo := repository.NewNotificationRepository(db)
 	swapRepo := repository.NewSwapRepository(db)
 
-	notifSvc := service.NewNotificationService(notifRepo)
+	notifSvc := service.NewNotificationService(notifRepo, nil)
 	emailSvc := service.NewEmailService(config.GraphAPIConfig{})
 	securitySvc := service.NewSecurityService(repository.NewSecurityRepository(db), 10, time.Minute)
 	authSvc := service.NewAuthService(employeeRepo, securitySvc, 10, 5, time.Minute)
 	scheduleSvc := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifSvc, emailSvc, db)
-	leaveSvc := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, shiftRepo, leaveBalanceRepo, leaveTypeRepo, notifSvc, emailSvc, nil)
+	leaveSvc := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, shiftRepo, leaveBalanceRepo, leaveTypeRepo, notifSvc, emailSvc)
 	taskSvc := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	swapSvc := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifSvc, emailSvc, db)
 

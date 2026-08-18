@@ -373,3 +373,27 @@ func TestContentTypeForExt(t *testing.T) {
 		}
 	}
 }
+
+// Legacy uploaders stored webp and bmp files before validation existed; they
+// must stay servable (passive raster types), while active content stays out.
+func TestContentTypeForExtLegacyTypes(t *testing.T) {
+	cases := []struct {
+		ext  string
+		want string
+		ok   bool
+	}{
+		{".webp", "image/webp", true},
+		{".WEBP", "image/webp", true},
+		{".bmp", "image/bmp", true},
+		{".svg", "", false},
+		{".html", "", false},
+		{".pdf", "", false},
+		{".png", "image/png", true},
+	}
+	for _, c := range cases {
+		got, ok := ContentTypeForExt(c.ext)
+		if got != c.want || ok != c.ok {
+			t.Errorf("ContentTypeForExt(%q) = (%q, %v), want (%q, %v)", c.ext, got, ok, c.want, c.ok)
+		}
+	}
+}

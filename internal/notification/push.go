@@ -76,12 +76,14 @@ func (s *pushService) send(ctx context.Context, subs []models.PushSubscription, 
 			log.Printf("Failed to send push to endpoint %s: %v", sub.Endpoint, err)
 			continue
 		}
-		defer res.Body.Close()
 
 		if res.StatusCode == 410 || res.StatusCode == 404 {
 			// Subscription is no longer valid, delete it
 			_ = s.repo.DeletePushSubscription(ctx, sub.Endpoint)
 		}
+		// Closed per iteration; a deferred close here would hold every response
+		// body open until the whole fan-out finishes.
+		res.Body.Close()
 	}
 	return nil
 }

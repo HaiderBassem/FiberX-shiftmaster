@@ -74,14 +74,15 @@ func main() {
 		cfg.Security.MaxLoginAttempts,
 		cfg.Security.LockoutDuration(),
 	)
-	notifService := service.NewNotificationService(notifRepo)
+	// The push service must exist before the notification service: every
+	// persisted notification is delivered in real time through it.
+	pushService := notification.NewPushService(notifRepo, employeeRepo, cfg.VAPID)
+	notifService := service.NewNotificationService(notifRepo, pushService)
 	emailService := service.NewEmailService(cfg.GraphAPI)
 	employeeService := service.NewEmployeeService(employeeRepo, departmentRepo, authService)
 	scheduleService := service.NewScheduleService(scheduleRepo, employeeRepo, shiftRepo, leaveRepo, notifService, emailService, db)
 
-	pushService := notification.NewPushService(notifRepo, employeeRepo, cfg.VAPID)
-
-	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, shiftRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService, pushService)
+	leaveService := service.NewLeaveService(leaveRepo, employeeRepo, departmentRepo, scheduleRepo, shiftRepo, leaveBalanceRepo, leaveTypeRepo, notifService, emailService)
 	swapService := service.NewSwapService(swapRepo, scheduleRepo, employeeRepo, taskRepo, notifService, emailService, db)
 	taskService := service.NewTaskService(taskRepo, boardRepo, employeeRepo, scheduleRepo)
 	auditService := service.NewAuditService(auditRepo)
@@ -159,7 +160,7 @@ func main() {
 	leaveTypeHandler := handlers.NewLeaveTypeHandler(leaveTypeService)
 	infoTableHandler := handlers.NewInfoTableHandler(infoTableService)
 	helpDocHandler := handlers.NewHelpDocumentHandler(helpDocService)
-	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService)
+	announcementHandler := handlers.NewAnnouncementHandler(announcementRepo, announcementService, cfg.Upload)
 	pushHandler := handlers.NewPushHandler(notifRepo, cfg.VAPID)
 	handoverHandler := handlers.NewHandoverHandler(handoverRepo, employeeRepo, shiftRepo, scheduleRepo, notifService)
 	uploadHandler := handlers.NewUploadHandler(cfg.Upload)
