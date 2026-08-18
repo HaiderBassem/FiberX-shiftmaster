@@ -187,3 +187,34 @@ func TestAnnouncementExistingImagesAreFiltered(t *testing.T) {
 		}
 	}
 }
+
+// Traversal-shaped or query-bearing strings must not survive the gate even
+// with a valid prefix, and the legacy JSON path is gated identically.
+func TestAnnouncementImageGateRejectsTraversalAndJSONPath(t *testing.T) {
+	for _, bad := range []string{
+		"/api/uploads/../../etc/passwd",
+		"/uploads/images/x.png?sig=abc",
+		"/api/uploads/images/x.png#frag",
+		"/api/uploads/images/..\\x.png",
+	} {
+		if storedUploadPath(bad) {
+			t.Errorf("storedUploadPath(%q) = true, want false", bad)
+		}
+	}
+	if !storedUploadPath("/api/uploads/announcements/ab_12 photo.png") {
+		t.Error("legacy filename with space was rejected")
+	}
+
+	r, svc, _ := newAnnouncementRig(t, true)
+	body := `{"title":"t","message":"m","priority":"normal","images":["/api/uploads/images/ok.png","https://evil.example/x.png","/api/uploads/../secret.png"]}`
+	req := httptest.NewRequest(http.MethodPost, "/announcements", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body %s", rec.Code, rec.Body.String())
+	}
+	if len(svc.created.Images) != 1 || svc.created.Images[0] != "/api/uploads/images/ok.png" {
+		t.Errorf("JSON path images = %v, want only the valid stored path", svc.created.Images)
+	}
+}

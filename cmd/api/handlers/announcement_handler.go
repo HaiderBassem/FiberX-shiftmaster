@@ -87,11 +87,29 @@ func (h *AnnouncementHandler) GetAll(c *gin.Context) {
 // storedUploadPath reports whether s is a same-origin path into the
 // authenticated upload store — the only shape this application has ever
 // written into announcements.images. It is the validation gate for
-// "existing_images", which round-trips previously stored URLs through the
-// client on edit: anything else (absolute URLs, javascript:, data:) has no
-// legitimate way to appear there and is dropped.
+// client-supplied image URLs, which round-trip previously stored values
+// through the editor: anything else (absolute URLs, javascript:, data:,
+// traversal or query-bearing strings) has no legitimate way to appear there
+// and is dropped.
 func storedUploadPath(s string) bool {
-	return strings.HasPrefix(s, "/api/uploads/") || strings.HasPrefix(s, "/uploads/")
+	if !strings.HasPrefix(s, "/api/uploads/") && !strings.HasPrefix(s, "/uploads/") {
+		return false
+	}
+	if strings.Contains(s, "..") || strings.ContainsAny(s, "?#\\") {
+		return false
+	}
+	return true
+}
+
+// filterStoredUploadPaths keeps only values storedUploadPath accepts.
+func filterStoredUploadPaths(urls []string) []string {
+	kept := urls[:0]
+	for _, u := range urls {
+		if storedUploadPath(u) {
+			kept = append(kept, u)
+		}
+	}
+	return kept
 }
 
 func (h *AnnouncementHandler) Create(c *gin.Context) {
@@ -112,11 +130,13 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 	var req models.Announcement
 
 	if contentType == "application/json" {
-		// Legacy JSON support (no images)
+		// Legacy JSON support. Image URLs arriving this way are client input
+		// too, and pass through the same gate as existing_images below.
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 			return
 		}
+		req.Images = filterStoredUploadPaths(req.Images)
 	} else {
 		// Multipart form data (with images)
 		req.Title = c.PostForm("title")
@@ -164,11 +184,7 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 		if existingImages := c.PostForm("existing_images"); existingImages != "" {
 			var urls []string
 			if err := json.Unmarshal([]byte(existingImages), &urls); err == nil {
-				for _, u := range urls {
-					if storedUploadPath(u) {
-						req.Images = append(req.Images, u)
-					}
-				}
+				req.Images = append(req.Images, filterStoredUploadPaths(urls)...)
 			}
 		}
 	}

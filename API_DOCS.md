@@ -232,6 +232,13 @@ The socket is a **signal**, not a delivery channel: on any frame the client
 refetches `/notifications`. Deduplication happens there, against notification
 ids, so an event arriving over both the socket and the poll is shown once.
 
+Every notification persisted through the notification service is also
+delivered in real time (WebSocket signal plus web push when subscribed) —
+domain services no longer opt in individually. A notification row may carry
+`action_url`, a same-origin path the client renders as the card's
+destination (e.g. `/approvals`, `/leaves`); it is also the web-push click
+target.
+
 Upgrades are refused unless the `Origin` header exactly matches an entry in
 `CORS_ALLOWED_ORIGINS`.
 
