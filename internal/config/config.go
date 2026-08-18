@@ -388,12 +388,21 @@ func (c *Config) CookieSecure() bool {
 	if len(c.CORS.AllowedOrigins) == 0 {
 		return false
 	}
+	// Loopback origins are debugging leftovers, not the address users browse
+	// on; a stray http://localhost entry must not strip Secure from a real
+	// HTTPS deployment.
+	sawPublic := false
 	for _, origin := range c.CORS.AllowedOrigins {
-		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(origin)), "https://") {
+		o := strings.ToLower(strings.TrimSpace(origin))
+		if strings.HasPrefix(o, "http://localhost") || strings.HasPrefix(o, "http://127.0.0.1") || strings.HasPrefix(o, "http://[::1]") {
+			continue
+		}
+		if !strings.HasPrefix(o, "https://") {
 			return false
 		}
+		sawPublic = true
 	}
-	return true
+	return sawPublic
 }
 
 // Validate checks all configuration values.

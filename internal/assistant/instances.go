@@ -82,6 +82,14 @@ func (d *Deps) instancesForRange(ctx context.Context, emp *models.Employee, from
 			continue
 		}
 		start, end, overnight := temporal.Materialize(row.ShiftDate, sh.StartTime, sh.EndTime)
+		// Normalise the wire-contract form at construction, so every consumer
+		// (get_current_shift, get_my_schedule, the hourly-leave anchor) reports
+		// a partial-day زمنية as 'hourly', never as a day on leave. The team
+		// tools normalise the same way.
+		status := row.ShiftStatus
+		if status == "leave" && row.LeaveReason != nil && strings.HasPrefix(*row.LeaveReason, models.HourlyLeaveReasonPrefix) {
+			status = "hourly"
+		}
 		out = append(out, temporal.Instance{
 			EmployeeShiftID: row.ID,
 			EmployeeID:      row.EmployeeID,
@@ -92,7 +100,7 @@ func (d *Deps) instancesForRange(ctx context.Context, emp *models.Employee, from
 			StartAt:         start,
 			EndAt:           end,
 			Overnight:       overnight,
-			Status:          row.ShiftStatus,
+			Status:          status,
 			CheckInAt:       row.CheckInTime,
 			CheckOutAt:      row.CheckOutTime,
 		})

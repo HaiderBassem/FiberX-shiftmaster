@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/google/uuid"
@@ -12,6 +14,9 @@ import (
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
 )
+
+// pushHTTPClient bounds every web-push request; one per process is enough.
+var pushHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 type PushService interface {
 	SendToEmployee(ctx context.Context, employeeID uuid.UUID, title, message, url string) error
@@ -70,6 +75,9 @@ func (s *pushService) send(ctx context.Context, subs []models.PushSubscription, 
 			VAPIDPrivateKey: s.config.PrivateKey,
 			TTL:             86400, // 24 hours TTL
 			Urgency:         webpush.UrgencyHigh,
+			// The library's default client has no timeout; a hung push
+			// endpoint would pin a delivery goroutine forever.
+			HTTPClient:      pushHTTPClient,
 		})
 
 		if err != nil {

@@ -808,6 +808,9 @@ func TestHourlyLeaveRowStaysOnDuty(t *testing.T) {
 	if !res.Active.BusinessDate.Equal(today) {
 		t.Fatalf("active business date = %v, want today", res.Active.BusinessDate)
 	}
+	if res.Active.Status != "hourly" {
+		t.Fatalf("instance status = %q, want 'hourly' — raw 'leave' makes the model report a full day off", res.Active.Status)
+	}
 
 	// A full-day leave, by contrast, must still take the day out.
 	if _, err := h.db.Exec(ctx,

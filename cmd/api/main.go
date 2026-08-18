@@ -145,7 +145,7 @@ func main() {
 	// discarded by the browser, which took every protected image down with it.
 	secureCookies := cfg.CookieSecure()
 	if cfg.Server.IsProduction() && !secureCookies {
-		log.Printf("WARN: cookies are issued without the Secure attribute because the deployment serves plain HTTP; put the site behind HTTPS when possible")
+		log.Printf("WARN: cookies are issued without the Secure attribute (COOKIE_SECURE is unset and CORS_ALLOWED_ORIGINS lists no public https:// origin); set COOKIE_SECURE=true if users reach the site over HTTPS")
 	}
 	authHandler := handlers.NewAuthHandler(authService, employeeService, cfg.JWT, secureCookies)
 	empHandler := handlers.NewEmployeeHandler(employeeService, leaveBalanceRepo, taskRepo, leaveRepo, departmentRepo, cfg.Upload)

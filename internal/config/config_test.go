@@ -157,6 +157,11 @@ func TestCookieSecureFollowsDeploymentScheme(t *testing.T) {
 		{"production over https", build("production", nil, "https://shift.example.com"), true},
 		{"production with mixed schemes", build("production", nil, "https://a.example", "http://b.example"), false},
 		{"production with no origins", build("production", nil), false},
+		// A leftover loopback debugging origin is not the address users browse
+		// on, and must not strip Secure from a genuinely-HTTPS deployment.
+		{"production https plus localhost leftover", build("production", nil, "https://a.example", "http://localhost:5173"), true},
+		{"production https plus 127.0.0.1 leftover", build("production", nil, "https://a.example", "http://127.0.0.1:3000"), true},
+		{"production with only loopback origins", build("production", nil, "http://localhost:5173"), false},
 		{"explicit override wins over https", build("production", boolPtr(false), "https://a.example"), false},
 		{"explicit override wins over http", build("production", boolPtr(true), "http://a.example"), true},
 	}
