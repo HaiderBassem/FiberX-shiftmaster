@@ -19,6 +19,14 @@ type LeaveBalance = {
   reset_cycle: string;
 };
 
+/** One leave type's balances, grouped so a monthly type renders as twelve rows. */
+type BalanceGroup = {
+  name: string;
+  unit: string;
+  reset_cycle: string;
+  balances: LeaveBalance[];
+};
+
 export const EmployeeLeaveBalances = ({ employeeId }: { employeeId: string }) => {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -73,7 +81,7 @@ export const EmployeeLeaveBalances = ({ employeeId }: { employeeId: string }) =>
         ) : (
           <div className="space-y-6">
             {Object.values(
-              balances?.reduce((acc: any, b: any) => {
+              balances?.reduce((acc: Record<string, BalanceGroup>, b: LeaveBalance) => {
                 if (!acc[b.leave_type_id]) {
                   acc[b.leave_type_id] = {
                     name: b.leave_type_name_en,
@@ -85,7 +93,7 @@ export const EmployeeLeaveBalances = ({ employeeId }: { employeeId: string }) =>
                 acc[b.leave_type_id].balances.push(b);
                 return acc;
               }, {}) || {}
-            ).map((group: any) => (
+            ).map((group) => (
               <div key={group.name} className="p-4 rounded-xl border border-border/50 bg-card shadow-sm">
                 <div className="flex items-center justify-between mb-4 border-b border-border/50 pb-3">
                   <h3 className="font-semibold text-lg text-foreground">{group.name}</h3>
@@ -96,7 +104,7 @@ export const EmployeeLeaveBalances = ({ employeeId }: { employeeId: string }) =>
                 
                 {group.reset_cycle === 'annual' ? (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-muted/30">
-                    {group.balances.map((b: any) => (
+                    {group.balances.map((b) => (
                       <div key={b.id} className="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-3">
                         <div>
                           <p className="text-sm text-muted-foreground">
@@ -136,7 +144,7 @@ export const EmployeeLeaveBalances = ({ employeeId }: { employeeId: string }) =>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                    {group.balances.sort((a: any, b: any) => a.month - b.month).map((b: any) => (
+                    {group.balances.sort((a, b) => a.month - b.month).map((b) => (
                       <div key={b.id} className="p-3 rounded-lg bg-muted/30 border border-border/40 flex flex-col gap-2">
                         <div className="flex justify-between items-center mb-1">
                           <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Month {b.month}</h4>

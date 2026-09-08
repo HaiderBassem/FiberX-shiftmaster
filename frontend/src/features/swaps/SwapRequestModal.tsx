@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
+import type { SwapEligibleEmployee } from '@/types/domain';
 
 export type SwapMode = 'off' | 'shift';
 
@@ -45,7 +46,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
         ? `/swaps/eligible-targets?date=${shiftDate}`
         : `/swaps/eligible-shift-targets?date=${shiftDate}`;
       const res = await api.get(endpoint);
-      return res.data?.data || [];
+      return (res.data?.data || []) as SwapEligibleEmployee[];
     },
     enabled: isOpen && !!shiftDate,
   });
@@ -179,7 +180,7 @@ export const SwapRequestModal: React.FC<SwapRequestModalProps> = ({
                       onChange={(e) => setTargetEmployeeId(e.target.value)}
                     >
                       <option value="">{t('swaps.select_colleague')}</option>
-                      {employees.map((emp: any) => (
+                      {employees.map((emp) => (
                         <option key={emp.id} value={emp.id}>
                           {emp.first_name} {emp.last_name}
                           {swapMode === 'shift' && emp.is_off ? ` (Off)` : ''}

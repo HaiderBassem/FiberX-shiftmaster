@@ -245,11 +245,11 @@ const InfoTableView: React.FC = () => {
                     {table.columns.sort((a, b) => a.order - b.order).map(col => (
                       <td key={col.id} className="px-6 py-4">
                         {col.type === 'link' && row.data[col.id] ? (
-                          <a href={row.data[col.id]} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">
+                          <a href={String(row.data[col.id])} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">
                             Link
                           </a>
                         ) : col.type === 'date' && row.data[col.id] ? (
-                          new Date(row.data[col.id]).toLocaleDateString()
+                          new Date(String(row.data[col.id])).toLocaleDateString()
                         ) : (
                           row.data[col.id] || '-'
                         )}

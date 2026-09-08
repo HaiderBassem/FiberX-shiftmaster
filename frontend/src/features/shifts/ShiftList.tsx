@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,7 +75,7 @@ export const ShiftList = () => {
       setShowCreate(false); setCreateShiftCode(''); setCreateName('');
       setCreateStart('08:00'); setCreateEnd('16:00'); setCreateColor('#0CCCCC');
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to create shift'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to create shift'),
   });
 
   const updateMutation = useMutation({
@@ -89,16 +89,16 @@ export const ShiftList = () => {
       });
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['shifts'] }); setEditId(null); },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update shift'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to update shift'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => { setError(null); await api.delete(`/shifts/${id}`); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['shifts'] }),
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to delete shift'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to delete shift'),
   });
 
-  const startEdit = (s: any) => {
+  const startEdit = (s: (typeof shiftsForUi)[number]) => {
     setEditId(s.id); setEditShiftCode(s.shift_code); setEditName(s.name);
     setEditStart(s.start_hm); setEditEnd(s.end_hm); setEditColor(s.color);
     setEditMinRest(s.min_rest_hours); setEditRequiresVehicle(!!s.requires_vehicle);
@@ -165,7 +165,7 @@ export const ShiftList = () => {
         <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">Failed to load shifts.</div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {shiftsForUi?.map((shift: any) => (
+          {shiftsForUi.map((shift) => (
             <Card key={shift.id} className="transition-all hover:shadow-md overflow-hidden relative group">
               <div className="absolute top-0 w-full h-1.5 transition-all group-hover:h-2" style={{ backgroundColor: shift.color }} />
               <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">

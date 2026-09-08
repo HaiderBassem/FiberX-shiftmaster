@@ -1,12 +1,32 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import type { ServiceCategory, ServicePlan } from './types';
 import { useTranslation } from 'react-i18next';
 import {
   ArrowRight, Plus, Pencil, Trash2, Wifi, Loader2, X,
   Clock, DollarSign, Zap, Server, Router, Cpu, StickyNote, Search, ToggleLeft, ToggleRight, ArrowUp, ArrowDown
 } from 'lucide-react';
+
+/**
+ * The plan form's own shape: numbers are held as strings while typing and
+ * parsed on submit, so this is not the Plan wire type.
+ */
+interface PlanForm {
+  name: string;
+  price: string;
+  duration_days: string;
+  speed: string;
+  data_cap: string;
+  connection_type: string;
+  installation_fee: string;
+  router_included: boolean;
+  description: string;
+  cabinet_notes: string;
+}
+
+/** The text fields `field()` can render; router_included is a checkbox. */
+type StringField = Exclude<keyof PlanForm, 'router_included'>;
 
 /* ─── Plan Detail Modal ────────────────────────────────── */
 function PlanDetailModal({ plan, onClose }: { plan: ServicePlan; onClose: () => void }) {
@@ -101,7 +121,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
   categoryId: string; initial?: ServicePlan | null; onClose: () => void; onSaved: () => void;
 }) {
   const { t } = useTranslation();
-  const [f, setF] = useState({
+  const [f, setF] = useState<PlanForm>({
     name: initial?.name ?? '',
     price: initial?.price?.toString() ?? '',
     duration_days: initial?.duration_days?.toString() ?? '30',
@@ -120,7 +140,7 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
   const [err, setErr] = useState('');
 
 
-  const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
+  const set = <K extends keyof PlanForm>(k: K, v: PlanForm[K]) => setF(p => ({ ...p, [k]: v }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,15 +162,15 @@ function PlanModal({ categoryId, initial, onClose, onSaved }: {
         await api.post(`/services/categories/${categoryId}/plans`, payload);
       }
       onSaved(); onClose();
-    } catch (e: any) {
-      setErr(e.response?.data?.error ?? t('services.error_occurred'));
+    } catch (e: unknown) {
+      setErr(apiError(e) ?? t('services.error_occurred'));
     } finally { setBusy(false); }
   };
 
-  const field = (label: string, key: string, type = 'text', placeholder = '') => (
+  const field = (label: string, key: StringField, type = 'text', placeholder = '') => (
     <div>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
-      <input type={type} value={(f as any)[key]} onChange={e => set(key, e.target.value)}
+      <input type={type} value={f[key]} onChange={e => set(key, e.target.value)}
         placeholder={placeholder}
         className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60" />
     </div>

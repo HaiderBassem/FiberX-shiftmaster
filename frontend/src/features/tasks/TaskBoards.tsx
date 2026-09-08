@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -168,8 +168,8 @@ const BoardListView = ({
       queryClient.invalidateQueries({ queryKey: ['board-stats'] });
       setBoardName(''); setBoardDesc(''); setShowForm(false); setError(null);
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to create board');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to create board');
     },
   });
 
@@ -184,8 +184,8 @@ const BoardListView = ({
       queryClient.invalidateQueries({ queryKey: ['boards'] });
       setEditId(null); setError(null);
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to update board');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to update board');
     },
   });
 
@@ -196,8 +196,8 @@ const BoardListView = ({
       queryClient.invalidateQueries({ queryKey: ['board-stats'] });
       setError(null);
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to delete board');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to delete board');
     },
   });
 
@@ -466,7 +466,7 @@ const BoardDetailView = ({
       queryClient.invalidateQueries({ queryKey: ['board-view'] });
       setTaskTitle(''); setTaskDesc(''); setTaskDays([]); setShowTaskForm(false); setError(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || 'Failed to create task'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to create task'),
   });
 
   const deleteTask = useMutation({
@@ -487,7 +487,7 @@ const BoardDetailView = ({
       queryClient.invalidateQueries({ queryKey: ['board-recurring', board.id] });
       setAssigningCell(null); setAssignTaskId(''); setError(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || 'Failed to assign recurring task'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to assign recurring task'),
   });
 
   const removeAssignment = useMutation({

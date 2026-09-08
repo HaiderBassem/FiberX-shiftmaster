@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,37 @@ import {
 } from 'lucide-react';
 import { addDays, addWeeks, format, startOfWeek } from 'date-fns';
 import { toast } from 'sonner';
+import type { Leave, Employee, EmployeeShift, Shift, PatternDay } from '@/types/domain';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-/** Pull the server's own message out of an axios error, so failures say what broke. */
-function describeError(err: any, fallback: string): string {
-  const detail = err?.response?.data?.error || err?.message;
+/**
+ * The parts of a scheduled row these helpers read. A row may be absent for a
+ * day the schedule has not materialised yet, which is why every one of them
+ * accepts null.
+ */
+type ScheduleRowLike =
+  | Partial<Pick<EmployeeShift, 'shift_status' | 'leave_reason' | 'shift_id'>>
+  | null
+  | undefined;
+
+/**
+ * A row in the day's roster: either a real scheduled record, or a stand-in for
+ * an active employee who has none yet and is therefore shown on their default
+ * shift. The stand-ins are marked so the UI can label them and refuse to offer
+ * actions that need a real record to act on.
+ */
+type RosterRow = Partial<EmployeeShift> &
+  Pick<EmployeeShift, 'employee_id' | 'shift_status'> & { id: string; _isVirtual?: boolean };
+
+/** The fallback, plus the server's own message when it sent one. */
+function describeError(err: unknown, fallback: string): string {
+  const detail = apiError(err);
   return detail ? `${fallback}: ${detail}` : fallback;
 }
 
 /** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
-function resolveDisplayStatus(row: any): string {
+function resolveDisplayStatus(row: ScheduleRowLike): string {
   const raw = String(row?.shift_status || '').toLowerCase();
   if (raw === 'leave' && row?.leave_reason && String(row.leave_reason).startsWith('[hourly]')) {
     return 'hourly';
@@ -32,7 +52,11 @@ function resolveDisplayStatus(row: any): string {
 }
 
 /** Resolve display status for a day when DB row may be missing (matches daily view virtual rows). */
-function resolveDayStatus(emp: any, row: any, dateStr: string): string {
+function resolveDayStatus(
+  emp: Pick<Employee, 'weekly_off_days' | 'default_shift_id'>,
+  row: ScheduleRowLike,
+  dateStr: string,
+): string {
   if (row?.shift_status) return resolveDisplayStatus(row);
   const dayOfWeek = new Date(`${dateStr}T12:00:00`).getDay();
   if (emp.weekly_off_days >= 0 && emp.weekly_off_days === dayOfWeek) return 'off';
@@ -40,7 +64,11 @@ function resolveDayStatus(emp: any, row: any, dateStr: string): string {
   return 'none';
 }
 
-function resolveShiftName(row: any, emp: any, shiftLookup: Record<string, any>): string | null {
+function resolveShiftName(
+  row: ScheduleRowLike,
+  emp: Pick<Employee, 'default_shift_id'> | null | undefined,
+  shiftLookup: Record<string, Shift>,
+): string | null {
   const shiftId = row?.shift_id || emp?.default_shift_id;
   if (!shiftId) return null;
   return shiftLookup[shiftId]?.name || 'Shift';
@@ -73,7 +101,7 @@ export const ScheduleView = () => {
     queryKey: ['schedules', viewDate, deptId],
     queryFn: async () => {
       const response = await api.get(`/schedules/daily?date=${viewDate}`);
-      return response.data?.data || [];
+      return (response.data?.data || []) as EmployeeShift[];
     },
   });
 
@@ -81,15 +109,15 @@ export const ScheduleView = () => {
     queryKey: ['employees', 'all', deptId],
     queryFn: async () => {
       const res = await api.get('/employees');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     },
   });
 
   const employees = useMemo(() => {
     if (!rawEmployees) return [];
     if (user?.role === 'admin') return rawEmployees;
-    if (user?.role === 'manager') return rawEmployees.filter((e: any) => e.role !== 'admin');
-    if (user?.role === 'team_leader') return rawEmployees.filter((e: any) => e.role !== 'admin' && e.role !== 'manager' && (e.role !== 'team_leader' || e.id === user.id));
+    if (user?.role === 'manager') return rawEmployees.filter(e => e.role !== 'admin');
+    if (user?.role === 'team_leader') return rawEmployees.filter(e => e.role !== 'admin' && e.role !== 'manager' && (e.role !== 'team_leader' || e.id === user.id));
     return rawEmployees;
   }, [rawEmployees, user]);
 
@@ -97,7 +125,7 @@ export const ScheduleView = () => {
     queryKey: ['shifts', deptId],
     queryFn: async () => {
       const res = await api.get('/shifts');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Shift[];
     },
   });
 
@@ -116,13 +144,13 @@ export const ScheduleView = () => {
   // Whether a roster edit updates the employee's fixed weekly pattern (repeats every
   // week) or applies to that date only. Permanent matches the long-standing behaviour.
   const [applyPermanently, setApplyPermanently] = useState(true);
-  const [patternEmployee, setPatternEmployee] = useState<any | null>(null);
+  const [patternEmployee, setPatternEmployee] = useState<Employee | null>(null);
 
   const { data: weeklyRows, isLoading: weeklyLoading, error: weeklyError } = useQuery({
     queryKey: ['schedules', 'weekly-matrix', weekStartKey, deptId, shifts?.length ?? 0],
     queryFn: async () => {
-      const shiftLookup: Record<string, any> = {};
-      (shifts || []).forEach((s: any) => { shiftLookup[s.id] = s; });
+      const shiftLookup: Record<string, Shift> = {};
+      (shifts || []).forEach(s => { shiftLookup[s.id] = s; });
 
       const dates = weekDays.map((d) => format(d, 'yyyy-MM-dd'));
       // A rejected day used to become an empty array, so a failing API silently
@@ -130,15 +158,15 @@ export const ScheduleView = () => {
       const dayResponses = await Promise.all(
         dates.map((d) => api.get(`/schedules/daily?date=${d}`)),
       );
-      const dayMap: Record<string, any[]> = {};
+      const dayMap: Record<string, EmployeeShift[]> = {};
       dates.forEach((d, idx) => {
         dayMap[d] = dayResponses[idx]?.data?.data || [];
       });
 
-      const emps = (employees || []).filter((e: any) => !e.status || e.status.toLowerCase() === 'active');
-      return emps.map((emp: any) => {
+      const emps = (employees || []).filter(e => !e.status || e.status.toLowerCase() === 'active');
+      return emps.map(emp => {
         const days = dates.map((d) => {
-          const row = (dayMap[d] || []).find((r: any) => String(r.employee_id) === String(emp.id));
+          const row = (dayMap[d] || []).find(r => String(r.employee_id) === String(emp.id));
           const status = resolveDayStatus(emp, row, d);
           return {
             date: d,
@@ -156,36 +184,49 @@ export const ScheduleView = () => {
   const filteredWeeklyRows = useMemo(() => {
     const rows = weeklyRows || [];
     if (!filterShiftId) return rows;
-    return rows.filter((row: any) => row?.employee?.default_shift_id === filterShiftId);
+    return rows.filter(row => row?.employee?.default_shift_id === filterShiftId);
   }, [weeklyRows, filterShiftId]);
 
   const { data: pendingLeaves } = useQuery({
     queryKey: ['leaves', 'pending', 'schedule-panel', deptId],
     queryFn: async () => {
       const res = await api.get('/leaves/pending');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Leave[];
     },
     enabled: isSupervisor,
   });
 
+  // The day-long requests among the pending ones, for the alerts panel below.
+  //
+  // This used to filter on `leave_type === 'annual' || leave_type === 'vacation'`.
+  // There is no `leave_type` field on the wire — a leave carries
+  // `leave_type_id`, `leave_type_name_ar/_en` and `leave_type_is_hourly` — so
+  // the comparison was undefined against a string, the list was empty every
+  // time, and the panel showed "No pending vacation requests" no matter how
+  // many were waiting. Matching on the type NAME would be just as fragile,
+  // because leave types are named by whoever configures them; `is_hourly` is
+  // the property that actually separates a زمنية from a day off, and a day
+  // off is what this panel means by a vacation request.
+  const dayLeaveAlerts = (pendingLeaves || []).filter(l => !l.leave_type_is_hourly);
+
   const employeeMap = useMemo(() => {
-    const m: Record<string, any> = {};
-    (employees || []).forEach((e: any) => { m[e.id] = e; });
+    const m: Record<string, Employee> = {};
+    (employees || []).forEach(e => { m[e.id] = e; });
     return m;
   }, [employees]);
 
   const shiftMap = useMemo(() => {
-    const m: Record<string, any> = {};
-    (shifts || []).forEach((s: any) => { m[s.id] = s; });
+    const m: Record<string, Shift> = {};
+    (shifts || []).forEach(s => { m[s.id] = s; });
     return m;
   }, [shifts]);
 
-  const shiftsByShift: Record<string, any[]> = useMemo(() => {
-    const groups: Record<string, any[]> = {};
+  const shiftsByShift: Record<string, RosterRow[]> = useMemo(() => {
+    const groups: Record<string, RosterRow[]> = {};
 
     // Track which employees already have a real DB record for this day
     const coveredEmployeeIds = new Set<string>();
-    (activeSchedule || []).forEach((es: any) => {
+    (activeSchedule || []).forEach(es => {
       const emp = employeeMap[es.employee_id];
       if (!emp) return; // Ignore shifts for employees outside of our allowed scope/department
       
@@ -197,7 +238,7 @@ export const ScheduleView = () => {
     });
 
     // Add virtual rows for active employees with no record today
-    (employees || []).forEach((emp: any) => {
+    (employees || []).forEach(emp => {
       if (emp.status && emp.status.toLowerCase() !== 'active') return;
       if (coveredEmployeeIds.has(String(emp.id))) return; // already has a real row
       const key = emp.default_shift_id || 'off_no_shift';
@@ -208,11 +249,12 @@ export const ScheduleView = () => {
         employee_id: emp.id,
         shift_id: emp.default_shift_id || null,
         shift_status: 'working',
+        leave_reason: null,
         _isVirtual: true,
       });
     });
 
-    Object.values(groups).forEach((list) => list.sort((a: any, b: any) => (a.employee_id || '').localeCompare(b.employee_id || '')));
+    Object.values(groups).forEach((list) => list.sort((a, b) => (a.employee_id || '').localeCompare(b.employee_id || '')));
     return groups;
   }, [activeSchedule, employees, filterShiftId]);
 
@@ -220,7 +262,7 @@ export const ScheduleView = () => {
     const base = { working: 0, off: 0, leave: 0, vacation: 0, hourly: 0, other: 0, total: 0 };
     // Count real DB rows
     const coveredIds = new Set<string>();
-    (activeSchedule || []).forEach((es: any) => {
+    (activeSchedule || []).forEach(es => {
       if (!employeeMap[es.employee_id]) return; // Skip out-of-scope employees
       coveredIds.add(String(es.employee_id));
       base.total++;
@@ -233,7 +275,7 @@ export const ScheduleView = () => {
       else base.other++;
     });
     // Count virtual rows (employees with no record = assumed working)
-    (employees || []).forEach((emp: any) => {
+    (employees || []).forEach(emp => {
       if ((!emp.status || emp.status.toLowerCase() === 'active') && !coveredIds.has(String(emp.id))) {
         base.total++;
         base.working++;
@@ -265,8 +307,8 @@ export const ScheduleView = () => {
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
       setSetEmployeeId(''); setSetShiftId('');
     },
-    onError: (err: any) => {
-      setSetError(err?.response?.data?.error || err?.message || 'Failed to set shift');
+    onError: (err: unknown) => {
+      setSetError(describeError(err, 'Failed to set shift'));
     },
   });
 
@@ -284,7 +326,7 @@ export const ScheduleView = () => {
       toast.success(applyPermanently ? 'Off day saved — repeats every week' : 'Off day saved for this date');
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => toast.error(describeError(err, 'Could not set the off day')),
+    onError: (err: unknown) => toast.error(describeError(err, 'Could not set the off day')),
   });
 
   const setWorkingQuick = useMutation({
@@ -298,7 +340,7 @@ export const ScheduleView = () => {
       toast.success(applyPermanently ? 'Shift saved — repeats every week' : 'Shift saved for this date');
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => toast.error(describeError(err, 'Could not assign the shift')),
+    onError: (err: unknown) => toast.error(describeError(err, 'Could not assign the shift')),
   });
 
   const deleteShift = useMutation({
@@ -309,7 +351,7 @@ export const ScheduleView = () => {
       toast.success('Assignment cleared');
       queryClient.invalidateQueries({ queryKey: ['schedules'] });
     },
-    onError: (err: any) => toast.error(describeError(err, 'Could not clear the assignment')),
+    onError: (err: unknown) => toast.error(describeError(err, 'Could not clear the assignment')),
   });
 
   return (
@@ -341,7 +383,7 @@ export const ScheduleView = () => {
               <Filter className="w-4 h-4 text-muted-foreground absolute left-3 top-3" />
               <select className={selectClass + " pl-9"} value={filterShiftId} onChange={(e) => setFilterShiftId(e.target.value)}>
                 <option value="">All shifts</option>
-                {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
+                {shifts?.map(s => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
               </select>
             </div>
           </div>
@@ -376,12 +418,12 @@ export const ScheduleView = () => {
                 <Label>Employee</Label>
                 <select className={selectClass} value={setEmployeeId} onChange={(e) => setSetEmployeeId(e.target.value)}>
                   <option value="">Select employee…</option>
-                  {(employees || []).filter((e: any) => !e.status || e.status.toLowerCase() === 'active').map((e: any) => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
+                  {(employees || []).filter(e => !e.status || e.status.toLowerCase() === 'active').map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>)}
                 </select>
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <select className={selectClass} value={setShiftStatus} onChange={(e) => setSetShiftStatus(e.target.value as any)}>
+                <select className={selectClass} value={setShiftStatus} onChange={(e) => setSetShiftStatus(e.target.value as 'working' | 'off')}>
                   <option value="working">Working</option>
                   <option value="off">Off</option>
                 </select>
@@ -390,7 +432,7 @@ export const ScheduleView = () => {
                 <Label>Shift</Label>
                 <select className={selectClass} value={setShiftId} onChange={(e) => setSetShiftId(e.target.value)} disabled={setShiftStatus !== 'working'}>
                   <option value="">{setShiftStatus === 'working' ? 'Select shift…' : 'Not required'}</option>
-                  {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
+                  {shifts?.map(s => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
                 </select>
               </div>
             </div>
@@ -433,11 +475,11 @@ export const ScheduleView = () => {
               {Object.entries(shiftsByShift).map(([shiftId, rows]) => {
                 const shift = shiftMap[shiftId];
                 const title = shift ? `${shift.name} (${shift.shift_code})` : 'Off / No Shift';
-                const working = rows.filter((r: any) => r.shift_status === 'working').length;
-                const off = rows.filter((r: any) => r.shift_status === 'off').length;
-                const leave = rows.filter((r: any) => r.shift_status === 'leave').length;
-                const hourly = rows.filter((r: any) => r.shift_status === 'hourly').length;
-                const vacation = rows.filter((r: any) => r.shift_status === 'vacation').length;
+                const working = rows.filter(r => r.shift_status === 'working').length;
+                const off = rows.filter(r => r.shift_status === 'off').length;
+                const leave = rows.filter(r => r.shift_status === 'leave').length;
+                const hourly = rows.filter(r => r.shift_status === 'hourly').length;
+                const vacation = rows.filter(r => r.shift_status === 'vacation').length;
 
                 return (
                   <div key={shiftId} className="rounded-2xl border border-border overflow-hidden">
@@ -456,7 +498,7 @@ export const ScheduleView = () => {
                     </div>
 
                     <div className="divide-y divide-border">
-                      {rows.map((es: any) => {
+                      {rows.map(es => {
                         const emp = employeeMap[es.employee_id];
                         const name = emp ? `${emp.first_name} ${emp.last_name}` : 'Unknown Employee';
                         const code = emp?.employee_code || '';
@@ -601,7 +643,7 @@ export const ScheduleView = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredWeeklyRows.map((row: any) => (
+                  {filteredWeeklyRows.map(row => (
                     <tr key={row.employee.id} className="border-b border-border align-top">
                       <td className="p-3">
                         <div className="text-foreground font-medium">
@@ -619,7 +661,7 @@ export const ScheduleView = () => {
                           </button>
                         )}
                       </td>
-                      {row.days.map((d: any) => {
+                      {row.days.map(d => {
                         const tone =
                           d.status === 'working' ? 'text-emerald-500 border-emerald-500/30 bg-emerald-500/5'
                             : d.status === 'off' ? 'text-amber-500 border-amber-500/30 bg-amber-500/5'
@@ -668,7 +710,7 @@ export const ScheduleView = () => {
                                     </option>
                                     
                                     <optgroup label="Assign Shift">
-                                      {shifts?.map((s: any) => (
+                                      {shifts?.map(s => (
                                         <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>
                                       ))}
                                     </optgroup>
@@ -723,17 +765,14 @@ export const ScheduleView = () => {
             <CardDescription>Pending requests that need attention.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {pendingLeaves?.filter((l: any) => l.leave_type === 'annual' || l.leave_type === 'vacation').length > 0 ? (
-              pendingLeaves
-                .filter((l: any) => l.leave_type === 'annual' || l.leave_type === 'vacation')
-                .map((leave: any) => (
+            {dayLeaveAlerts.length > 0 ? (
+              dayLeaveAlerts.map(leave => (
                   <div key={leave.id} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
                     <span className="text-amber-500 font-medium">Vacation request:</span>{' '}
                     <span className="text-foreground font-semibold">
-                      {leave.employee_name ||
-                        (employeeMap[leave.employee_id]
-                          ? `${employeeMap[leave.employee_id].first_name} ${employeeMap[leave.employee_id].last_name}`
-                          : `Employee #${String(leave.employee_id).slice(0, 8)}`)}
+                      {employeeMap[leave.employee_id]
+                        ? `${employeeMap[leave.employee_id].first_name} ${employeeMap[leave.employee_id].last_name}`
+                        : `Employee #${String(leave.employee_id).slice(0, 8)}`}
                     </span>{' '}
                     <span className="text-muted-foreground">({leave.start_date?.split('T')[0]} → {leave.end_date?.split('T')[0]})</span>
                   </div>
@@ -759,8 +798,8 @@ const WeeklyPatternModal = ({
   onClose,
   onSaved,
 }: {
-  employee: any;
-  shifts: any[];
+  employee: Employee;
+  shifts: Shift[];
   onClose: () => void;
   onSaved: () => void;
 }) => {
@@ -771,14 +810,14 @@ const WeeklyPatternModal = ({
     queryKey: ['schedules', 'pattern', employee.id],
     queryFn: async () => {
       const res = await api.get(`/schedules/pattern/${employee.id}`);
-      return res.data?.data || [];
+      return (res.data?.data || []) as PatternDay[];
     },
   });
 
   useEffect(() => {
     if (!data) return;
     setDays(
-      data.map((d: any) => ({
+      data.map(d => ({
         day_of_week: d.day_of_week,
         is_off: !!d.is_off,
         shift_id: d.shift_id || null,
@@ -792,8 +831,8 @@ const WeeklyPatternModal = ({
       await api.put(`/schedules/pattern/${employee.id}`, { days });
     },
     onSuccess: onSaved,
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to save the weekly pattern');
+    onError: (err: unknown) => {
+      setError(describeError(err, 'Failed to save the weekly pattern'));
     },
   });
 
@@ -859,7 +898,7 @@ const WeeklyPatternModal = ({
                 >
                   <option value="">Select shift…</option>
                   <option value="off">Off day</option>
-                  {shifts.map((s: any) => (
+                  {shifts.map(s => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.shift_code})
                     </option>
@@ -923,7 +962,7 @@ const ReplacementButton = ({
     queryKey: ['replacements', date],
     queryFn: async () => {
       const res = await api.get(`/schedules/replacements?date=${date}`);
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     },
     enabled: open,
   });
@@ -938,7 +977,7 @@ const ReplacementButton = ({
           <div className="text-xs text-muted-foreground mb-2">Assign replacement for this shift</div>
           <select className={selectClass} value={selected} onChange={(e) => setSelected(e.target.value)} disabled={isLoading}>
             <option value="">Select employee…</option>
-            {replacements?.map((e: any) => (
+            {replacements?.map(e => (
               <option key={e.id} value={e.id}>{e.first_name} {e.last_name} — {e.employee_code}</option>
             ))}
           </select>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,19 +19,32 @@ import { toast } from 'sonner';
 import { fmtDateTime } from '@/lib/dateUtils';
 import { AnnouncementBanner } from '../announcements/AnnouncementBanner';
 import { AnnouncementTicker } from '../announcements/AnnouncementTicker';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend
 } from 'recharts';
 import { assetUrl } from '@/lib/assets';
+import type {
+  MyTaskRow,
+  EmployeeShift,
+  Shift,
+  AppNotification,
+  AuditLog,
+  Employee,
+  LeaveHistoryRow,
+  ShiftSwap,
+  TaskBoardStats,
+} from '@/types/domain';
 
 // An hourly leave occupies part of the day, not the day: it is stored as
 // 'leave' with a '[hourly] ' reason prefix (or as 'hourly' directly) — the
 // same wire contract the schedule and calendar views decode. Without this,
 // a one-hour زمنية painted the whole day as "on leave" and hid the employee
 // from the leader's Active Staff list.
-const isHourlyLeaveRow = (row: any): boolean => {
+const isHourlyLeaveRow = (
+  row: Pick<EmployeeShift, 'shift_status' | 'leave_reason'> | null | undefined,
+): boolean => {
   const raw = String(row?.shift_status || '').toLowerCase();
   if (raw === 'hourly') return true;
   return raw === 'leave' && !!row?.leave_reason && String(row.leave_reason).startsWith('[hourly]');
@@ -40,12 +53,12 @@ const isHourlyLeaveRow = (row: any): boolean => {
 // ───────────────────────────────────────────────────────────
 // Shared Animations
 // ───────────────────────────────────────────────────────────
-const containerVariants: any = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1 } }
 };
 
-const itemVariants: any = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
 };
@@ -60,7 +73,7 @@ const CompletionDialog = ({
   onComplete,
   isPending,
 }: {
-  task: any;
+  task: MyTaskRow;
   onClose: () => void;
   onComplete: (completionType: string, notes: string) => void;
   isPending: boolean;
@@ -165,13 +178,13 @@ const EmployeeDashboard = () => {
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
-  const [completingTask, setCompletingTask] = useState<any>(null);
+  const [completingTask, setCompletingTask] = useState<MyTaskRow | null>(null);
 
   const { data: weeklyTasks } = useQuery({
     queryKey: ['my-weekly-tasks', weekStart],
     queryFn: async () => {
       const res = await api.get(`/tasks/my-week?week_start=${weekStart}`);
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as MyTaskRow[];
     },
   });
 
@@ -180,7 +193,7 @@ const EmployeeDashboard = () => {
     queryKey: ['my-today-schedule', today],
     queryFn: async () => {
       const res = await api.get(`/schedules/daily?date=${today}`);
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as EmployeeShift[];
     },
   });
 
@@ -189,7 +202,7 @@ const EmployeeDashboard = () => {
     queryKey: ['shifts'],
     queryFn: async () => {
       const res = await api.get('/shifts');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as Shift[];
     },
   });
 
@@ -197,7 +210,7 @@ const EmployeeDashboard = () => {
     queryKey: ['notifications-unread'],
     queryFn: async () => {
       const res = await api.get('/notifications/unread');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as AppNotification[];
     },
   });
 
@@ -205,7 +218,7 @@ const EmployeeDashboard = () => {
     queryKey: ['activity'],
     queryFn: async () => {
       const res = await api.get('/activity');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as AuditLog[];
     },
   });
 
@@ -226,8 +239,7 @@ const EmployeeDashboard = () => {
     mutationFn: async (executionId: string) => { await api.post(`/tasks/executions/${executionId}/start`); },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-weekly-tasks'] }),
     onError: (err: unknown) => {
-      const detail = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(detail || t('dashboard.task_action_failed'));
+      toast.error(apiError(err) || t('dashboard.task_action_failed'));
     },
   });
 
@@ -243,25 +255,24 @@ const EmployeeDashboard = () => {
       setCompletingTask(null);
     },
     onError: (err: unknown) => {
-      const detail = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      toast.error(detail || t('dashboard.task_action_failed'));
+      toast.error(apiError(err) || t('dashboard.task_action_failed'));
     },
   });
 
   const totalTasks = weeklyTasks?.length || 0;
-  const completedTasks = (weeklyTasks || []).filter((t: any) => t.status === 'completed').length;
-  const inProgressTasks = (weeklyTasks || []).filter((t: any) => t.status === 'in_progress').length;
+  const completedTasks = (weeklyTasks || []).filter(t => t.status === 'completed').length;
+  const inProgressTasks = (weeklyTasks || []).filter(t => t.status === 'in_progress').length;
   const pendingTasks = totalTasks - completedTasks - inProgressTasks;
   const completionPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  const todayTasks = (weeklyTasks || []).filter((t: any) => t.assigned_date?.startsWith(today));
+  const todayTasks = (weeklyTasks || []).filter(t => t.assigned_date?.startsWith(today));
 
   // Resolve today's shift for the logged-in employee
-  const myTodayRow = (todayScheduleRows || []).find((r: any) => String(r.employee_id) === String(user?.id));
+  const myTodayRow = (todayScheduleRows || []).find(r => String(r.employee_id) === String(user?.id));
   const myTodayShift = (() => {
     const shiftId = myTodayRow?.shift_id;
     if (!shiftId) return null;
-    return (allShifts || []).find((s: any) => s.id === shiftId) || null;
+    return (allShifts || []).find(s => s.id === shiftId) || null;
   })();
   const myTodayStatus = isHourlyLeaveRow(myTodayRow) ? 'working' : myTodayRow?.shift_status || 'working';
   const myTodayHasHourlyLeave = isHourlyLeaveRow(myTodayRow);
@@ -290,19 +301,6 @@ const EmployeeDashboard = () => {
     { name: t('dashboard.active'), value: inProgressTasks, color: '#f59e0b' }, // amber-500
     { name: t('common.pending'), value: pendingTasks, color: '#64748b' }, // slate-500
   ].filter(d => d.value > 0);
-
-  const DashboardStats = () => (
-    <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-      {tasksEnabled && (
-        <>
-          <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label={t('dashboard.this_week')} value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
-          <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label={t('dashboard.completed')} value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
-          <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label={t('dashboard.progress')} value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
-        </>
-      )}
-      <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label={t('dashboard.notifications')} value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
-    </motion.div>
-  );
 
   return (
     <motion.div 
@@ -419,7 +417,16 @@ const EmployeeDashboard = () => {
         <AnnouncementBanner />
       </motion.div>
 
-      <DashboardStats />
+      <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        {tasksEnabled && (
+          <>
+            <StatCard icon={<CheckSquare className="w-6 h-6 text-primary" />} label={t('dashboard.this_week')} value={totalTasks} color="text-foreground" glowColor="rgba(12,204,204,0.15)" />
+            <StatCard icon={<CheckCircle2 className="w-6 h-6 text-emerald-500" />} label={t('dashboard.completed')} value={completedTasks} color="text-emerald-500" glowColor="rgba(16,185,129,0.15)" />
+            <StatCard icon={<TrendingUp className="w-6 h-6 text-primary" />} label={t('dashboard.progress')} value={`${completionPct}%`} color="text-primary" glowColor="rgba(12,204,204,0.15)" />
+          </>
+        )}
+        <StatCard icon={<AlertCircle className="w-6 h-6 text-amber-500" />} label={t('dashboard.notifications')} value={notifications?.length || 0} color="text-amber-500" glowColor="rgba(245,158,11,0.15)" />
+      </motion.div>
 
       {tasksEnabled && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -486,7 +493,7 @@ const EmployeeDashboard = () => {
                 </div>
               ) : (
                 <div className="space-y-3 overflow-y-auto max-h-[280px] pr-2 no-scrollbar">
-                  {todayTasks.map((task: any) => (
+                  {todayTasks.map(task => (
                     <motion.div 
                       key={task.assignment_id} 
                       whileHover={{ scale: 1.01 }}
@@ -553,7 +560,7 @@ const EmployeeDashboard = () => {
           <CardContent>
             {activity?.length ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                {activity.slice(0, 6).map((log: any) => (
+                {activity.slice(0, 6).map(log => (
                   <div
                     key={log.id}
                     className="flex items-start justify-between gap-4 p-4 rounded-xl bg-card border border-border/60 shadow-sm hover:border-primary/40 transition-colors"
@@ -594,7 +601,7 @@ const LeaderDashboard = () => {
     queryKey: ['all-employees-active'],
     queryFn: async () => {
       const res = await api.get('/employees?active=true');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as Employee[];
     },
   });
 
@@ -602,7 +609,7 @@ const LeaderDashboard = () => {
     queryKey: ['board-stats'],
     queryFn: async () => {
       const res = await api.get('/tasks/boards/stats');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as TaskBoardStats[];
     },
   });
 
@@ -610,7 +617,7 @@ const LeaderDashboard = () => {
     queryKey: ['shifts'],
     queryFn: async () => {
       const res = await api.get('/shifts');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as Shift[];
     },
   });
 
@@ -618,7 +625,7 @@ const LeaderDashboard = () => {
     queryKey: ['dashboard-leaves-history'],
     queryFn: async () => {
       const res = await api.get('/leaves/history');
-      return res.data?.data || [];
+      return (res.data?.data || []) as LeaveHistoryRow[];
     },
   });
 
@@ -626,7 +633,7 @@ const LeaderDashboard = () => {
     queryKey: ['dashboard-swaps-history'],
     queryFn: async () => {
       const res = await api.get('/swaps/history');
-      return res.data?.data || [];
+      return (res.data?.data || []) as ShiftSwap[];
     },
   });
 
@@ -634,7 +641,7 @@ const LeaderDashboard = () => {
     queryKey: ['dashboard-schedules-daily'],
     queryFn: async () => {
       const res = await api.get('/schedules/daily');
-      return res.data?.data || [];
+      return (res.data?.data || []) as EmployeeShift[];
     },
   });
 
@@ -642,23 +649,23 @@ const LeaderDashboard = () => {
     queryKey: ['notifications-unread'],
     queryFn: async () => {
       const res = await api.get('/notifications/unread');
-      return (res.data?.data || []) as any[];
+      return (res.data?.data || []) as AppNotification[];
     },
   });
 
 
-  const totalEmployees = (employees || []).filter((e: any) => e.role === 'employee').length;
+  const totalEmployees = (employees || []).filter(e => e.role === 'employee').length;
 
-  const shiftPieData = (shifts || []).map((s: any) => {
-    const count = (employees || []).filter((e: any) => e.default_shift_id === s.id && e.role === 'employee').length;
+  const shiftPieData = (shifts || []).map(s => {
+    const count = (employees || []).filter(e => e.default_shift_id === s.id && e.role === 'employee').length;
     return { name: s.name, value: count, color: s.color_code || '#0CCCCC' };
   }).filter(s => s.value > 0);
 
-  const totalBoardTasks = boardStats?.reduce((sum: number, b: any) => sum + b.total_assigned, 0) || 0;
-  const totalBoardDone = boardStats?.reduce((sum: number, b: any) => sum + b.total_completed, 0) || 0;
+  const totalBoardTasks = boardStats?.reduce((sum, b) => sum + b.total_assigned, 0) || 0;
+  const totalBoardDone = boardStats?.reduce((sum, b) => sum + b.total_completed, 0) || 0;
   const overallPct = totalBoardTasks > 0 ? Math.round((totalBoardDone / totalBoardTasks) * 100) : 0;
 
-  const boardBarData = (boardStats || []).map((b: any) => ({
+  const boardBarData = (boardStats || []).map(b => ({
     name: b.board_name,
     Completed: b.total_completed,
     Active: b.total_in_progress,
@@ -804,7 +811,7 @@ const LeaderDashboard = () => {
                 onChange={(e) => setSelectedShiftFilter(e.target.value)}
               >
                 <option value="all">{t('dashboard.all_shifts')}</option>
-                {shifts?.map((s: any) => (
+                {shifts?.map(s => (
                   <option key={s.id} value={s.id.toString()}>{s.name}</option>
                 ))}
               </select>
@@ -813,13 +820,13 @@ const LeaderDashboard = () => {
           <CardContent>
             {employees ? (() => {
               const todayStr = new Date().toISOString().split('T')[0];
-              const staff = employees.filter((e: any) => {
+              const staff = employees.filter(e => {
                 if (e.role !== 'employee') return false;
                 
                 let effectiveShiftId = e.default_shift_id;
                 
                 // Check for approved Swaps today
-                const todaysSwap = todaySwaps?.find((s: any) => 
+                const todaysSwap = todaySwaps?.find(s => 
                   s.shift_date?.startsWith(todayStr) && 
                   s.status === 'approved' &&
                   (s.requester_id === e.id || s.target_employee_id === e.id)
@@ -829,15 +836,23 @@ const LeaderDashboard = () => {
                    if (todaysSwap.requester_id === e.id) {
                       return false; // Swapped out, not working
                    } else if (todaysSwap.target_employee_id === e.id) {
-                      const requester = employees.find((req: any) => req.id === todaysSwap.requester_id);
+                      const requester = employees.find(req => req.id === todaysSwap.requester_id);
                       if (requester) effectiveShiftId = requester.default_shift_id;
                    }
                 }
 
                 // Check for approved Leaves today
-                const isOnLeave = todayLeaves?.some((l: any) => {
-                  if (l.employee_id !== e.id) return false;
-                  if (l.status !== 'approved' && l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
+                const isOnLeave = todayLeaves?.some(l => {
+                  // Matched on the employee CODE, because that is what this
+                  // endpoint gives us to match on. /leaves/history returns
+                  // LeaveHistoryRow, which identifies the person by name and
+                  // code and carries no employee_id at all — so the id compare
+                  // that used to be here read undefined on every row, was never
+                  // equal, and the whole check silently did nothing.
+                  if (l.employee_code !== e.employee_code) return false;
+                  // The only two approved states there are; an 'approved'
+                  // label was also tested for here and can never match.
+                  if (l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
                   const start = new Date(l.start_date).toISOString().split('T')[0];
                   const end = new Date(l.end_date).toISOString().split('T')[0];
                   return todayStr >= start && todayStr <= end;
@@ -846,7 +861,7 @@ const LeaderDashboard = () => {
                 if (isOnLeave) return false;
 
                 // Check for OFF schedules today
-                const todaySched = todaySchedules?.find((s: any) => s.employee_id === e.id && s.shift_date?.startsWith(todayStr));
+                const todaySched = todaySchedules?.find(s => s.employee_id === e.id && s.shift_date?.startsWith(todayStr));
                 if (todaySched) {
                     if (!isHourlyLeaveRow(todaySched) && (todaySched.shift_status === 'off' || todaySched.shift_status === 'leave' || todaySched.shift_status === 'vacation')) {
                         return false;
@@ -866,24 +881,24 @@ const LeaderDashboard = () => {
 
               return (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {staff.map((emp: any) => {
+                  {staff.map(emp => {
                     // Re-calculate effective shift for display based on schedules and swaps
                     let effectiveShiftId = emp.default_shift_id;
-                    const todaySched = todaySchedules?.find((s: any) => s.employee_id === emp.id && s.shift_date?.startsWith(todayStr));
+                    const todaySched = todaySchedules?.find(s => s.employee_id === emp.id && s.shift_date?.startsWith(todayStr));
                     if (todaySched && todaySched.shift_id) {
                         effectiveShiftId = todaySched.shift_id;
                     }
                     
-                    const todaysSwap = todaySwaps?.find((s: any) => s.shift_date?.startsWith(todayStr) && s.status === 'approved' && s.target_employee_id === emp.id);
+                    const todaysSwap = todaySwaps?.find(s => s.shift_date?.startsWith(todayStr) && s.status === 'approved' && s.target_employee_id === emp.id);
                     if (todaysSwap) {
-                        const requester = employees.find((req: any) => req.id === todaysSwap.requester_id);
+                        const requester = employees.find(req => req.id === todaysSwap.requester_id);
                         if (requester) {
-                           const reqSched = todaySchedules?.find((s: any) => s.employee_id === requester.id && s.shift_date?.startsWith(todayStr));
+                           const reqSched = todaySchedules?.find(s => s.employee_id === requester.id && s.shift_date?.startsWith(todayStr));
                            if (reqSched && reqSched.shift_id) effectiveShiftId = reqSched.shift_id;
                            else effectiveShiftId = requester.default_shift_id;
                         }
                     }
-                    const shift = shifts?.find((s: any) => s.id === effectiveShiftId);
+                    const shift = shifts?.find(s => s.id === effectiveShiftId);
                     
                     // Determine if the shift is active right now
                     let isActiveNow = false;

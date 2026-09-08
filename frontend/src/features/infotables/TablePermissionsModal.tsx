@@ -4,6 +4,7 @@ import { X, Search, Shield, UserCircle, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { Employee } from '@/types/domain';
 
 interface TablePermissionsModalProps {
   isOpen: boolean;
@@ -19,7 +20,7 @@ export const TablePermissionsModal = ({ isOpen, onClose }: TablePermissionsModal
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await api.get('/employees');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     },
     enabled: isOpen,
   });
@@ -37,7 +38,7 @@ export const TablePermissionsModal = ({ isOpen, onClose }: TablePermissionsModal
 
   const filteredEmployees = useMemo(() => {
     if (!employees) return [];
-    return employees.filter((emp: any) =>
+    return employees.filter((emp: Employee) =>
       `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(search.toLowerCase()) ||
       emp.employee_code.toLowerCase().includes(search.toLowerCase())
     );
@@ -81,7 +82,7 @@ export const TablePermissionsModal = ({ isOpen, onClose }: TablePermissionsModal
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredEmployees.map((emp: any) => (
+              {filteredEmployees.map((emp: Employee) => (
                 <div key={emp.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3">
                     <UserCircle className="w-8 h-8 text-muted-foreground" />

@@ -129,9 +129,17 @@ export default function AssistantPanel() {
 
   // Only two things hide the panel: the operator switched the feature off, and
   // the very first status request not having answered yet.
+  //
+  // A status request that FAILS is deliberately not one of them. It used to be
+  // — the panel returned null whenever it had no status, which folds "the
+  // operator turned this off" and "the status call did not come back" into the
+  // same silent disappearance, and the second one is a fault the person should
+  // be told about rather than a feature they never had. A failed call leaves
+  // `status` undefined below, which reads as `unavailable`, so the panel stays
+  // on the page and says so. The query keeps polling, so it heals by itself
+  // when the backend answers again.
   if (statusLoading && !status) return null;
-  if (status && status.state === 'disabled') return null;
-  if (!status && !statusLoading) return null;
+  if (status?.state === 'disabled') return null;
 
   const state = status?.state ?? 'unavailable';
   const ready = status?.ready === true;

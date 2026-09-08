@@ -12,6 +12,7 @@ import api from '@/lib/api';
 import { assetUrl } from '@/lib/assets';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/authStore';
+import type { Department, Ticket } from '@/types/domain';
 
 export const TicketList = () => {
   const { t, i18n } = useTranslation();
@@ -34,7 +35,7 @@ export const TicketList = () => {
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     }
   });
 
@@ -43,7 +44,7 @@ export const TicketList = () => {
     queryKey: ['tickets'],
     queryFn: async () => {
       const res = await api.get('/tickets');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Ticket[];
     },
     refetchInterval: 15000,
   });
@@ -141,8 +142,8 @@ export const TicketList = () => {
                 >
                   <option value="">{t('tickets.select_department')}</option>
                   {(departments || [])
-                    .filter((d: any) => d.id !== user?.department_id)
-                    .map((d: any) => (
+                    .filter((d) => d.id !== user?.department_id)
+                    .map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </select>
@@ -226,7 +227,7 @@ export const TicketList = () => {
           </div>
         )}
 
-        {tickets.map((ticket: any) => {
+        {tickets.map((ticket) => {
           const isExpanded = selectedTicketId === ticket.id;
           const isClosed = ticket.status === 'closed';
 
@@ -313,7 +314,7 @@ export const TicketList = () => {
 };
 
 // Extracted outside to prevent remounting on every parent render
-const TicketComments = ({ ticket }: { ticket: any }) => {
+const TicketComments = ({ ticket }: { ticket: Ticket }) => {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'ar' ? ar : enUS;
   const queryClient = useQueryClient();
@@ -365,7 +366,7 @@ const TicketComments = ({ ticket }: { ticket: any }) => {
 
       {/* Existing Comments */}
       <div className="space-y-4 mb-4">
-        {(ticket.comments || []).map((c: any) => (
+        {(ticket.comments || []).map((c) => (
           <div key={c.id} className="bg-muted/30 p-3 rounded-xl">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">

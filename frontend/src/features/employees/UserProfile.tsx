@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { CalendarDays, CheckSquare, Clock, User } from 'lucide-react';
 import { assetUrl } from '@/lib/assets';
+import type { ProfileStats } from '@/types/domain';
 
 export const UserProfile = () => {
   const { t, i18n } = useTranslation();
@@ -18,7 +19,7 @@ export const UserProfile = () => {
     queryKey: ['profile-stats'],
     queryFn: async () => {
       const response = await api.get('/employees/me/profile-stats');
-      return response.data?.data;
+      return response.data?.data as ProfileStats | undefined;
     },
   });
 
@@ -134,8 +135,8 @@ export const UserProfile = () => {
           <CardContent className="space-y-6">
             {stats?.leave_balances && stats.leave_balances.length > 0 ? (
               stats.leave_balances
-                .filter((b: any) => b.reset_cycle === 'annual' || b.month === new Date().getMonth() + 1)
-                .map((balance: any) => {
+                .filter((b) => b.reset_cycle === 'annual' || b.month === new Date().getMonth() + 1)
+                .map((balance) => {
                   const percentage = Math.min(((balance.used_amount + (balance.pending_amount || 0)) / balance.allocated_amount) * 100, 100) || 0;
                   const remaining = balance.allocated_amount - balance.used_amount - (balance.pending_amount || 0);
                   

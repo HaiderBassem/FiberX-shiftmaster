@@ -327,6 +327,14 @@ func (h *EmployeeHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": emp})
 }
 
+// The enum literals the employees table accepts, mirroring employee_status,
+// employee_role and gender_type in internal/database/migrations/002_types.sql.
+var (
+	validEmployeeStatus = map[string]bool{"active": true, "inactive": true, "on_leave": true, "terminated": true}
+	validEmployeeRole   = map[string]bool{"employee": true, "team_leader": true, "manager": true, "admin": true, "hr": true}
+	validGender         = map[string]bool{"male": true, "female": true}
+)
+
 type updateEmployeeRequest struct {
 	FirstName            string     `json:"first_name"`
 	LastName             string     `json:"last_name"`
@@ -461,6 +469,23 @@ func (h *EmployeeHandler) Update(c *gin.Context) {
 		if req.Gender == "" {
 			req.Gender = current.Gender
 		}
+	}
+
+	// These three columns are Postgres enums. An unknown literal is rejected by
+	// the database itself, which surfaces as a 500 carrying raw driver text, so
+	// the value is checked here and refused as the bad request it is. The
+	// dedicated status endpoint already does this; the general update did not.
+	if !validEmployeeStatus[req.Status] {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid status: " + req.Status})
+		return
+	}
+	if !validEmployeeRole[req.Role] {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid role: " + req.Role})
+		return
+	}
+	if !validGender[req.Gender] {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid gender: " + req.Gender})
+		return
 	}
 
 	emp := &models.Employee{
@@ -1004,7 +1029,9 @@ func (h *EmployeeHandler) GetProfileStats(c *gin.Context) {
 	if err == nil {
 		for _, l := range leaves {
 			switch l.Status {
-			case "approved", "approved_by_manager":
+			// Manager approval is the terminal approved state; "approved" is not
+			// one of the leave_status labels, so it never matched anything.
+			case "approved_by_manager":
 				if l.StartTime != nil && l.EndTime != nil {
 					totalHourlyLeavesTaken++
 				} else {

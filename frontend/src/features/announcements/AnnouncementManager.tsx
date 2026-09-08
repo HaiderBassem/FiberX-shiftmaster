@@ -356,7 +356,7 @@ export const AnnouncementManager: React.FC = () => {
                   <label className="mb-1 block text-sm font-medium">Priority</label>
                   <select
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
+                    onChange={(e) => setPriority(e.target.value as typeof priority)}
                     className="w-full rounded-md border p-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
                   >
                     <option value="info">Info</option>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, X, User, Save, Building2 } from 'lucide-react';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { fiberxDataService } from '../../services/fiberxDataService';
 import { Button } from '@/components/ui/button';
+import type { Employee, Department } from '@/types/domain';
 
 interface Props {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await api.get('/employees');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     },
     enabled: isOpen,
   });
@@ -37,7 +38,7 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     },
     enabled: isOpen,
   });
@@ -63,8 +64,8 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
       queryClient.invalidateQueries({ queryKey: ['fiberx-data'] });
       setSelectedEmployee('');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.error || 'Failed to update access');
+    onError: (err: unknown) => {
+      alert(apiError(err) || 'Failed to update access');
     },
   });
 
@@ -76,8 +77,8 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
       queryClient.invalidateQueries({ queryKey: ['fiberx-data'] });
       setSelectedDepartment('');
     },
-    onError: (err: any) => {
-      alert(err?.response?.data?.error || 'Failed to update share');
+    onError: (err: unknown) => {
+      alert(apiError(err) || 'Failed to update share');
     },
   });
 
@@ -144,7 +145,7 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
                     className="flex-1 px-3 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
                   >
                     <option value="">Select employee...</option>
-                    {employees.map((emp: any) => (
+                    {employees.map((emp) => (
                       <option key={emp.id} value={emp.id}>
                         {emp.first_name} {emp.last_name} ({emp.department_id ? 'Has Dept' : 'No Dept'})
                       </option>
@@ -240,7 +241,7 @@ export function FiberxDataPermissionsModal({ isOpen, onClose, documentId }: Prop
                     className="flex-1 px-3 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
                   >
                     <option value="">Select department...</option>
-                    {departments.map((dept: any) => (
+                    {departments.map((dept) => (
                       <option key={dept.id} value={dept.id}>
                         {dept.name}
                       </option>

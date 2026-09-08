@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -185,8 +185,8 @@ export const EmployeeList = () => {
       setCreatePosition(''); setCreateDept(''); setCreateShift('');
       setCreateSecPhone(''); setCreateSecEmail('');
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to create employee');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to create employee');
     },
   });
 
@@ -219,7 +219,7 @@ export const EmployeeList = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setEditId(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update employee'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to update employee'),
   });
 
   const deleteEmployee = useMutation({
@@ -228,7 +228,7 @@ export const EmployeeList = () => {
       await api.delete(`/employees/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to delete employee'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to delete employee'),
   });
 
   const startEdit = (emp: Employee) => {

@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/authStore';
 import api from '../../lib/api';
 import { ItemRequestModal } from './ItemRequestModal';
 import { ItemCategoryManager } from './ItemCategoryManager';
+import { apiError } from '@/lib/api';
 
 interface ItemRequest {
   id: string;
@@ -37,7 +38,7 @@ export const ItemList = () => {
   const cancelItemMutation = useMutation({
     mutationFn: async (id: string) => { await api.post(`/item-requests/${id}/cancel`); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['item-requests'] }); },
-    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel request'),
+    onError: (err: unknown) => alert(apiError(err) || 'Failed to cancel request'),
   });
 
   const pendingRequests = requests?.filter(r => r.status === 'pending') || [];

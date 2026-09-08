@@ -32,7 +32,7 @@ export const ItemCategoryManager = ({ isOpen, onClose }: ItemCategoryManagerProp
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Omit<Category, 'id'> & { id?: string }) => {
       if (data.id) {
         await api.put(`/item-requests/categories/${data.id}`, data);
       } else {
@@ -65,7 +65,7 @@ export const ItemCategoryManager = ({ isOpen, onClose }: ItemCategoryManagerProp
   const handleSave = () => {
     if (!formData.name.trim() || !formData.to_emails.trim()) return;
     saveMutation.mutate({
-      id: editingId === 'new' ? undefined : editingId,
+      id: editingId === 'new' || editingId === null ? undefined : editingId,
       name: formData.name,
       to_emails: formData.to_emails,
       cc_emails: formData.cc_emails.trim() ? formData.cc_emails : null,

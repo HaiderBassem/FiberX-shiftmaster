@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Key, ArrowLeft, Mail, Phone, Briefcase, Building2, CalendarDays, Users,
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { EmployeeLeaveBalances } from './EmployeeLeaveBalances';
 import { assetUrl } from '@/lib/assets';
+import type { EmployeeStatus } from '@/types/domain';
 
 type Employee = {
   id: string;
@@ -28,7 +29,7 @@ type Employee = {
   weekly_off_days: number;
   can_cover_night_shift: boolean;
   can_post_announcements: boolean;
-  status: string;
+  status: EmployeeStatus;
   last_login: string | null;
   secondary_phone: string | null;
   secondary_email: string | null;
@@ -68,7 +69,7 @@ export const EmployeeDetail = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Partial<Employee>) => {
       setError(null);
       await api.put(`/employees/${id}`, data);
     },
@@ -77,7 +78,7 @@ export const EmployeeDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsEditing(false);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to update'),
   });
 
   const deptMap = useMemo(() => {
@@ -267,10 +268,11 @@ export const EmployeeDetail = () => {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <select className={selectClass} value={editData.status || ''} onChange={(e) => setEditData({...editData, status: e.target.value})}>
+                <select className={selectClass} value={editData.status || ''} onChange={(e) => setEditData({...editData, status: e.target.value as EmployeeStatus})}>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
+                  <option value="on_leave">On Leave</option>
+                  <option value="terminated">Terminated</option>
                 </select>
               </div>
             </div>

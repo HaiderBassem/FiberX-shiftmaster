@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Clock, CheckCircle2, XCircle, Plus } from 'lucide-react';
@@ -9,9 +9,10 @@ import { fmtDate } from '@/lib/dateUtils';
 import { useAuthStore } from '@/store/authStore';
 import { LeaveTypeManager } from './LeaveTypeManager';
 import { LeaveRequestModal } from './LeaveRequestModal';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 import { useTranslation } from 'react-i18next';
+import type { Leave, LeaveType, LeaveBalance } from '@/types/domain';
 
 export const LeaveList = () => {
   const { user } = useAuthStore();
@@ -35,12 +36,12 @@ export const LeaveList = () => {
 
   const { data: leaves, isLoading } = useQuery({
     queryKey: ['leaves', 'me'],
-    queryFn: async () => { const response = await api.get('/leaves/me'); return response.data?.data || []; },
+    queryFn: async () => { const response = await api.get('/leaves/me'); return (response.data?.data || []) as Leave[]; },
   });
 
   const { data: leaveTypes, isLoading: isLoadingTypes } = useQuery({
     queryKey: ['leave-types', 'active'],
-    queryFn: async () => { const response = await api.get('/leave-types?active=true'); return response.data?.data || []; },
+    queryFn: async () => { const response = await api.get('/leave-types?active=true'); return (response.data?.data || []) as LeaveType[]; },
   });
 
   const { data: balances } = useQuery({
@@ -48,7 +49,7 @@ export const LeaveList = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       const res = await api.get(`/leaves/my-balances?year=${new Date(startDate).getFullYear()}`);
-      return res.data?.data || [];
+      return (res.data?.data || []) as LeaveBalance[];
     },
     enabled: !!user?.id && !!startDate,
   });
@@ -56,7 +57,7 @@ export const LeaveList = () => {
   const submitMutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      const payload: any = { leave_type_id: leaveTypeId || (leaveTypes?.[0]?.id), start_date: startDate, end_date: endDate, reason };
+      const payload: Record<string, string | undefined> = { leave_type_id: leaveTypeId || (leaveTypes?.[0]?.id), start_date: startDate, end_date: endDate, reason };
       if (isHourly) {
         payload.start_time = startTime;
         payload.end_time = endTime;
@@ -68,16 +69,16 @@ export const LeaveList = () => {
       setReason(''); setStartTime(''); setEndTime(''); 
       setIsModalOpen(false);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to submit leave'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to submit leave'),
   });
 
   const cancelLeaveMutation = useMutation({
     mutationFn: async (id: string) => { await api.post(`/leaves/${id}/cancel`); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['leaves'] }); },
-    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel leave request'),
+    onError: (err: unknown) => alert(apiError(err) || 'Failed to cancel leave request'),
   });
 
-  const selectedType = leaveTypes?.find((t: any) => t.id === (leaveTypeId || leaveTypes?.[0]?.id));
+  const selectedType = leaveTypes?.find((lt: LeaveType) => lt.id === (leaveTypeId || leaveTypes?.[0]?.id));
   const isHourly = selectedType?.unit === 'hours';
 
   // Find applicable balance
@@ -85,11 +86,11 @@ export const LeaveList = () => {
   let hasEnoughBalance = true;
   if (selectedType && balances) {
     const month = selectedType.reset_cycle === 'monthly' ? new Date(startDate).getMonth() + 1 : 0;
-    const balance = balances.find((b: any) => b.leave_type_id === selectedType.id && b.month === month);
+    const balance = balances.find((b: LeaveBalance) => b.leave_type_id === selectedType.id && b.month === month);
     
     let pendingAmount = 0;
     if (leaves) {
-      leaves.forEach((l: any) => {
+      leaves.forEach((l: Leave) => {
         if ((l.status === 'pending' || l.status === 'approved_by_team_leader') && l.leave_type_id === selectedType.id) {
           const lMonth = selectedType.reset_cycle === 'monthly' ? new Date(l.start_date).getMonth() + 1 : 0;
           if (lMonth === month) {
@@ -159,7 +160,7 @@ export const LeaveList = () => {
     }
   };
 
-  const containerVariants: any = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -167,7 +168,7 @@ export const LeaveList = () => {
     }
   };
 
-  const itemVariants: any = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
@@ -220,7 +221,7 @@ export const LeaveList = () => {
                   animate="show"
                   className="space-y-4"
                 >
-                  {leaves?.filter((l: any) => l.status === 'pending' || l.status === 'approved_by_team_leader').map((leave: any) => (
+                  {leaves?.filter((l: Leave) => l.status === 'pending' || l.status === 'approved_by_team_leader').map((leave: Leave) => (
                     <motion.div key={leave.id} variants={itemVariants}>
                       <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
                         <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -283,7 +284,7 @@ export const LeaveList = () => {
                     </motion.div>
                   ))}
                   
-                  {(!leaves || leaves.filter((l: any) => l.status === 'pending' || l.status === 'approved_by_team_leader').length === 0) && (
+                  {(!leaves || leaves.filter((l: Leave) => l.status === 'pending' || l.status === 'approved_by_team_leader').length === 0) && (
                     <motion.div variants={itemVariants}>
                       <Card className="border-dashed border-2 bg-transparent rounded-3xl">
                         <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">
@@ -304,7 +305,7 @@ export const LeaveList = () => {
                   animate="show"
                   className="space-y-4"
                 >
-                  {leaves?.filter((l: any) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').map((leave: any) => (
+                  {leaves?.filter((l: Leave) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').map((leave: Leave) => (
                     <motion.div key={leave.id} variants={itemVariants}>
                       <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
                         <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -354,7 +355,7 @@ export const LeaveList = () => {
                     </motion.div>
                   ))}
                   
-                  {(!leaves || leaves.filter((l: any) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').length === 0) && (
+                  {(!leaves || leaves.filter((l: Leave) => l.status !== 'pending' && l.status !== 'approved_by_team_leader').length === 0) && (
                     <motion.div variants={itemVariants}>
                       <Card className="border-dashed border-2 bg-transparent rounded-3xl">
                         <CardContent className="flex flex-col items-center justify-center py-10 text-muted-foreground">

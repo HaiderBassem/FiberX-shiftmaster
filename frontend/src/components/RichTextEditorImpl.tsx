@@ -3,6 +3,23 @@ import JoditEditor from 'jodit-react';
 import api from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 
+/** What POST /upload/image answers with. */
+interface UploadResponse {
+  success?: boolean;
+  data?: { url?: string };
+}
+
+/** The shape Jodit's own success handler is handed after `process`. */
+interface JoditUploadResult {
+  files?: string[];
+}
+
+/** The sliver of the Jodit editor `defaultHandlerSuccess` reaches for. */
+interface JoditInstance {
+  selection: { insertImage: (url: string, styles: null, width: number) => void };
+  options: { imageDefaultWidth: number };
+}
+
 export interface RichTextEditorProps {
   value: string;
   onChange: (value: string) => void;
@@ -45,10 +62,10 @@ const RichTextEditorImpl: React.FC<RichTextEditorProps> = ({
       headers: {
         Authorization: `Bearer ${token}`, // Pass the JWT token for auth
       },
-      isSuccess: (resp: any) => {
+      isSuccess: (resp: UploadResponse) => {
         return resp && resp.success;
       },
-      process: (resp: any) => {
+      process: (resp: UploadResponse) => {
         // Jodit expects this format by default if we don't map it properly, 
         // but we return {"success": true, "data": {"url": "..."}}
         if (resp && resp.success && resp.data && resp.data.url) {
@@ -62,17 +79,17 @@ const RichTextEditorImpl: React.FC<RichTextEditorProps> = ({
         }
         return resp;
       },
-      defaultHandlerSuccess: function (data: any) {
+      defaultHandlerSuccess: function (data: JoditUploadResult) {
         // 'this' is bound to Jodit's uploader instance inside defaultHandlerSuccess
         // We need to access the Jodit instance.
-        const j = (this as any).jodit;
+        const j = (this as unknown as { jodit: JoditInstance }).jodit;
         if (data && data.files && data.files.length) {
           data.files.forEach((url: string) => {
             j.selection.insertImage(url, null, j.options.imageDefaultWidth);
           });
         }
       },
-      error: (e: any) => {
+      error: (e: unknown) => {
         console.error('Image upload failed:', e);
       }
     },

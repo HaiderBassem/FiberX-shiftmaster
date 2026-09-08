@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { useNotification } from '@/providers/NotificationProvider';
 import { assetUrl } from '@/lib/assets';
+import type { Department, AppNotification } from '@/types/domain';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
   const { t, i18n } = useTranslation();
@@ -46,7 +47,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     },
     enabled: user?.role === 'admin',
   });
@@ -56,7 +57,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['my-managed-departments'],
     queryFn: async () => {
       const res = await api.get('/departments/my-managed');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     },
     enabled: user?.role === 'manager',
   });
@@ -66,12 +67,12 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await api.get('/notifications');
-      return res.data?.data || [];
+      return (res.data?.data || []) as AppNotification[];
     },
     enabled: !!user,
   });
   
-  const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
+  const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
 
   // Auto-select first managed department for managers on first load
   useEffect(() => {
@@ -118,7 +119,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
               }}
             >
               <option value="">{t('topbar.all_departments')}</option>
-              {allDepartments.map((d: any) => (
+              {allDepartments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -138,7 +139,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
                 switchDepartmentContext();
               }}
             >
-              {managedDepartments.map((d: any) => (
+              {managedDepartments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>

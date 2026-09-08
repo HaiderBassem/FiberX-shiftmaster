@@ -23,7 +23,8 @@ export type UUID = string;
 
 export type EmployeeRole = 'employee' | 'team_leader' | 'manager' | 'admin' | 'hr';
 
-export type EmployeeStatus = 'active' | 'inactive' | 'suspended';
+/** Mirrors the employee_status Postgres enum exactly; there is no 'suspended'. */
+export type EmployeeStatus = 'active' | 'inactive' | 'on_leave' | 'terminated';
 
 // ── Core entities ──────────────────────────────────────────────────────────
 
@@ -92,7 +93,20 @@ export interface Shift {
 
 // ── Scheduling ─────────────────────────────────────────────────────────────
 
-export type ShiftStatus = 'working' | 'off' | 'leave' | 'vacation' | 'hourly';
+/**
+ * employee_shifts.shift_status is the shift_status_type enum. All eight members
+ * are listed: a row can legitimately be sick, training or business_trip, and a
+ * union that omits them makes those days unrepresentable rather than impossible.
+ */
+export type ShiftStatus =
+  | 'working'
+  | 'off'
+  | 'leave'
+  | 'sick'
+  | 'vacation'
+  | 'training'
+  | 'business_trip'
+  | 'hourly';
 
 /**
  * Who authored a scheduled day. Mirrors models.ShiftSource*.
@@ -119,6 +133,17 @@ export interface EmployeeShift {
   source: ShiftSource;
   created_at: Timestamp;
   updated_at: Timestamp;
+}
+
+/**
+ * A scheduled row joined to the person it belongs to, as the department-wide
+ * endpoints return it. Mirrors models.EmployeeShiftExtended.
+ */
+export interface EmployeeShiftExtended extends EmployeeShift {
+  first_name: string;
+  last_name: string;
+  employee_role: EmployeeRole;
+  default_shift_id: UUID | null;
 }
 
 /** One weekday of an employee's repeating weekly pattern. */
@@ -176,6 +201,39 @@ export interface Leave {
   updated_at: Timestamp;
 }
 
+/** A single approval action with the approver's name. Mirrors models.LeaveApprovalDetail. */
+export interface LeaveApprovalDetail {
+  approver_name: string;
+  approver_role: string;
+  action: string;
+  notes: string | null;
+  created_at: Timestamp;
+}
+
+/**
+ * A row of the leave history list. Mirrors models.LeaveHistoryRow.
+ *
+ * Note this is NOT a Leave: the id is `leave_id`, the employee is identified by
+ * name and code rather than by id, and it carries the approval trail.
+ */
+export interface LeaveHistoryRow {
+  leave_id: UUID;
+  employee_name: string;
+  employee_code: string;
+  employee_profile_image: string | null;
+  leave_type_id: UUID;
+  leave_type_name_ar: string | null;
+  leave_type_name_en: string | null;
+  start_date: DateOnly;
+  end_date: DateOnly;
+  total_days: number;
+  reason: string | null;
+  status: LeaveStatus;
+  applied_date: DateOnly | null;
+  rejection_reason: string | null;
+  approvals: LeaveApprovalDetail[];
+}
+
 export interface LeaveBalance {
   id: UUID;
   employee_id: UUID;
@@ -192,12 +250,26 @@ export interface LeaveBalance {
   reset_cycle: 'annual' | 'monthly';
 }
 
+/** A swap candidate: an employee plus whether they are off on the target date. */
+export interface SwapEligibleEmployee extends Employee {
+  is_off: boolean;
+}
+
+/** The /employees/me/profile-stats payload. */
+export interface ProfileStats {
+  leave_balances: LeaveBalance[];
+  completed_tasks: number;
+  active_tasks: number;
+  total_leaves_taken: number;
+  total_hourly_leaves_taken: number;
+  worked_hours: number;
+}
+
 // ── Swaps ──────────────────────────────────────────────────────────────────
 
 export type SwapStatus =
   | 'pending'
   | 'employee_accepted'
-  | 'employee_rejected'
   | 'approved'
   | 'rejected'
   | 'cancelled';
@@ -211,15 +283,21 @@ export interface ShiftSwap {
   reason: string | null;
   status: SwapStatus;
   requester_name?: string;
-  target_name?: string;
+  /** The wire name is target_employee_name; models.ShiftSwap serialises it under that key. */
+  target_employee_name?: string;
   requester_profile_image?: string | null;
   target_profile_image?: string | null;
+  approved_by_team_leader?: UUID | null;
+  approved_by_manager?: UUID | null;
+  approval_date?: Timestamp | null;
   created_at: Timestamp;
+  updated_at?: Timestamp;
 }
 
 // ── Tasks ──────────────────────────────────────────────────────────────────
 
-export type TaskExecutionStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+/** task_executions.status is the task_status enum; there is no 'skipped'. */
+export type TaskExecutionStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
 
 export interface TaskBoard {
   id: UUID;
@@ -229,12 +307,26 @@ export interface TaskBoard {
   created_at: Timestamp;
 }
 
+/** Aggregate completion stats for one board. Mirrors models.TaskBoardStats. */
+export interface TaskBoardStats {
+  board_id: UUID;
+  board_name: string;
+  total_assigned: number;
+  total_pending: number;
+  total_in_progress: number;
+  total_completed: number;
+  completion_pct: number;
+}
+
 export interface TaskSchedule {
   id: UUID;
   board_id: UUID | null;
   title: string;
   description: string | null;
   recurrence: string | null;
+  /** Day-of-week indices, present when recurrence is 'weekly'. */
+  recurrence_days: number[] | null;
+  max_assignees: number;
   shift_id: UUID | null;
   is_active: boolean;
   created_at: Timestamp;
@@ -250,41 +342,109 @@ export interface TaskExecution {
   completed_at: Timestamp | null;
 }
 
+/**
+ * One row of "my tasks this week" — a task joined to its assignment, board and
+ * shift. Mirrors models.MyTaskRow.
+ *
+ * The title field is `task_title`, not `title`: this is a joined row, not a
+ * task record, and the board and shift names it carries are already resolved.
+ */
+export interface MyTaskRow {
+  assignment_id: UUID;
+  assigned_date: Timestamp;
+  task_title: string;
+  task_description: string | null;
+  board_name: string | null;
+  shift_name: string | null;
+  shift_code: string | null;
+  shift_color: string | null;
+  execution_id: UUID | null;
+  status: TaskExecutionStatus;
+  completion_type: string | null;
+  started_at: Timestamp | null;
+  completed_at: Timestamp | null;
+  notes: string | null;
+}
+
 // ── Cross-department ───────────────────────────────────────────────────────
 
 export type TicketStatus = 'open' | 'closed';
 
+/** One comment on a ticket. Mirrors models.TicketComment. */
+export interface TicketComment {
+  id: UUID;
+  ticket_id: UUID;
+  employee_id: UUID;
+  author_name: string;
+  author_image?: string | null;
+  comment: string;
+  /** A JSON-encoded array of image URLs, or null. */
+  attachments: string | null;
+  created_at: Timestamp;
+}
+
 export interface Ticket {
   id: UUID;
   title: string;
-  description: string | null;
+  description: string;
   source_department_id: UUID;
   target_department_id: UUID;
-  created_by: UUID;
+  /** The wire name is creator_id; models.Ticket serialises it under that key. */
+  creator_id: UUID;
   status: TicketStatus;
+  closed_by: UUID | null;
+  /** A JSON-encoded array of image URLs, or null. */
+  attachments: string | null;
   created_at: Timestamp;
-  closed_at: Timestamp | null;
+  updated_at: Timestamp;
+
+  // Joined for the UI; absent unless the handler filled them in.
+  creator_name?: string | null;
+  creator_profile_image?: string | null;
+  source_department?: string | null;
+  target_department?: string | null;
+  closed_by_name?: string | null;
+  comments?: TicketComment[];
 }
 
 export type HandoverStatus = 'open' | 'claimed' | 'completed';
 
+/** One comment on a handover. Mirrors models.HandoverComment. */
+export interface HandoverComment {
+  id: UUID;
+  employee_id: UUID;
+  author_name: string;
+  comment: string;
+  created_at: Timestamp;
+}
+
 export interface Handover {
   id: UUID;
   department_id: UUID;
-  shift_id: UUID | null;
-  created_by: UUID;
-  shift_summary: string | null;
-  pending_issues: string | null;
+  /** The wire name is creator_id; models.Handover serialises it under that key. */
+  creator_id: UUID;
+  shift_summary: string;
+  pending_issues: string;
   status: HandoverStatus;
   claimed_by: UUID | null;
-  claimer_notes: string | null;
   done_by: UUID | null;
   created_at: Timestamp;
+  updated_at: Timestamp;
+
+  // Joined for the UI; absent unless the handler filled them in.
+  creator_name?: string | null;
+  claimer_name?: string | null;
+  done_by_name?: string | null;
+  comments?: HandoverComment[];
 }
 
 // ── Notifications ──────────────────────────────────────────────────────────
 
-export type NotificationPriority = 'low' | 'normal' | 'medium' | 'high';
+/**
+ * notifications.priority is the notification_priority enum. Announcements carry
+ * their own info/normal/important/critical column and are not typed by this.
+ */
+export type NotificationPriority = 'low' | 'medium' | 'high';
 
 export interface AppNotification {
   id: UUID;
@@ -297,6 +457,64 @@ export interface AppNotification {
   priority: NotificationPriority;
   is_read: boolean;
   action_url: string | null;
+  created_at: Timestamp;
+}
+
+/**
+ * A pending leave with the joined detail the approval dashboard needs.
+ * Mirrors models.PendingLeaveRich.
+ */
+export interface PendingLeaveRich {
+  id: UUID;
+  employee_id: UUID;
+  leave_type_id: UUID;
+  leave_type_name_ar: string | null;
+  leave_type_name_en: string | null;
+  start_date: DateOnly;
+  end_date: DateOnly;
+  total_days: number;
+  reason: string | null;
+  status: LeaveStatus;
+  applied_date: DateOnly | null;
+  employee_name: string;
+  employee_code: string;
+  employee_profile_image: string | null;
+  default_shift_id: string;
+  shift_name: string;
+  shift_code: string;
+  department_name: string;
+  tl_approvals: number;
+  total_tls: number;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+/** An employee request for an item. Mirrors models.ItemRequest. */
+export interface ItemRequest {
+  id: UUID;
+  employee_id: UUID;
+  category_id: UUID;
+  description: string;
+  status: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+  category_name?: string | null;
+  employee_name?: string | null;
+}
+
+// ── Audit ──────────────────────────────────────────────────────────────────
+
+/** One recorded action. Mirrors models.AuditLog; the JSONB columns arrive as strings. */
+export interface AuditLog {
+  id: UUID;
+  employee_id: UUID | null;
+  action: string;
+  table_name: string;
+  record_id: UUID | null;
+  old_data: string | null;
+  new_data: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
   created_at: Timestamp;
 }
 

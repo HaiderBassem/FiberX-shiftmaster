@@ -622,18 +622,26 @@ func (s *LeaveService) ApproveByManager(ctx context.Context, leaveID uuid.UUID, 
 
 // CancelApprovedLeave cancels an already approved leave and reverts its effects.
 func (s *LeaveService) CancelApprovedLeave(ctx context.Context, leaveID uuid.UUID, cancelledBy uuid.UUID, role string) error {
-	// Only Managers can cancel manager-approved leaves. Team leaders can cancel TL-approved leaves (which are technically still pending final approval but have their shifts applied or wait).
-	// Actually, wait, leave status: "approved_by_team_leader", "approved_by_manager", "approved".
+	// Only managers can cancel a fully approved leave. Team leaders may cancel
+	// one they approved themselves, which is still awaiting a manager.
+	//
+	// The two labels below are the only approved states there are: the
+	// leave_status enum is ('pending', 'approved_by_team_leader',
+	// 'approved_by_manager', 'rejected', 'cancelled'). An "approved" label was
+	// compared for here as well, and it can never match — the column cannot
+	// hold it. The same literal in a query once broke the reminder sweep
+	// outright, because Postgres rejects an unknown enum literal rather than
+	// matching nothing; see GetLeavesForReminders.
 	leave, err := s.leaveRepo.GetByID(ctx, leaveID)
 	if err != nil {
 		return fmt.Errorf("leave not found: %w", err)
 	}
 
-	if leave.Status != "approved_by_manager" && leave.Status != "approved_by_team_leader" && leave.Status != "approved" {
+	if leave.Status != "approved_by_manager" && leave.Status != "approved_by_team_leader" {
 		return fmt.Errorf("leave is not in an approved state: %s", leave.Status)
 	}
 
-	if leave.Status == "approved_by_manager" || leave.Status == "approved" {
+	if leave.Status == "approved_by_manager" {
 		if role != "manager" && role != "admin" && role != "team_leader" {
 			return fmt.Errorf("only managers and team leaders can cancel a fully approved leave")
 		}

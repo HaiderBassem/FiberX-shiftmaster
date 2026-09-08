@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ClipboardList, Plus, CheckSquare, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react';
+import type { TaskSchedule, TaskBoard, Shift } from '@/types/domain';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -28,17 +29,17 @@ export const TaskManagement = () => {
   // ── Queries ──
   const { data: taskSchedules, isLoading: schedulesLoading } = useQuery({
     queryKey: ['tasks', 'schedules'],
-    queryFn: async () => { const res = await api.get('/tasks/schedules'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/tasks/schedules'); return (res.data?.data || []) as TaskSchedule[]; },
   });
 
   const { data: shifts } = useQuery({
     queryKey: ['shifts'],
-    queryFn: async () => { const res = await api.get('/shifts'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/shifts'); return (res.data?.data || []) as Shift[]; },
   });
 
   const { data: boards } = useQuery({
     queryKey: ['tasks', 'boards'],
-    queryFn: async () => { const res = await api.get('/tasks/boards'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/tasks/boards'); return (res.data?.data || []) as TaskBoard[]; },
   });
 
   // ── Mutations ──
@@ -93,7 +94,7 @@ export const TaskManagement = () => {
         </div>
       ) : (
         <div className="space-y-4 flex-1 overflow-y-auto max-h-[600px] pr-2">
-          {taskSchedules?.map((ts: any) => (
+          {taskSchedules?.map((ts) => (
             <Card key={ts.id} className={`transition-all ${ts.is_active ? '' : 'opacity-60'}`}>
               <CardHeader className="p-4 pb-2">
                 <div className="flex items-start justify-between">
@@ -152,7 +153,7 @@ export const TaskManagement = () => {
             <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="space-y-2">
                 <Label>Task Title</Label>
-                <Input value={title} onChange={(e: any) => setTitle(e.target.value)} placeholder="e.g. Node check" />
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Node check" />
               </div>
               <div className="space-y-2">
                 <Label>Description</Label>
@@ -168,14 +169,14 @@ export const TaskManagement = () => {
                   <Label>Board</Label>
                   <select className={selectClass} value={selectedBoardId} onChange={(e) => setSelectedBoardId(e.target.value)}>
                     <option value="">No board (optional)</option>
-                    {boards?.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {boards?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <Label>Shift</Label>
                   <select className={selectClass} value={selectedShiftId} onChange={(e) => setSelectedShiftId(e.target.value)}>
                     <option value="">Any Shift</option>
-                    {shifts?.map((s: any) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
+                    {shifts?.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.shift_code})</option>)}
                   </select>
                 </div>
               </div>
@@ -191,7 +192,7 @@ export const TaskManagement = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Max Assignees</Label>
-                  <Input type="number" min={1} value={maxAssignees} onChange={(e: any) => setMaxAssignees(parseInt(e.target.value) || 1)} />
+                  <Input type="number" min={1} value={maxAssignees} onChange={(e) => setMaxAssignees(parseInt(e.target.value) || 1)} />
                 </div>
               </div>
 

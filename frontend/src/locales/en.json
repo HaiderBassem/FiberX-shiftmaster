@@ -19,7 +19,8 @@
     "external_modules": "External Modules",
     "tickets": "Tickets",
     "services": "Services",
-    "logout": "Logout"
+    "logout": "Logout",
+    "item_requests": "Item Requests"
   },
   "topbar": {
     "welcome": "Welcome",
@@ -233,7 +234,8 @@
     "start": "Start",
     "done": "Done",
     "no_board_tasks_week": "No board tasks this week",
-    "no_board_tasks_leader": "Your team leader hasn't assigned any board tasks yet."
+    "no_board_tasks_leader": "Your team leader hasn't assigned any board tasks yet.",
+    "complete": "Complete"
   },
   "handovers": {
     "shift_handovers": "Shift Handovers",
@@ -321,7 +323,8 @@
     "requester": "Requester",
     "target": "Target",
     "created": "Created",
-    "confirm_cancel_swap": "Are you sure you want to cancel this approved swap? This will swap the shifts back."
+    "confirm_cancel_swap": "Are you sure you want to cancel this approved swap? This will swap the shifts back.",
+    "swap_history": "Swap History"
   },
   "departments": {
     "title": "Departments",
@@ -399,7 +402,10 @@
     "loading": "Loading",
     "failed_upload": "Upload failed. Please try again.",
     "success": "Done successfully.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "reason": "Reason",
+    "save": "Save",
+    "submitting": "Submitting..."
   },
   "auth": {
     "welcome_back": "Welcome back",

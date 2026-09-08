@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import type { Province } from './types';
 import { X, Loader2, Plus, Trash2, Edit2, Check, X as XIcon } from 'lucide-react';
 
@@ -27,7 +27,7 @@ export function ProvinceManager({ onClose }: { onClose: () => void }) {
       setNewName('');
       setError('');
     },
-    onError: (err: any) => setError(err.response?.data?.error || t('services.error_occurred'))
+    onError: (err: unknown) => setError(apiError(err) || t('services.error_occurred'))
   });
 
   const updateMut = useMutation({
@@ -38,7 +38,7 @@ export function ProvinceManager({ onClose }: { onClose: () => void }) {
       setEditingId(null);
       setError('');
     },
-    onError: (err: any) => setError(err.response?.data?.error || t('services.error_occurred'))
+    onError: (err: unknown) => setError(apiError(err) || t('services.error_occurred'))
   });
 
   const deleteMut = useMutation({
@@ -46,7 +46,7 @@ export function ProvinceManager({ onClose }: { onClose: () => void }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['provinces'] });
     },
-    onError: (err: any) => setError(err.response?.data?.error || t('services.error_occurred'))
+    onError: (err: unknown) => setError(apiError(err) || t('services.error_occurred'))
   });
 
   const handleCreate = () => {

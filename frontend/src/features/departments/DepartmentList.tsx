@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Building2, Crown, Plus, Edit3, Trash2, Save, X, Database } from 'lucide-react';
@@ -99,8 +99,8 @@ export const DepartmentList = () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
       setDeptCode(''); setDeptName(''); setDeptDesc(''); setDeptManagerId(''); setDeptMaxLeaves(''); setDeptMaxHourlyLeaves('');
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || t('departments.failed_create'));
+    onError: (err: unknown) => {
+      setError(apiError(err) || t('departments.failed_create'));
     },
   });
 
@@ -121,8 +121,8 @@ export const DepartmentList = () => {
       queryClient.invalidateQueries({ queryKey: ['departments'] });
       setEditId(null);
     },
-    onError: (err: any) =>
-      setError(err?.response?.data?.error || err?.message || t('departments.failed_update')),
+    onError: (err: unknown) =>
+      setError(apiError(err) || t('departments.failed_update')),
   });
 
   const deleteDepartment = useMutation({
@@ -131,8 +131,8 @@ export const DepartmentList = () => {
       await api.delete(`/departments/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['departments'] }),
-    onError: (err: any) =>
-      setError(err?.response?.data?.error || err?.message || t('departments.failed_delete')),
+    onError: (err: unknown) =>
+      setError(apiError(err) || t('departments.failed_delete')),
   });
 
   const filteredDepartments = useMemo(() => {
@@ -382,8 +382,8 @@ export const DepartmentList = () => {
                                 const newVal = e.target.checked;
                                 api.put(`/departments/${dept.id}/fiberx-toggle`, { enabled: newVal }).then(() => {
                                   queryClient.invalidateQueries({ queryKey: ['departments'] });
-                                }).catch((err: any) => {
-                                  alert(err?.response?.data?.error || t('departments.failed_toggle_fiberx'));
+                                }).catch((err: unknown) => {
+                                  alert(apiError(err) || t('departments.failed_toggle_fiberx'));
                                   queryClient.invalidateQueries({ queryKey: ['departments'] });
                                 });
                               }}

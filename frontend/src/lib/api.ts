@@ -144,3 +144,17 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+/**
+ * The server's own error message out of a failed request, when there is one.
+ *
+ * Handlers reject with an axios error whose body is `{ error: "..." }`. Nothing
+ * is invented when that field is absent: callers supply their own translated
+ * fallback, which reads better than axios's untranslated "Request failed with
+ * status code 500". Takes `unknown` so callers can type their catch/onError
+ * parameter honestly.
+ */
+export function apiError(err: unknown): string | undefined {
+  const e = err as { response?: { data?: { error?: string; message?: string } } };
+  return e?.response?.data?.error || e?.response?.data?.message;
+}

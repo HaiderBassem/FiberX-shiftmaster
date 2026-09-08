@@ -4,6 +4,7 @@ import api from '@/lib/api';
 import { X, Loader2, Share2, Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Province, ProvinceShare } from './types';
+import type { Department } from '@/types/domain';
 
 export function ProvinceShareModal({ province, onClose }: { province: Province; onClose: () => void }) {
   const { t } = useTranslation();
@@ -17,7 +18,7 @@ export function ProvinceShareModal({ province, onClose }: { province: Province; 
 
   const { data: allDepts } = useQuery({
     queryKey: ['departments'],
-    queryFn: async () => (await api.get('/departments')).data.data ?? [],
+    queryFn: async () => ((await api.get('/departments')).data.data ?? []) as Department[],
   });
 
   const shareMut = useMutation({
@@ -34,7 +35,7 @@ export function ProvinceShareModal({ province, onClose }: { province: Province; 
   });
 
   // Filter out departments that already have shares
-  const availableDepts = allDepts?.filter((d: any) => 
+  const availableDepts = allDepts?.filter((d) => 
     !shares?.find(s => s.department_id === d.id) && d.id !== province.department_id
   ) ?? [];
 
@@ -64,7 +65,7 @@ export function ProvinceShareModal({ province, onClose }: { province: Province; 
               className="flex-1 bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary/50"
             >
               <option value="">{t('services.select_department_to_share')}</option>
-              {availableDepts.map((d: any) => (
+              {availableDepts.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
             </select>

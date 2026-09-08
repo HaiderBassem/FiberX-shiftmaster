@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,11 @@ import { format } from 'date-fns';
 import { fmtDate, fmtDateTime, parseDate } from '@/lib/dateUtils';
 import { useTranslation } from 'react-i18next';
 import { assetUrl } from '@/lib/assets';
+import type { Employee, LeaveHistoryRow, ShiftSwap, PendingLeaveRich, ItemRequest } from '@/types/domain';
+
+/** Title-cases a leave-type label. The wire value is nullable, so 'Leave' stands in. */
+const leaveTypeLabel = (name: string | null | undefined) =>
+  name ? name.charAt(0).toUpperCase() + name.slice(1) : 'Leave';
 
 // ─── Coverage Preview Widget ───────────────────────────────────────────────────
 const CoveragePreview = ({ shiftId, date }: { shiftId: string; date: string }) => {
@@ -96,7 +101,7 @@ const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (e
   const { t } = useTranslation();
   const { data: replacements, isLoading } = useQuery({
     queryKey: ['replacements', date],
-    queryFn: async () => { const res = await api.get(`/schedules/replacements?date=${date}`); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get(`/schedules/replacements?date=${date}`); return (res.data?.data || []) as Employee[]; },
     enabled: !!date,
   });
 
@@ -107,7 +112,7 @@ const QuickReplacementSelect = ({ date, onSelect }: { date: string; onSelect: (e
       <Label className="flex items-center gap-1"><UserPlus className="w-4 h-4" /> {t('approvals.quick_replacement')}</Label>
       <select className={selectClass} onChange={(e) => onSelect(e.target.value)} disabled={isLoading}>
         <option value="">{t('approvals.select_replacement')}</option>
-        {replacements?.map((emp: any) => (
+        {replacements?.map(emp => (
           <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name} — {emp.employee_code}</option>
         ))}
       </select>
@@ -126,7 +131,7 @@ const LeaveHistory = () => {
 
   const { data: history, isLoading } = useQuery({
     queryKey: ['leaves', 'history', selectedDeptId],
-    queryFn: async () => { const res = await api.get('/leaves/history'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/leaves/history'); return (res.data?.data || []) as LeaveHistoryRow[]; },
   });
 
   const statusBadge = (status: string) => {
@@ -168,7 +173,7 @@ const LeaveHistory = () => {
           </CardContent>
         </Card>
       ) : (
-        history?.map((item: any) => (
+        history?.map(item => (
           <Card key={item.leave_id} className="overflow-hidden">
             <CardHeader className="pb-2 cursor-pointer" onClick={() => setExpandedId(expandedId === item.leave_id ? null : item.leave_id)}>
               <div className="flex items-start sm:items-center justify-between gap-2 flex-col sm:flex-row">
@@ -181,7 +186,7 @@ const LeaveHistory = () => {
                     <span className="text-xs text-muted-foreground font-mono">({item.employee_code})</span>
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    {item.leave_type_name_en?.charAt(0).toUpperCase() + item.leave_type_name_en?.slice(1) || 'Leave'} ·{' '}
+                    {leaveTypeLabel(item.leave_type_name_en)} ·{' '}
                     {fmtDate(item.start_date, 'MMM d')} → {fmtDate(item.end_date, 'MMM d, yyyy')} ·{' '}
                     {item.total_days} day{item.total_days > 1 ? 's' : ''}
                   </CardDescription>
@@ -215,7 +220,7 @@ const LeaveHistory = () => {
                   </p>
                   {item.approvals?.length > 0 ? (
                     <div className="space-y-2">
-                      {item.approvals.map((ap: any, idx: number) => (
+                      {item.approvals.map((ap, idx) => (
                         <div key={idx} className={`flex items-start gap-3 p-2 rounded-lg text-sm ${ap.action === 'approved' ? 'bg-emerald-500/5' : 'bg-destructive/5'}`}>
                           <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${ap.action === 'approved' ? 'bg-emerald-500/20' : 'bg-destructive/20'}`}>
                             {ap.action === 'approved' ? <CheckCircle2 className="w-3 h-3 text-emerald-500" /> : <XCircle className="w-3 h-3 text-destructive" />}
@@ -239,7 +244,7 @@ const LeaveHistory = () => {
                     <p className="text-xs text-muted-foreground italic">{t('approvals.no_approval_actions')}</p>
                   )}
                   {/* Cancel Approval Button */}
-                  {(item.status === 'approved_by_manager' || item.status === 'approved_by_team_leader' || item.status === 'approved') && (
+                  {(item.status === 'approved_by_manager' || item.status === 'approved_by_team_leader') && (
                     <div className="mt-4 flex justify-end">
                       <Button
                         variant="outline"
@@ -275,7 +280,7 @@ const SwapHistory = () => {
 
   const { data: history, isLoading } = useQuery({
     queryKey: ['swaps', 'history', selectedDeptId],
-    queryFn: async () => { const res = await api.get('/swaps/history'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/swaps/history'); return (res.data?.data || []) as ShiftSwap[]; },
   });
 
   const cancelSwap = useMutation({
@@ -317,7 +322,7 @@ const SwapHistory = () => {
           </CardContent>
         </Card>
       ) : (
-        history?.map((swap: any) => (
+        history?.map(swap => (
           <Card key={swap.id}>
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
@@ -388,18 +393,24 @@ export const ApprovalDashboard = () => {
   // Use the rich endpoint for pending leaves (includes employee name, shift, department, TL approvals)
   const { data: pendingLeaves, isLoading: leavesLoading } = useQuery({
     queryKey: ['leaves', 'pending', 'rich', selectedDeptId],
-    queryFn: async () => { const res = await api.get('/leaves/pending/rich'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/leaves/pending/rich'); return (res.data?.data || []) as PendingLeaveRich[]; },
   });
 
   const { data: pendingSwaps, isLoading: swapsLoading } = useQuery({
     queryKey: ['swaps', 'pending', selectedDeptId],
-    queryFn: async () => { const res = await api.get(['manager', 'admin', 'team_leader'].includes(user?.role || '') ? '/swaps/pending/manager' : '/swaps/pending'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get(['manager', 'admin', 'team_leader'].includes(user?.role || '') ? '/swaps/pending/manager' : '/swaps/pending'); return (res.data?.data || []) as ShiftSwap[]; },
   });
 
   const { data: pendingItemRequests, isLoading: itemRequestsLoading } = useQuery({
     queryKey: ['itemRequests', 'pending', selectedDeptId],
-    queryFn: async () => { const res = await api.get('/item-requests/pending'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/item-requests/pending'); return (res.data?.data || []) as ItemRequest[]; },
   });
+
+  // react-query hands back `undefined` until the first fetch resolves; render from
+  // these so every list/count site below is total.
+  const leaveRows = pendingLeaves ?? [];
+  const swapRows = pendingSwaps ?? [];
+  const itemRows = pendingItemRequests ?? [];
 
   const updateItemRequestStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => { await api.post(`/item-requests/${id}/status`, { status }); },
@@ -422,13 +433,13 @@ export const ApprovalDashboard = () => {
   const approveSwap = useMutation({
     mutationFn: async (swapId: string) => { setSwapError(null); await api.post(`/swaps/${swapId}/approve`); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); setSwapError(null); },
-    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || t('approvals.failed_approve_swap')),
+    onError: (err: unknown) => setSwapError(apiError(err) || t('approvals.failed_approve_swap')),
   });
 
   const rejectSwap = useMutation({
     mutationFn: async (swapId: string) => { setSwapError(null); await api.post(`/swaps/${swapId}/reject`, { reason: '' }); },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['swaps'] }); setSwapError(null); },
-    onError: (err: any) => setSwapError(err?.response?.data?.error || err?.message || t('approvals.failed_reject_swap')),
+    onError: (err: unknown) => setSwapError(apiError(err) || t('approvals.failed_reject_swap')),
   });
 
   // Helper: check if shift code looks like a night shift
@@ -493,17 +504,17 @@ export const ApprovalDashboard = () => {
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <CalendarOff className="w-5 h-5 text-destructive" />
               {t('approvals.leave_requests')}
-              {pendingLeaves?.length > 0 && (
+              {leaveRows.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-destructive/20 text-destructive border border-destructive/30">
-                  {pendingLeaves.length}
+                  {leaveRows.length}
                 </span>
               )}
             </h3>
 
             {leavesLoading ? (
               <div className="space-y-3">{[1,2].map(i => <Card key={i} className="animate-pulse h-32" />)}</div>
-            ) : pendingLeaves?.length > 0 ? (
-              pendingLeaves.map((leave: any) => (
+            ) : leaveRows.length > 0 ? (
+              leaveRows.map(leave => (
                 <Card key={leave.id} className="overflow-hidden">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
@@ -516,7 +527,7 @@ export const ApprovalDashboard = () => {
                           <span className="text-xs text-muted-foreground font-mono">({leave.employee_code})</span>
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          {leave.leave_type_name_en?.charAt(0).toUpperCase() + leave.leave_type_name_en?.slice(1) || 'Leave'} ·{' '}
+                          {leaveTypeLabel(leave.leave_type_name_en)} ·{' '}
                           {leave.leave_type_name_en?.toLowerCase() === 'hourly' ? (
                             <>
                               {fmtDate(leave.start_date, 'MMM d, yyyy')}
@@ -610,17 +621,17 @@ export const ApprovalDashboard = () => {
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <ArrowLeftRight className="w-5 h-5 text-primary" />
               {t('approvals.swap_requests')}
-              {pendingSwaps?.length > 0 && (
+              {swapRows.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-primary/20 text-primary border border-primary/30">
-                  {pendingSwaps.length}
+                  {swapRows.length}
                 </span>
               )}
             </h3>
 
             {swapsLoading ? (
               <div className="space-y-3">{[1,2].map(i => <Card key={i} className="animate-pulse h-24" />)}</div>
-            ) : pendingSwaps?.length > 0 ? (
-              pendingSwaps.map((swap: any) => (
+            ) : swapRows.length > 0 ? (
+              swapRows.map(swap => (
                 <Card key={swap.id}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Shift Swap · {fmtDate(swap.shift_date)}</CardTitle>
@@ -668,17 +679,17 @@ export const ApprovalDashboard = () => {
             <h3 className="text-lg sm:text-xl font-semibold text-foreground flex items-center gap-2">
               <Package className="w-5 h-5 text-indigo-500" />
               {t('approvals.item_requests')}
-              {pendingItemRequests?.length > 0 && (
+              {itemRows.length > 0 && (
                 <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-600 border border-indigo-500/30">
-                  {pendingItemRequests.length}
+                  {itemRows.length}
                 </span>
               )}
             </h3>
 
             {itemRequestsLoading ? (
               <div className="space-y-3">{[1,2].map(i => <Card key={i} className="animate-pulse h-24" />)}</div>
-            ) : pendingItemRequests?.length > 0 ? (
-              pendingItemRequests.map((req: any) => (
+            ) : itemRows.length > 0 ? (
+              itemRows.map(req => (
                 <Card key={req.id}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">{req.category_name || t('approvals.request')}</CardTitle>

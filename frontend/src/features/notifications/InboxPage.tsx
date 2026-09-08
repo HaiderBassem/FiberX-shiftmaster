@@ -13,6 +13,7 @@ import {
   CheckCheck, Filter, X
 } from 'lucide-react';
 import { assetUrl } from '@/lib/assets';
+import type { LucideIcon } from 'lucide-react';
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 const getImageUrl = (url: string) => assetUrl(url);
@@ -37,7 +38,7 @@ const PRIORITY_CONFIG = {
   normal: { labelKey: 'inbox.priority_normal', bg: 'bg-white/5 border-white/10', text: 'text-gray-300', icon: Megaphone, dot: 'bg-gray-400' },
 };
 
-const NOTIF_TYPE_CONFIG: Record<string, { color: string; bg: string; Icon: any }> = {
+const NOTIF_TYPE_CONFIG: Record<string, { color: string; bg: string; Icon: LucideIcon }> = {
   swap: { color: 'text-purple-400', bg: 'bg-purple-500/15 border-purple-500/30', Icon: ArrowRightLeft },
   leave: { color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/30', Icon: CalendarClock },
   task: { color: 'text-cyan-400', bg: 'bg-cyan-500/15 border-cyan-500/30', Icon: ClipboardCheck },

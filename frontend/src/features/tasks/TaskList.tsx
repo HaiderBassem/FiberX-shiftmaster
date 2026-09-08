@@ -12,6 +12,7 @@ import { format, startOfWeek, addDays, subDays, isToday, isBefore } from 'date-f
 import { useAuthStore } from '@/store/authStore';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { useTranslation } from 'react-i18next';
+import type { Leave, EmployeeShift } from '@/types/domain';
 
 // ───────────────────────────────────────────────────────────
 // Types
@@ -136,7 +137,7 @@ export const MyTasksWeekly = () => {
     queryKey: ['leaves', 'me'],
     queryFn: async () => {
       const response = await api.get('/leaves/me');
-      return response.data?.data || [];
+      return (response.data?.data || []) as Leave[];
     },
   });
 
@@ -146,7 +147,7 @@ export const MyTasksWeekly = () => {
     queryFn: async () => {
       if (!user?.id) return [];
       const res = await api.get(`/schedules/employee/${user?.id}?from=${weekStartStr}&to=${weekEndStr}`);
-      return res.data?.data || [];
+      return (res.data?.data || []) as EmployeeShift[];
     },
     enabled: !!user?.id,
   });
@@ -296,7 +297,7 @@ export const MyTasksWeekly = () => {
             const today = isToday(date);
             const isPast = isBefore(date, new Date()) && !today;
 
-            const dayLeave = leaves?.find((l: any) => {
+            const dayLeave = leaves?.find((l) => {
               if (l.status !== 'approved_by_manager' && l.status !== 'approved_by_team_leader') return false;
               const sDate = l.start_date?.split('T')[0];
               if (!sDate) return false;
@@ -304,7 +305,7 @@ export const MyTasksWeekly = () => {
               return dateKey >= sDate && dateKey <= eDate;
             });
 
-            const dayOffSchedule = scheduleRows?.find((s: any) => s.shift_date?.startsWith(dateKey) && ['off', 'vacation', 'leave'].includes(s.shift_status));
+            const dayOffSchedule = scheduleRows?.find((s) => s.shift_date?.startsWith(dateKey) && ['off', 'vacation', 'leave'].includes(s.shift_status));
             
             const isHourlyLeave = dayLeave?.leave_type_name_en?.toLowerCase() === 'hourly';
             const isOff = (!!dayLeave && !isHourlyLeave) || !!dayOffSchedule;

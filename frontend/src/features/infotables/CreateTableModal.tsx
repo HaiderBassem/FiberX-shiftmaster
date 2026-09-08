@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, GripVertical } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
 import type { InfoTable, InfoTableColumn } from '../../types/infoTable';
+import { apiError } from '@/lib/api';
 
 interface CreateTableModalProps {
   isOpen: boolean;
@@ -82,8 +83,8 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ isOpen, onClose, on
         });
         onCreated(newTable);
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || `Failed to ${initialData ? 'update' : 'create'} table`);
+    } catch (err: unknown) {
+      setError(apiError(err) || `Failed to ${initialData ? 'update' : 'create'} table`);
     } finally {
       setLoading(false);
     }
