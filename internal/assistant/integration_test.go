@@ -52,11 +52,113 @@ func testDB(t *testing.T) *database.DB {
 	return db
 }
 
+// harnessLock serialises test processes that share one database.
+//
+// Leave types are global in this schema — they belong to the company, not to a
+// department — so a second harness running at the same time creates a second
+// hourly type that the first one can see. Everything that depends on there
+// being exactly one hourly type (staging زمنية without naming a type, which is
+// the behaviour people rely on) then fails, and it fails as "multiple hourly
+// types exist", which reads like a product bug and is not one. That is a real
+// trap: it cost an hour of chasing a defect that did not exist.
+//
+// The fix is to make the shared resource behave like one. Each harness holds a
+// session-level advisory lock for as long as the test needs the database, so a
+// second `go test` against the same database waits rather than interleaves.
+const harnessLock = 7318452901
+
+// sweepLeakedRows deletes rows an earlier harness could not clean up.
+//
+// The per-run cleanup below is a t.Cleanup, so it does not run when the test
+// binary is killed rather than failed — a `go test -timeout` kill, a panic in
+// another package, an interrupted run. What survives is the same global
+// leave type the lock above exists to keep unique, and the next run then fails
+// with "multiple hourly types exist": the product is fine, the database is
+// dirty, and the message accuses the code. Cleaning up on the way IN rather
+// than only on the way out is what makes the suite recover by itself instead
+// of needing someone to know the SQL.
+//
+// This is safe precisely because it runs while holding the exclusive harness
+// lock: no other harness can be mid-run, so anything matching these patterns
+// belongs to a run that is already over. The patterns are the harness's own
+// naming — an 8-hex uuid prefix — so they cannot match seeded or real data.
+func sweepLeakedRows(ctx context.Context, t *testing.T, db *database.DB) {
+	t.Helper()
+
+	rows, err := db.Query(ctx, `SELECT id FROM employees WHERE email LIKE '%@assistant.test'`)
+	if err != nil {
+		t.Fatalf("sweep: find leaked employees: %v", err)
+	}
+	var stale []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			t.Fatalf("sweep: scan leaked employee: %v", err)
+		}
+		stale = append(stale, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		t.Fatalf("sweep: read leaked employees: %v", err)
+	}
+
+	// Dependants first, then the employee, in the same order the per-run
+	// cleanup uses — the foreign keys are the same either way.
+	for _, emp := range stale {
+		for _, q := range []string{
+			`DELETE FROM assistant_pending_actions WHERE employee_id=$1`,
+			`DELETE FROM assistant_conversations WHERE employee_id=$1`,
+			`DELETE FROM audit_logs WHERE employee_id=$1`,
+			`DELETE FROM notifications WHERE recipient_id=$1 OR sender_id=$1`,
+			`DELETE FROM leaves WHERE employee_id=$1`,
+			`DELETE FROM leave_approvals WHERE approver_id=$1`,
+			`DELETE FROM employee_leave_balances WHERE employee_id=$1`,
+			`DELETE FROM employee_shifts WHERE employee_id=$1`,
+			`DELETE FROM schedule_templates WHERE employee_id=$1`,
+			`DELETE FROM assistant_requests WHERE employee_id=$1`,
+			`DELETE FROM help_documents WHERE created_by=$1`,
+			`DELETE FROM employees WHERE id=$1`,
+		} {
+			if _, err := db.Exec(ctx, q, emp); err != nil {
+				t.Fatalf("sweep: %s: %v", q, err)
+			}
+		}
+	}
+
+	// The global rows, which are the ones that actually break the next run.
+	for _, q := range []string{
+		`DELETE FROM leave_types WHERE name_en ~ '^(Hourly|Annual) [0-9a-f]{8}$'`,
+		`DELETE FROM weekly_schedule WHERE department_id IN (SELECT id FROM departments WHERE name ~ '^Asst[AB] [0-9a-f]{8}$')`,
+		`DELETE FROM shifts WHERE name ~ '^(Night|Day) [0-9a-f]{8}$'`,
+		`DELETE FROM departments WHERE name ~ '^Asst[AB] [0-9a-f]{8}$'`,
+	} {
+		if _, err := db.Exec(ctx, q); err != nil {
+			t.Fatalf("sweep: %s: %v", q, err)
+		}
+	}
+}
+
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 	ctx := context.Background()
 	db := testDB(t)
 	h := &harness{t: t, db: db}
+
+	lockConn, err := db.Acquire(ctx)
+	if err != nil {
+		t.Fatalf("acquire a connection for the harness lock: %v", err)
+	}
+	if _, err := lockConn.Exec(ctx, `SELECT pg_advisory_lock($1)`, harnessLock); err != nil {
+		lockConn.Release()
+		t.Fatalf("take the harness lock: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = lockConn.Exec(context.Background(), `SELECT pg_advisory_unlock($1)`, harnessLock)
+		lockConn.Release()
+	})
+
+	sweepLeakedRows(ctx, t, db)
 
 	suffix := uuid.NewString()[:8]
 	mustScan := func(dest *uuid.UUID, query string, args ...any) {

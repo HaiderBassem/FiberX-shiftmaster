@@ -104,6 +104,15 @@ else
     BUDGET_MB=$(( (RAM_MB - 6000) * 55 / 100 ))
 fi
 
+# The tiers, largest first; the first one that fits the budget wins.
+#
+# The 9B row is the one the evaluation suite in internal/assistant/eval_test.go
+# was measured against — Iraqi Arabic, code-switching, misspellings, overnight
+# leave, adversarial prompts and an injected document. Treat it as the known
+# quantity: the tiers above it are stronger and the tier below it is measurably
+# weaker at choosing between many tools in Arabic, which is the hardest thing
+# this assistant asks of a model.
+#
 # name | repo | file | approx MB | per-slot context | note
 TIERS=$(cat <<'TIERS'
 Qwen3.5-14B-Q4_K_M|unsloth/Qwen3.5-14B-GGUF|Qwen3.5-14B-Q4_K_M.gguf|9000|16384|strongest tier; needs a GPU or a large server

@@ -290,3 +290,67 @@ func TestExtractPendingAction(t *testing.T) {
 		t.Fatalf("false positive")
 	}
 }
+
+// "منو عندي هسه بالشفت؟" asks who ELSE is on. get_current_shift describes the
+// caller alone, so it can never answer that — the rail must hand the model a
+// redirect instead of the self-scope payload, without executing the tool.
+func TestWhoQuestionRedirectsAwayFromSelfScopeTool(t *testing.T) {
+	client := &scriptedLLM{responses: []*llm.Response{
+		{Content: []llm.ContentBlock{toolUse("t1", "get_current_shift", `{}`)}, StopReason: llm.StopToolUse},
+		{Content: []llm.ContentBlock{llm.TextBlock("ok")}, StopReason: llm.StopEndTurn},
+	}}
+	d := unitDeps(client)
+	emit, _ := collectEvents()
+
+	appended, _, err := d.runTurn(context.Background(), employeeActor("team_leader"), NewRegistry(AllTools()),
+		[]llm.Message{{Role: llm.RoleUser, Content: []llm.ContentBlock{llm.TextBlock("منو عندي هسه بالشفت؟")}}}, emit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := appended[1].Content[0]
+	if !result.IsError || !strings.Contains(result.Content, "get_team_status") {
+		t.Fatalf("tool result = %+v", result)
+	}
+}
+
+// The same question from an employee, who has no team tools, must run
+// get_current_shift as asked: a redirect to a tool they cannot call would
+// leave the turn with nothing.
+func TestWhoQuestionIsNotRedirectedWithoutTeamTools(t *testing.T) {
+	client := &scriptedLLM{responses: []*llm.Response{
+		{Content: []llm.ContentBlock{toolUse("t1", "get_current_shift", `{}`)}, StopReason: llm.StopToolUse},
+		{Content: []llm.ContentBlock{llm.TextBlock("ok")}, StopReason: llm.StopEndTurn},
+	}}
+	d := unitDeps(client)
+	emit, _ := collectEvents()
+
+	appended, _, err := d.runTurn(context.Background(), employeeActor("employee"), NewRegistry(AllTools()),
+		[]llm.Message{{Role: llm.RoleUser, Content: []llm.ContentBlock{llm.TextBlock("منو عندي هسه بالشفت؟")}}}, emit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(appended[1].Content[0].Content, "get_team_status") {
+		t.Fatalf("employee was redirected to a tool they cannot call: %+v", appended[1].Content[0])
+	}
+}
+
+func TestIsWhoQuestion(t *testing.T) {
+	for _, q := range []string{
+		"منو عندي هسه بالشفت؟", "مين موجود اليوم؟", "من هو المسؤول؟",
+		"who is on shift now", "Who else is working?", "whose shift is it",
+	} {
+		if !isWhoQuestion(q) {
+			t.Errorf("isWhoQuestion(%q) = false", q)
+		}
+	}
+	for _, q := range []string{
+		"شنو دوامي هسه؟", "متى يبدأ شفتي؟", "when does my shift end",
+		"show me the whole schedule", "من يوم الأحد لين الخميس",
+		// منو is a substring of ordinary words, and من is the preposition "from"
+		"منور اليوم", "الغرفة منورة", "من الساعة 8 لين 4",
+	} {
+		if isWhoQuestion(q) {
+			t.Errorf("isWhoQuestion(%q) = true", q)
+		}
+	}
+}

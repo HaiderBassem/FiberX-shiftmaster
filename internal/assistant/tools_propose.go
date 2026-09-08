@@ -68,7 +68,15 @@ func toolProposeHourlyLeave() Tool {
 		"Stage an hourly leave (زمنية) anchored to the caller's actual shift; the server resolves the window, including "+
 			"overnight shifts that cross midnight — NEVER compute the window yourself. 'The last hour of my shift' = anchor shift_end, minutes 60; "+
 			"'first half hour' = anchor shift_start, minutes 30; a specific window = anchor explicit with start_time/end_time (HH:MM). "+
-			"Omit date to use the currently active (or next) shift — this is what makes 'last hour' correct even after midnight.",
+			"Omit date to use the currently active (or next) shift — this is what makes 'last hour' correct even after midnight. "+
+			// The Arabic is here because this is the sentence people actually
+			// type, and because the arithmetic they are asking for is the
+			// arithmetic the model gets wrong: asked for the last hour of a
+			// shift ending 00:30 it will happily narrate 00:30–01:30. Naming
+			// the phrases on the tool that computes them correctly keeps the
+			// model out of the calculation entirely.
+			"أريد آخر ساعة من دوامي = anchor shift_end, minutes 60. آخر نص ساعة = anchor shift_end, minutes 30. "+
+			"أول ساعة / أول نص ساعة من الدوام = anchor shift_start. إذا ما عدك إلا نوع زمني واحد لا تسأل عنه — استخدمه.",
 		nil,
 		`{
 			"type":"object",

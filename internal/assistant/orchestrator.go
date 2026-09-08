@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"regexp"
 	"time"
 
 	"shiftmaster-backend/internal/assistant/llm"
@@ -73,6 +74,9 @@ func (d *Deps) runTurn(
 	var appended []llm.Message
 	// repeats detects a model looping on one call; see below.
 	repeats := map[string]int{}
+	// asksWho, with redirected, forms the who-question rail; see below.
+	asksWho := isWhoQuestion(latestUserText(history))
+	redirected := false
 
 	for round := 0; ; round++ {
 		stats.Rounds = round + 1
@@ -160,6 +164,28 @@ func (d *Deps) runTurn(
 				continue
 			}
 
+			// A "who is on with me right now" question is about COLLEAGUES, but
+			// every keyword in it (هسه, بالشفت, عندي) also belongs to a question
+			// about your own shift, and get_current_shift describes the caller
+			// alone. Measured against the real model, the wording of the tool
+			// description and of the standing instructions each moved this but
+			// neither settled it: the losing turn answered "منو عندي هسه
+			// بالشفت؟" from get_current_shift and then offered to look the team
+			// up. So the mismatch is caught here instead of being asked for
+			// again — one nudge, once per turn, spent only when the caller can
+			// actually see the team, and only against the one tool that by
+			// definition cannot answer a who-question.
+			if asksWho && !redirected && block.Name == "get_current_shift" {
+				if _, visible := registry.Lookup("get_team_status", actor.Role()); visible {
+					redirected = true
+					const msg = "this question asks WHO is working, which is about other people; get_current_shift only describes you. Call get_team_status instead and answer from it."
+					body, _ := json.Marshal(map[string]string{"error": msg})
+					emit(Event{Type: "tool", Tool: block.Name, OK: false, Message: msg})
+					results = append(results, llm.ToolResultBlock(block.ID, string(body), true))
+					continue
+				}
+			}
+
 			payload, ok := d.execTool(ctx, actor, registry, block, emit, stats)
 			results = append(results, llm.ToolResultBlock(block.ID, payload, !ok))
 		}
@@ -172,6 +198,27 @@ func (d *Deps) runTurn(
 		messages = append(messages, resultMsg)
 		appended = append(appended, resultMsg)
 	}
+}
+
+// whoQuestion matches the ways this deployment's users ask "who".
+//
+// Arabic: Iraqi منو, Levantine/Egyptian مين, and formal من هو / من عنده /
+// من موجود. Each is required to stand as its own word — منو is a substring of
+// ordinary words such as منور — which Go's \b cannot express for Arabic, so the
+// boundary is written as "not an Arabic letter" on either side. Bare من is
+// deliberately absent: it is also the preposition "from" and would fire on most
+// Arabic sentences.
+//
+// English: who / whom / whose on a plain word boundary, so "whole" is not one.
+var whoQuestion = regexp.MustCompile(
+	`(^|[^\p{Arabic}])(منو|مين|من هو|من عنده|من موجود)([^\p{Arabic}]|$)` +
+		`|(?i:\bwho(m|se)?\b)`)
+
+// isWhoQuestion reports whether the turn asks about people other than the
+// caller. It is a narrow trigger for one rail, not a general intent classifier:
+// a false negative costs nothing beyond the behaviour that already exists.
+func isWhoQuestion(text string) bool {
+	return whoQuestion.MatchString(text)
 }
 
 // latestUserText is the message this turn is answering, used only to decide

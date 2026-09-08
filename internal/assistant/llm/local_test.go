@@ -178,11 +178,11 @@ func TestTranscriptRendersToolCallsNatively(t *testing.T) {
 	}
 }
 
-func TestToolChoiceIsAlwaysAuto(t *testing.T) {
-	// tool_choice "required" is never sent. Measured against llama.cpp it does
-	// not force a tool call, and it suppresses the stop token, so a turn that
-	// wanted a one-line answer runs to the token limit repeating itself. The
-	// escape hatch must still be on offer so "no data needed" stays an explicit,
+func TestTheFirstCallOfARoundLeavesTheChoiceOpen(t *testing.T) {
+	// The opening call is always "auto". The constrained choice belongs to the
+	// reconsideration and nowhere else: it suppresses the stop token, so a turn
+	// that wanted a one-line answer would run to the token limit. The escape
+	// hatch must be on offer here so "no data needed" stays an explicit,
 	// recorded choice rather than a silent one.
 	stub := newStub(t, toolReply("get_current_shift", `{}`))
 	client := localClient(stub.URL, true)
@@ -230,8 +230,18 @@ func TestUngroundedOpeningIsReconsideredOnce(t *testing.T) {
 	if stub.count() != 2 {
 		t.Fatalf("made %d calls, want exactly 2", stub.count())
 	}
-	if !strings.Contains(stub.request(1).Messages[len(stub.request(1).Messages)-1].Content, "without looking anything up") {
-		t.Fatalf("nudge missing from the retry")
+	// The retry constrains the choice rather than asking for it, and sends the
+	// same messages so the prefix stays in the runtime's cache.
+	retry := stub.request(1)
+	if retry.ToolChoice != "required" {
+		t.Fatalf("retry tool_choice = %q, want the grammar-constrained choice", retry.ToolChoice)
+	}
+	if len(retry.Messages) != len(stub.request(0).Messages) {
+		t.Fatalf("retry sent %d messages, want the same %d as the first call",
+			len(retry.Messages), len(stub.request(0).Messages))
+	}
+	if retry.MaxTokens != groundingRetryTokens {
+		t.Fatalf("retry max_tokens = %d, want the short cap %d", retry.MaxTokens, groundingRetryTokens)
 	}
 }
 

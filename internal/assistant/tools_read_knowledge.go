@@ -30,34 +30,6 @@ func plainText(html string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
-// snippetAround returns a window of text around the first match of q.
-func snippetAround(text, q string, width int) string {
-	lower := strings.ToLower(text)
-	idx := strings.Index(lower, strings.ToLower(q))
-	if idx < 0 {
-		return clipRunes(text, width)
-	}
-	r := []rune(text)
-	// Convert byte index to rune index approximately by re-scanning.
-	runeIdx := len([]rune(text[:idx]))
-	start := runeIdx - width/3
-	if start < 0 {
-		start = 0
-	}
-	end := start + width
-	if end > len(r) {
-		end = len(r)
-	}
-	out := string(r[start:end])
-	if start > 0 {
-		out = "…" + out
-	}
-	if end < len(r) {
-		out += "…"
-	}
-	return out
-}
-
 func toolSearchKnowledge() Tool {
 	return Tool{
 		Name: "search_knowledge",

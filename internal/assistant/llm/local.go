@@ -71,21 +71,30 @@ type LocalConfig struct {
 	RepeatPenalty   float64
 	PresencePenalty float64
 
-	// GroundingRetry asks the model to reconsider once when its first reply of
-	// a turn answers from nothing while tools were available.
+	// GroundingRetry asks the model to reconsider once, under a grammar, when
+	// its first reply of a turn answers from nothing while tools were
+	// available. See the reconsideration block in Complete for what that costs
+	// and why it is a second call rather than the first.
 	//
-	// This started life as tool_choice:"required" on the first round, which is
-	// the obvious way to force a lookup. Measured against the real runtime,
-	// that setting does not force anything — llama.cpp accepts it and the model
-	// still answers in prose — but it DOES suppress the stop token, so a turn
-	// that wanted a one-line answer ran to the token limit repeating itself.
-	// It made grounding no better and the output much worse.
+	// The measurement that produced this design: asking in writing ("you
+	// answered without looking anything up, call a tool") moved the local model
+	// some of the time and not reliably — the same Arabic question about prices
+	// was grounded on one run and invented on the next. Constraining the choice
+	// instead of requesting it removed the variance, because a grammar is not
+	// something the sampler can decline.
 	//
-	// So the model is left free to choose, and is asked to think again exactly
-	// once when it chose nothing. A turn that calls a tool immediately — the
-	// common case — never pays for this.
+	// A turn that calls a tool immediately — the common case — never pays for
+	// any of this.
 	GroundingRetry bool
 }
+
+// groundingRetryTokens caps the reconsideration.
+//
+// Under the tool grammar the model cannot emit a stop token by talking, so a
+// turn where no tool genuinely fits will generate until something stops it.
+// A tool call is short — a name and a small JSON object — so this is generous
+// for the case that succeeds and cheap for the case that does not.
+const groundingRetryTokens = 96
 
 // NoToolNeeded is the pseudo-tool the model picks when a turn genuinely needs
 // no system data. It never reaches the tool registry — the provider handles it
@@ -98,7 +107,7 @@ var noToolNeededSchema = json.RawMessage(`{
     "reason":{
       "type":"string",
       "enum":["greeting_or_small_talk","clarifying_question","explaining_how_something_works","facts_already_retrieved","out_of_scope"],
-      "description":"why no system data is needed for this turn"
+      "description":"why no system data is needed for this turn. 'clarifying_question' is only for an ACTION whose details are genuinely missing — never for a lookup: asking whether you should search is not a clarifying question, it is a search you did not run."
     }
   },
   "required":["reason"],
@@ -328,7 +337,14 @@ func toWireTools(tools []Tool, withEscape bool) []oaiTool {
 			Description: "Choose this ONLY when answering needs no data from ShiftMaster: greetings and small talk, " +
 				"asking the user a clarifying question, explaining how something works in general, or when the facts you need " +
 				"are already in this conversation from earlier tool results. Never choose it for a question about a real " +
-				"schedule, shift, task, leave balance, person, price or document — those always need a tool.",
+				"schedule, shift, task, leave balance, person, price or document — those always need a tool. " +
+				// The Arabic is not decoration. Measured on the local model, an
+				// Arabic question about prices or policy was far likelier to be
+				// answered from nothing than the same question in English, and the
+				// gap closed when the tool contracts named the Arabic words people
+				// actually type. This one is the last line of defence, so it says
+				// them too.
+				"لا تختر هذا أبداً لسؤال عن سعر أو باقة أو خدمة أو سياسة أو مستند أو دوام أو إجازة أو مهمة — كل هذه تحتاج أداة.",
 			Parameters: noToolNeededSchema,
 		}})
 	}
@@ -385,15 +401,30 @@ func (l *Local) Complete(ctx context.Context, req Request) (*Response, error) {
 	out := l.decode(resp)
 
 	// One chance to reconsider an ungrounded opening answer.
+	//
+	// The same messages are sent again with the choice constrained to a tool.
+	// Constrained is the operative word: under tool_choice "required" the
+	// runtime compiles the tool schemas into a grammar and the sampler cannot
+	// leave it, so this is not a request the model may talk its way out of the
+	// way a written instruction is. Measured on the local model, the Arabic
+	// questions that were answered from nothing — "شكد أرخص باقة عندكم؟",
+	// "شنو سياسة التأخير عندنا؟" — came back as the right call with the right
+	// Arabic argument every time under the constraint, and as prose without it.
+	//
+	// It is not used on the first call because the constraint also suppresses
+	// the stop token: a turn that genuinely needs no lookup ("مرحبا شلونك")
+	// cannot satisfy the grammar and runs to the token limit instead of
+	// stopping. That is why this is a second call, why it is capped short, and
+	// why prose coming back from it is read as "no tool fits" rather than as an
+	// answer — the wasted tokens are discarded and the user never sees them.
+	//
+	// The messages and the tool list are byte-identical to the first call, so
+	// the whole prefix is still in the KV cache and this costs generation only.
 	if l.cfg.GroundingRetry && req.Round == 0 && len(tools) > 0 && !req.Warmup &&
 		out.StopReason != StopToolUse {
 		second := base
-		second.Messages = append(append([]oaiMessage{}, messages...), oaiMessage{
-			Role: "user",
-			Content: "[system] You answered without looking anything up. If this question is about their real schedule, " +
-				"shift, tasks, leave, team, prices or documents, call the tool that answers it now. " +
-				"If it genuinely needs no data from ShiftMaster, call " + NoToolNeeded + " and say why.",
-		})
+		second.ToolChoice = "required"
+		second.MaxTokens = groundingRetryTokens
 		if retry, retryErr := l.chat(ctx, second); retryErr == nil {
 			reconsidered := l.decode(retry)
 			out.Usage.InputTokens += reconsidered.Usage.InputTokens
@@ -403,10 +434,10 @@ func (l *Local) Complete(ctx context.Context, req Request) (*Response, error) {
 				reconsidered.Usage = out.Usage
 				out = reconsidered
 			} else {
-				// It stands by answering directly. Keep the ORIGINAL reply —
-				// the nudge was written for the model, not the user, and a
-				// reply produced under it reads like a machine explaining
-				// itself.
+				// Either it chose the escape hatch, or the grammar produced
+				// nothing usable. Keep the ORIGINAL reply: it was written
+				// without a constraint fighting the stop token, and it is the
+				// one the person should read.
 				out.ToolFree = true
 			}
 		}

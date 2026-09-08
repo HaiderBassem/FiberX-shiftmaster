@@ -109,7 +109,21 @@ func parseDateArg(d *Deps, s string) (time.Time, error) {
 func toolGetCurrentShift() Tool {
 	return Tool{
 		Name: "get_current_shift",
-		Description: "Resolve the caller's shift situation at this exact moment. Returns the shift they are inside right now if any " +
+		Description:
+		// The boundary is the first thing said about this tool, not the last.
+		//
+		// It was stated at the end, after five sentences describing what the
+		// tool returns, and measured against the real model that lost:
+		// "منو عندي هسه بالشفت؟" — who is on with me right now — was answered
+		// with this tool, describing the caller alone, because every keyword
+		// in it (هسه, بالشفت) also belongs to a question about your own shift.
+		// The discriminator is the interrogative, so the rule is written as
+		// one: منو means WHO, and who is a question about other people.
+		"ONLY the caller's own shift. It never says who ELSE is working. " +
+			"A question that asks WHO — منو عندي هسه / منو بالشفت / منو موجود / منو وياي, " +
+			"'who is on shift now', 'who is with me', 'who else is working' — is about other people " +
+			"and belongs to get_team_status, even when it also says هسه or بالشفت. " +
+			"Resolve the caller's shift situation at this exact moment. Returns the shift they are inside right now if any " +
 			"(which may have STARTED YESTERDAY and still be running past midnight), the next upcoming one, and the last finished one — " +
 			"each labelled with the day it belongs to ('today', 'tomorrow', 'yesterday') and how far away it is, plus a 'state' field " +
 			"summarising the situation. Read those labels rather than comparing dates yourself: being off duty at this moment but " +
