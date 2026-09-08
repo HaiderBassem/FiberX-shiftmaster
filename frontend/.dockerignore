@@ -1,0 +1,15 @@
+# node_modules is installed inside the image from package-lock.json. Shipping
+# the host's copy would both bloat the context and risk carrying darwin-native
+# binaries into a linux image.
+node_modules
+dist
+.vite
+
+.git
+.DS_Store
+*.log
+
+# Vite inlines anything it can read at build time, so local env files must not
+# reach the builder.
+.env
+.env.*

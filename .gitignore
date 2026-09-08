@@ -118,3 +118,7 @@ tmp_*_bin
 
 # Coverage output
 coverage.out
+
+# Compose environment. deploy/docker.env.example is the committed template;
+# the real file carries the database password and the JWT signing key.
+.env.docker

@@ -11,6 +11,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege by default. Nothing here writes to the repository, and a job
+# that needs more should say so itself rather than inherit it.
+permissions:
+  contents: read
+
 env:
   # go.mod is authoritative. This previously pinned 1.22 while the module
   # declared 1.26, so the toolchain refused to build and every run was
@@ -24,6 +29,7 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # The scheduling tests are real integration tests against PostgreSQL. They
     # used to be skipped for want of a database, which meant the highest-risk
@@ -126,15 +132,32 @@ jobs:
           # Still nothing pending afterwards.
           go run ./cmd/migrate -dir internal/database/migrations status
 
+      # -p 1 runs one package at a time. Three packages share the single test
+      # database — internal/assistant, internal/service and
+      # internal/database/migrate — and only the assistant harness takes an
+      # advisory lock, which serialises it against other copies of itself but
+      # not against the other two. Left parallel, the suite fails intermittently
+      # on rows another package created or removed, and the failure reads like a
+      # product bug rather than a harness one. The whole suite runs in seconds,
+      # so this costs nothing worth having.
       - name: Test
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./cmd/... ./internal/... ./pkg/...
+        run: go test -race -p 1 -covermode=atomic -coverprofile=coverage.out ./cmd/... ./internal/... ./pkg/...
 
       - name: Coverage summary
         run: go tool cover -func=coverage.out | tail -1
 
+      # Reports only vulnerabilities in code paths this module actually reaches,
+      # so it stays actionable instead of listing every advisory in the graph.
+      - name: Check dependencies for known vulnerabilities
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ env.GO_VERSION }}
+          repo-checkout: false
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./frontend
@@ -158,15 +181,24 @@ jobs:
       - name: Typecheck
         run: npx tsc -b --force
 
+      # `npm run lint` caps warnings at the number the tree currently carries, so
+      # a new one fails the build rather than joining a backlog nobody reads.
       - name: Lint
         run: npm run lint
 
       - name: Build
         run: npm run build
 
+      # Runtime dependencies only. Dev-tool advisories are noise for a bundle
+      # that ships none of that code to a browser, and a check that is routinely
+      # ignored is worse than no check at all.
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
   migrations:
     name: Migration series
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     services:
       postgres:
@@ -211,3 +243,129 @@ jobs:
       # it does not depend on a client binary happening to be on the runner.
       - name: Confirm every migration was recorded
         run: go run ./cmd/migrate -dir internal/database/migrations status
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Run through the image rather than the action so both Dockerfiles are
+      # covered explicitly, and so the command here is the same one a developer
+      # can run locally to reproduce a failure.
+      #
+      # DL3008/DL3018: apt and apk package versions are not pinned. Pinning them
+      # against a rolling distro mirror produces builds that break when the
+      # mirror rotates, which is a worse failure than the one it prevents.
+      - name: Lint Dockerfiles
+        run: |
+          set -euo pipefail
+          for f in Dockerfile frontend/Dockerfile; do
+            echo "── $f"
+            docker run --rm -i hadolint/hadolint:v2.15.1-alpine \
+              hadolint --ignore DL3008 --ignore DL3018 - < "$f"
+          done
+
+      # Built through the action so the layer cache is shared with the compose
+      # run below: `docker compose up` then finds every layer already present.
+      - name: Build the API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: api
+          tags: shiftmaster/api:local
+          load: true
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build the web image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          tags: shiftmaster/web:local
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # The AI variant is optional at run time but must not be allowed to rot:
+      # it pins a llama.cpp release by URL, and a renamed or withdrawn asset
+      # would otherwise be discovered by whoever next tried to enable the
+      # assistant. Built, not run — running it needs a model no CI runner
+      # should be downloading.
+      #
+      # Pinned to amd64 because that is the only Linux binary the release
+      # publishes. Stated here rather than inferred from the runner, so this
+      # step keeps meaning the same thing if the fleet ever moves to arm.
+      - name: Build the AI variant of the API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: api-ai
+          platforms: linux/amd64
+          tags: shiftmaster/api-ai:local
+          load: true
+          cache-from: type=gha,scope=api-ai
+          cache-to: type=gha,mode=max,scope=api-ai
+
+      # The images building is not the claim worth making. This starts the real
+      # stack — Postgres, the migration one-shot, the API, Caddy — and proves
+      # the wiring: that migrations apply to an empty volume, that the API comes
+      # up healthy against them, and that the edge serves the app and proxies
+      # the API on one origin.
+      - name: Start the stack
+        run: |
+          set -euo pipefail
+          cp deploy/docker.env.example .env.docker
+          # One password, written to both the variable that seeds initdb and the
+          # one the API connects with; they have to agree or nothing starts.
+          pw="ci-$(openssl rand -hex 12)"
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${pw}/" .env.docker
+          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${pw}/" .env.docker
+          # The API rejects placeholder and low-entropy signing keys, so CI has
+          # to generate a real one exactly as an operator would.
+          # Both secrets are required in production, which is what the image
+          # sets; a missing one crash-loops the API instead of starting it
+          # insecurely.
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env.docker
+          sed -i "s/^APP_SECRET_KEY=.*/APP_SECRET_KEY=$(openssl rand -hex 32)/" .env.docker
+          docker compose up -d --wait web
+
+      - name: Verify the stack answers
+        run: |
+          set -euo pipefail
+
+          # Proxied through Caddy to the API, which round-trips the database
+          # before answering — so this is an end-to-end assertion, not a
+          # liveness ping.
+          health="$(curl -fsS http://localhost:8080/health)"
+          echo "health: $health"
+          echo "$health" | grep -q '"status":"healthy"'
+
+          # The SPA itself, and the fallback that makes client-side routing work.
+          curl -fsS http://localhost:8080/ | grep -qi 'id="root"'
+          curl -fsS -o /dev/null http://localhost:8080/some/deep/route
+
+          # An unauthenticated API call must be refused rather than served.
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/employees)"
+          echo "unauthenticated /api/employees: $code"
+          case "$code" in 401|403) ;; *) echo "::error::expected 401/403, got $code"; exit 1 ;; esac
+
+          # The migration one-shot must have finished cleanly; a non-zero exit
+          # there means the API started against a schema that was never applied.
+          rc="$(docker compose ps -a --format json migrate | python3 -c 'import sys,json; print(json.loads(sys.stdin.readline())["ExitCode"])')"
+          echo "migrate exit code: $rc"
+          [ "$rc" = "0" ]
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans
