@@ -8,7 +8,7 @@
 # same-origin means no CORS preflight and no third-party cookie question.
 
 # ── Build ────────────────────────────────────────────────────────────────────
-FROM node:24-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /app
 
 # npm ci installs exactly the committed lockfile and fails if it disagrees with
