@@ -363,7 +363,10 @@ func (r *Runtime) spawn(ctx context.Context) error {
 //   - cont-batching: several employees' turns interleave instead of queueing
 //     head-of-line behind one long generation.
 func (r *Runtime) serverArgs() []string {
-	host, port := "127.0.0.1", ""
+	// Both branches set host, so seeding it with a loopback literal only looked
+	// like a default — every path overwrote it before it was read. A Unix
+	// socket has no port, which the zero value already says.
+	var host, port string
 	if sock, ok := unixSocketPath(r.cfg.BaseURL); ok {
 		host = sock
 		_ = os.Remove(sock) // a stale socket file blocks bind
