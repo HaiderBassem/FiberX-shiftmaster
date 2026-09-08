@@ -20,7 +20,12 @@ env:
   # go.mod is authoritative. This previously pinned 1.22 while the module
   # declared 1.26, so the toolchain refused to build and every run was
   # meaningless.
-  GO_VERSION: '1.26.1'
+  #
+  # The patch level is not cosmetic: eighteen of the vulnerabilities govulncheck
+  # reported against 1.26.1 are standard-library ones, fixed between 1.26.2 and
+  # 1.26.6 and reachable only through the toolchain that built the binary. This
+  # must stay at or above go.mod's directive.
+  GO_VERSION: '1.26.8'
   # Node 20 is end-of-life. 24 is the current LTS and matches the runtime the
   # actions themselves now run on, so there is one Node version in play.
   NODE_VERSION: '24'
