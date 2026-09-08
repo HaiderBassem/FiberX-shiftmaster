@@ -246,8 +246,12 @@ func TestAdoptDoesNotRemutateAnAlreadyMigratedDatabase(t *testing.T) {
 		_, _ = admin.Exec(context.Background(), `DROP DATABASE IF EXISTS `+db+` WITH (FORCE)`)
 	})
 
+	// Through adminHostDSN rather than a hand-built string: the hand-built one
+	// carried the user and no password, which a trust-authenticated local
+	// server accepts and a password-authenticated one refuses outright —
+	// "failed SASL auth ... 28P01" on any CI whose Postgres wants a password.
 	cfg := testutil.TestDatabaseConfig(t)
-	target := connectAs(t, fmt.Sprintf("postgres://%s@%s:%s/%s?sslmode=disable", cfg.User, cfg.Host, cfg.Port, db))
+	target := connectAs(t, adminHostDSN(t, cfg.User, cfg.Password, db))
 	defer target.Close()
 
 	migrations, err := Load(filepath.Join("..", "migrations"))
