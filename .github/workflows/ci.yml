@@ -6,49 +6,371 @@ on:
   pull_request:
     branches: [ "main", "dev" ]
 
+# Cancel superseded runs on the same ref rather than queueing them.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default. Nothing here writes to the repository, and a job
+# that needs more should say so itself rather than inherit it.
+permissions:
+  contents: read
+
+env:
+  # go.mod is authoritative. This previously pinned 1.22 while the module
+  # declared 1.26, so the toolchain refused to build and every run was
+  # meaningless.
+  #
+  # The patch level is not cosmetic: eighteen of the vulnerabilities govulncheck
+  # reported against 1.26.1 are standard-library ones, fixed between 1.26.2 and
+  # 1.26.6 and reachable only through the toolchain that built the binary. This
+  # must stay at or above go.mod's directive.
+  GO_VERSION: '1.26.8'
+  # Node 20 is end-of-life. 24 is the current LTS and matches the runtime the
+  # actions themselves now run on, so there is one Node version in play.
+  NODE_VERSION: '24'
+
 jobs:
-  backend-ci:
-    name: Backend CI
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 20
+
+    # The scheduling tests are real integration tests against PostgreSQL. They
+    # used to be skipped for want of a database, which meant the highest-risk
+    # area of the system had no coverage running anywhere.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shiftmaster
+          POSTGRES_PASSWORD: shiftmaster
+          POSTGRES_DB: shiftmaster_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shiftmaster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SHIFTMASTER_TEST_DB: postgres://shiftmaster:shiftmaster@localhost:5432/shiftmaster_test?sslmode=disable
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: shiftmaster
+      DB_PASSWORD: shiftmaster
+      DB_NAME: shiftmaster_test
+      DB_SSL_MODE: disable
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
 
-    - name: Install dependencies
-      run: go mod tidy
+      # `go mod tidy` rewrites go.mod and go.sum during the build, so a run could
+      # pass against dependencies that differ from the committed ones. Download
+      # verifies instead of mutating.
+      - name: Download dependencies
+        run: go mod download
 
-    - name: Build
-      run: go build -v ./...
+      - name: Verify go.mod and go.sum are tidy
+        run: |
+          go mod tidy
+          if ! git diff --quiet go.mod go.sum; then
+            echo "::error::go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the result."
+            git diff go.mod go.sum
+            exit 1
+          fi
 
-    - name: Test
-      run: go test -v ./...
+      - name: Verify formatting
+        run: |
+          unformatted="$(gofmt -l ./cmd ./internal ./pkg)"
+          if [ -n "$unformatted" ]; then
+            echo "::error::These files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
 
-  frontend-ci:
-    name: Frontend CI
+      - name: Build
+        run: go build -v ./...
+
+      - name: Vet
+        run: go vet ./cmd/... ./internal/... ./pkg/...
+
+      # v6 of this action targets golangci-lint v1 and does not understand the
+      # v2 configuration format that .golangci.yml uses, so the lint step could
+      # not have worked regardless of the Node runtime warning. v9 supports v2
+      # and runs on node24.
+      #
+      # The linter version is pinned rather than `latest` so CI reproduces the
+      # run this configuration was verified against; `latest` would let an
+      # unrelated change start failing when a new release adds checks.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+
+      - name: Apply migrations to the test database
+        run: go run ./cmd/migrate -dir internal/database/migrations up
+
+      # Asserted through exit codes rather than by matching log text, which was
+      # brittle in both directions: it broke when the tool wrote its report to
+      # stderr, and rewording the message would have silently disabled the check.
+      - name: Verify migrations are idempotent
+        run: |
+          set -euo pipefail
+
+          # `status` exits non-zero while anything is pending. Passing here means
+          # every file is recorded in schema_migrations, which is exactly the
+          # condition under which a second `up` has nothing left to do.
+          go run ./cmd/migrate -dir internal/database/migrations status
+
+          # And running it again must genuinely succeed, not merely skip.
+          go run ./cmd/migrate -dir internal/database/migrations up
+
+          # Still nothing pending afterwards.
+          go run ./cmd/migrate -dir internal/database/migrations status
+
+      # -p 1 runs one package at a time. Three packages share the single test
+      # database — internal/assistant, internal/service and
+      # internal/database/migrate — and only the assistant harness takes an
+      # advisory lock, which serialises it against other copies of itself but
+      # not against the other two. Left parallel, the suite fails intermittently
+      # on rows another package created or removed, and the failure reads like a
+      # product bug rather than a harness one. The whole suite runs in seconds,
+      # so this costs nothing worth having.
+      - name: Test
+        run: go test -race -p 1 -covermode=atomic -coverprofile=coverage.out ./cmd/... ./internal/... ./pkg/...
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
+
+      # Reports only vulnerabilities in code paths this module actually reaches,
+      # so it stays actionable instead of listing every advisory in the graph.
+      - name: Check dependencies for known vulnerabilities
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ env.GO_VERSION }}
+          repo-checkout: false
+
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: ./frontend
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v7
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './frontend/package-lock.json'
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
 
-    - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
 
-    - name: Build
-      run: npm run build
+      # Type errors previously only surfaced during `npm run build`, where they
+      # were easy to miss among the bundler output.
+      - name: Typecheck
+        run: npx tsc -b --force
+
+      # `npm run lint` caps warnings at the number the tree currently carries, so
+      # a new one fails the build rather than joining a backlog nobody reads.
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # Runtime dependencies only. Dev-tool advisories are noise for a bundle
+      # that ships none of that code to a browser, and a check that is routinely
+      # ignored is worse than no check at all.
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  migrations:
+    name: Migration series
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shiftmaster
+          POSTGRES_PASSWORD: shiftmaster
+          POSTGRES_DB: shiftmaster_fresh
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shiftmaster"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: '5432'
+      DB_USER: shiftmaster
+      DB_PASSWORD: shiftmaster
+      DB_NAME: shiftmaster_fresh
+      DB_SSL_MODE: disable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      # Proves a database can still be built from zero. Two earlier migrations
+      # had broken this without anyone noticing, because nothing ever tried.
+      - name: Build a database from an empty schema
+        run: go run ./cmd/migrate -dir internal/database/migrations up
+
+      # Uses the tool's own contract rather than querying the ledger with psql:
+      # "nothing pending" is the same assertion as "every file is recorded", and
+      # it does not depend on a client binary happening to be on the runner.
+      - name: Confirm every migration was recorded
+        run: go run ./cmd/migrate -dir internal/database/migrations status
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      # Run through the image rather than the action so both Dockerfiles are
+      # covered explicitly, and so the command here is the same one a developer
+      # can run locally to reproduce a failure.
+      #
+      # DL3008/DL3018: apt and apk package versions are not pinned. Pinning them
+      # against a rolling distro mirror produces builds that break when the
+      # mirror rotates, which is a worse failure than the one it prevents.
+      - name: Lint Dockerfiles
+        run: |
+          set -euo pipefail
+          for f in Dockerfile frontend/Dockerfile; do
+            echo "── $f"
+            docker run --rm -i hadolint/hadolint:v2.15.1-alpine \
+              hadolint --ignore DL3008 --ignore DL3018 - < "$f"
+          done
+
+      # Built through the action so the layer cache is shared with the compose
+      # run below: `docker compose up` then finds every layer already present.
+      - name: Build the API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: api
+          tags: shiftmaster/api:local
+          load: true
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build the web image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          tags: shiftmaster/web:local
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # The AI variant is optional at run time but must not be allowed to rot:
+      # it pins a llama.cpp release by URL, and a renamed or withdrawn asset
+      # would otherwise be discovered by whoever next tried to enable the
+      # assistant. Built, not run — running it needs a model no CI runner
+      # should be downloading.
+      #
+      # Pinned to amd64 because that is the only Linux binary the release
+      # publishes. Stated here rather than inferred from the runner, so this
+      # step keeps meaning the same thing if the fleet ever moves to arm.
+      - name: Build the AI variant of the API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: api-ai
+          platforms: linux/amd64
+          tags: shiftmaster/api-ai:local
+          load: true
+          cache-from: type=gha,scope=api-ai
+          cache-to: type=gha,mode=max,scope=api-ai
+
+      # The images building is not the claim worth making. This starts the real
+      # stack — Postgres, the migration one-shot, the API, Caddy — and proves
+      # the wiring: that migrations apply to an empty volume, that the API comes
+      # up healthy against them, and that the edge serves the app and proxies
+      # the API on one origin.
+      - name: Start the stack
+        run: |
+          set -euo pipefail
+          cp deploy/docker.env.example .env.docker
+          # One password, written to both the variable that seeds initdb and the
+          # one the API connects with; they have to agree or nothing starts.
+          pw="ci-$(openssl rand -hex 12)"
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${pw}/" .env.docker
+          sed -i "s/^DB_PASSWORD=.*/DB_PASSWORD=${pw}/" .env.docker
+          # The API rejects placeholder and low-entropy signing keys, so CI has
+          # to generate a real one exactly as an operator would.
+          # Both secrets are required in production, which is what the image
+          # sets; a missing one crash-loops the API instead of starting it
+          # insecurely.
+          sed -i "s/^JWT_SECRET=.*/JWT_SECRET=$(openssl rand -hex 32)/" .env.docker
+          sed -i "s/^APP_SECRET_KEY=.*/APP_SECRET_KEY=$(openssl rand -hex 32)/" .env.docker
+          docker compose up -d --wait web
+
+      - name: Verify the stack answers
+        run: |
+          set -euo pipefail
+
+          # Proxied through Caddy to the API, which round-trips the database
+          # before answering — so this is an end-to-end assertion, not a
+          # liveness ping.
+          health="$(curl -fsS http://localhost:8080/health)"
+          echo "health: $health"
+          echo "$health" | grep -q '"status":"healthy"'
+
+          # The SPA itself, and the fallback that makes client-side routing work.
+          curl -fsS http://localhost:8080/ | grep -qi 'id="root"'
+          curl -fsS -o /dev/null http://localhost:8080/some/deep/route
+
+          # An unauthenticated API call must be refused rather than served.
+          code="$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/employees)"
+          echo "unauthenticated /api/employees: $code"
+          case "$code" in 401|403) ;; *) echo "::error::expected 401/403, got $code"; exit 1 ;; esac
+
+          # The migration one-shot must have finished cleanly; a non-zero exit
+          # there means the API started against a schema that was never applied.
+          rc="$(docker compose ps -a --format json migrate | python3 -c 'import sys,json; print(json.loads(sys.stdin.readline())["ExitCode"])')"
+          echo "migrate exit code: $rc"
+          [ "$rc" = "0" ]
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v --remove-orphans

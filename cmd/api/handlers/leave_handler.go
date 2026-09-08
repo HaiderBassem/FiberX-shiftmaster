@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -21,12 +23,12 @@ func NewLeaveHandler(leaveSvc *service.LeaveService) *LeaveHandler {
 
 type createLeaveRequest struct {
 	LeaveTypeID uuid.UUID `json:"leave_type_id" binding:"required"`
-	StartDate   string  `json:"start_date" binding:"required"`
-	EndDate     string  `json:"end_date" binding:"required"`
-	Reason      *string `json:"reason"`
-	Attachments *string `json:"attachments"`
-	StartTime   *string `json:"start_time"` // For hourly leaves (HH:MM)
-	EndTime     *string `json:"end_time"`   // For hourly leaves (HH:MM)
+	StartDate   string    `json:"start_date" binding:"required"`
+	EndDate     string    `json:"end_date" binding:"required"`
+	Reason      *string   `json:"reason"`
+	Attachments *string   `json:"attachments"`
+	StartTime   *string   `json:"start_time"` // For hourly leaves (HH:MM)
+	EndTime     *string   `json:"end_time"`   // For hourly leaves (HH:MM)
 }
 
 // Request creates a new leave request.
@@ -293,14 +295,26 @@ func (h *LeaveHandler) SyncBalances(c *gin.Context) {
 }
 
 // MyBalances returns the authenticated employee's own leave balances.
+// leaveBalanceYear reads the optional ?year= parameter, defaulting to the current
+// year.
+//
+// Both callers previously hardcoded 2026 and discarded the parameter entirely,
+// which happened to be correct during 2026 and would silently have returned the
+// wrong year's balances from January 2027 onwards.
+func leaveBalanceYear(c *gin.Context) int {
+	if raw := c.Query("year"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 2000 && parsed <= 2200 {
+			return parsed
+		}
+	}
+	return time.Now().Year()
+}
+
 func (h *LeaveHandler) MyBalances(c *gin.Context) {
 	empIDStr, _ := c.Get("employee_id")
 	empID, _ := uuid.Parse(empIDStr.(string))
 
-	year := 2026
-	if c.Query("year") != "" {
-		// Could parse year string to int here
-	}
+	year := leaveBalanceYear(c)
 
 	balances, err := h.leaveSvc.GetEmployeeLeaveBalances(c.Request.Context(), empID, year)
 	if err != nil {
@@ -319,13 +333,8 @@ func (h *LeaveHandler) GetEmployeeBalances(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid employee ID"})
 		return
 	}
-	
-	// Optional year param, default 2026
-	year := 2026
-	if c.Query("year") != "" {
-		// Could parse year string to int here
-		// ignoring for simplicity and hardcoding 2026 as this app is for 2026
-	}
+
+	year := leaveBalanceYear(c)
 
 	balances, err := h.leaveSvc.GetEmployeeLeaveBalances(c.Request.Context(), empID, year)
 	if err != nil {
@@ -349,7 +358,7 @@ func (h *LeaveHandler) UpdateEmployeeBalance(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid leave_type_id"})
 		return
 	}
-	
+
 	var req struct {
 		Year            int     `json:"year"`
 		Month           int     `json:"month"`

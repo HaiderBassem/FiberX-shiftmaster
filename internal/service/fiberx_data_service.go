@@ -75,7 +75,7 @@ func (s *FiberxDataService) UpdateDocument(ctx context.Context, doc *models.Fibe
 	if existing.AccessLevel != "write" {
 		return nil, errors.New("you do not have write access to this document")
 	}
-	
+
 	existing.Title = doc.Title
 	existing.Content = doc.Content
 	return s.repo.UpdateDocument(ctx, &existing.FiberxData)
@@ -113,7 +113,7 @@ func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, t
 	}
 
 	// targetEmp, err := s.empRepo.GetByID(ctx, targetEmployeeID) // if we needed to verify target emp
-	
+
 	if departmentID == nil {
 		return errors.New("employee does not belong to a department")
 	}
@@ -124,7 +124,7 @@ func (s *FiberxDataService) SetEmployeeAccess(ctx context.Context, documentID, t
 	if doc == nil {
 		return errors.New("document not found")
 	}
-	
+
 	if doc.AccessLevel != "write" {
 		return errors.New("you do not have write access to this document")
 	}
@@ -150,7 +150,7 @@ func (s *FiberxDataService) GetEmployeeAccessList(ctx context.Context, documentI
 	if doc == nil {
 		return nil, errors.New("document not found")
 	}
-	
+
 	return s.repo.GetEmployeeAccessList(ctx, documentID)
 }
 
@@ -198,6 +198,6 @@ func (s *FiberxDataService) GetDepartmentShares(ctx context.Context, documentID 
 	if doc == nil {
 		return nil, errors.New("document not found")
 	}
-	
+
 	return s.repo.GetDepartmentShares(ctx, documentID)
 }

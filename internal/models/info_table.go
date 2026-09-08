@@ -14,10 +14,10 @@ type InfoTableColumn struct {
 }
 
 type InfoTable struct {
-	ID           uuid.UUID         `json:"id"`
-	Name         string            `json:"name"`
-	Description  *string           `json:"description"`
-	Columns      []InfoTableColumn `json:"columns"`
+	ID            uuid.UUID         `json:"id"`
+	Name          string            `json:"name"`
+	Description   *string           `json:"description"`
+	Columns       []InfoTableColumn `json:"columns"`
 	DepartmentID  *uuid.UUID        `json:"department_id"`
 	CreatedBy     *uuid.UUID        `json:"created_by"`
 	CreatedAt     time.Time         `json:"created_at"`

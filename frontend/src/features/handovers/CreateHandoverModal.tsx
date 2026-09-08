@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { X } from 'lucide-react';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import { useTranslation } from 'react-i18next';
@@ -19,7 +19,7 @@ export default function CreateHandoverModal({
   const [error, setError] = useState('');
 
   const mutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { shift_summary: string; pending_issues: string }) => {
       const res = await api.post('/handovers', data);
       return res.data;
     },
@@ -30,8 +30,8 @@ export default function CreateHandoverModal({
       setError('');
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.response?.data?.error || t('handovers.failed_create_handover'));
+    onError: (err: unknown) => {
+      setError(apiError(err) || t('handovers.failed_create_handover'));
     },
   });
 

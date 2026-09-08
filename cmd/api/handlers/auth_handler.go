@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -9,7 +10,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/middleware"
+	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/service"
 )
 
@@ -17,18 +20,18 @@ import (
 type AuthHandler struct {
 	authService     *service.AuthService
 	employeeService *service.EmployeeService
-	jwtSecret       string
-	accessExpMin    int
-	refreshExpDays  int
+	jwtCfg          config.JWTConfig
+	// secureCookies marks issued cookies Secure. Disabled outside production so
+	// they still work over plain http in local development.
+	secureCookies bool
 }
 
-func NewAuthHandler(authSvc *service.AuthService, empSvc *service.EmployeeService, jwtSecret string, accessExpMin, refreshExpDays int) *AuthHandler {
+func NewAuthHandler(authSvc *service.AuthService, empSvc *service.EmployeeService, jwtCfg config.JWTConfig, secureCookies bool) *AuthHandler {
 	return &AuthHandler{
 		authService:     authSvc,
 		employeeService: empSvc,
-		jwtSecret:       jwtSecret,
-		accessExpMin:    accessExpMin,
-		refreshExpDays:  refreshExpDays,
+		jwtCfg:          jwtCfg,
+		secureCookies:   secureCookies,
 	}
 }
 
@@ -58,51 +61,104 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	var deptID *string
-	if emp.DepartmentID != nil {
-		idStr := emp.DepartmentID.String()
-		deptID = &idStr
-	}
-
-	accessToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, deptID, time.Duration(h.accessExpMin)*time.Minute)
+	accessToken, refreshToken, err := h.issueTokens(emp)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate token"})
 		return
 	}
 
-	refreshToken, err := h.generateToken(emp.ID.String(), emp.Email, emp.Role, deptID, time.Duration(h.refreshExpDays)*24*time.Hour)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate refresh token"})
-		return
-	}
+	h.setUploadCookie(c, emp)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": loginResponse{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
-			ExpiresIn:    h.accessExpMin * 60,
+			ExpiresIn:    h.jwtCfg.AccessExpireMin * 60,
 			Employee:     emp,
 		},
 	})
 }
 
-func (h *AuthHandler) generateToken(employeeID, email, role string, departmentID *string, expiry time.Duration) (string, error) {
+// setUploadCookie grants the browser access to stored files.
+//
+// Images are referenced by <img> tags, including tags inside rich-text content
+// held in the database, and a browser sends no Authorization header with those
+// requests. The cookie is scoped to the upload routes, HttpOnly and SameSite
+// strict, so it is neither readable by script nor usable by another origin.
+func (h *AuthHandler) setUploadCookie(c *gin.Context, emp *models.Employee) {
+	var deptID *string
+	if emp.DepartmentID != nil {
+		idStr := emp.DepartmentID.String()
+		deptID = &idStr
+	}
+
+	claims := &middleware.Claims{
+		EmployeeID:   emp.ID.String(),
+		Email:        emp.Email,
+		Role:         emp.Role,
+		DepartmentID: deptID,
+	}
+
+	if err := middleware.IssueUploadCookie(c, claims, h.jwtCfg.Secret, h.jwtCfg.Issuer, h.secureCookies); err != nil {
+		// Not fatal: the session is still usable, images simply will not load
+		// until the next successful refresh re-issues the cookie.
+		log.Printf("auth: failed to issue upload cookie for %s: %v", emp.ID, err)
+	}
+}
+
+// Logout clears the upload cookie. The access and refresh tokens are held by the
+// client, which discards them; this exists so the one credential the browser
+// stores on our behalf does not outlive the session.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	middleware.ClearUploadCookie(c, h.secureCookies)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "signed out"}})
+}
+
+// issueTokens mints a matched access/refresh pair from the employee's *current*
+// database state. Callers must never build tokens from claims carried by an
+// incoming token, or a role or department change would not take effect until the
+// refresh token finally expired.
+func (h *AuthHandler) issueTokens(emp *models.Employee) (accessToken string, refreshToken string, err error) {
+	var deptID *string
+	if emp.DepartmentID != nil {
+		idStr := emp.DepartmentID.String()
+		deptID = &idStr
+	}
+
+	accessToken, err = h.generateToken(emp, deptID, middleware.TokenTypeAccess, h.jwtCfg.AccessTokenDuration())
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err = h.generateToken(emp, deptID, middleware.TokenTypeRefresh, h.jwtCfg.RefreshTokenDuration())
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (h *AuthHandler) generateToken(emp *models.Employee, departmentID *string, tokenType string, expiry time.Duration) (string, error) {
+	now := time.Now()
 	claims := middleware.Claims{
-		EmployeeID:   employeeID,
-		Email:        email,
-		Role:         role,
+		EmployeeID:   emp.ID.String(),
+		Email:        emp.Email,
+		Role:         emp.Role,
 		DepartmentID: departmentID,
+		TokenType:    tokenType,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Issuer:    "shiftmaster-api",
+			Subject:   emp.ID.String(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(expiry)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    h.jwtCfg.Issuer,
 			ID:        uuid.New().String(),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(h.jwtSecret))
+	return token.SignedString([]byte(h.jwtCfg.Secret))
 }
 
 type changePasswordRequest struct {
@@ -182,6 +238,11 @@ type refreshRequest struct {
 }
 
 // Refresh validates a refresh token and issues new access + refresh tokens.
+//
+// The employee is re-read from the database on every refresh and the new tokens are
+// signed from that current state. Authorization carried by the incoming token is
+// treated as untrusted input: without this, a deactivated, locked-out or demoted
+// employee would keep their former privileges until the refresh token expired.
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req refreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -189,51 +250,42 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	// Parse and validate the refresh token
-	claims := &middleware.Claims{}
-	token, err := jwt.ParseWithClaims(req.RefreshToken, claims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method")
-		}
-		return []byte(h.jwtSecret), nil
-	})
-	if err != nil || !token.Valid {
+	// Only a refresh token is accepted here; an access token is rejected.
+	claims, err := middleware.ParseToken(req.RefreshToken, h.jwtCfg.Secret, h.jwtCfg.Issuer, middleware.TokenTypeRefresh)
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid or expired refresh token"})
 		return
 	}
 
-	// Generate new tokens
-	accessToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, claims.DepartmentID, time.Duration(h.accessExpMin)*time.Minute)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate access token"})
-		return
-	}
-
-	refreshToken, err := h.generateToken(claims.EmployeeID, claims.Email, claims.Role, claims.DepartmentID, time.Duration(h.refreshExpDays)*24*time.Hour)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate refresh token"})
-		return
-	}
-
-	// Fetch employee data
 	empID, err := uuid.Parse(claims.EmployeeID)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "invalid token claims"})
 		return
 	}
 
-	emp, err := h.employeeService.GetByID(c.Request.Context(), empID)
+	// Re-validate against current database state: existence, employment status and
+	// authentication lock are all re-checked here, exactly as they are at login.
+	emp, err := h.authService.GetAuthorizedEmployee(c.Request.Context(), empID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "employee not found"})
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": err.Error()})
 		return
 	}
+
+	accessToken, refreshToken, err := h.issueTokens(emp)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to generate token"})
+		return
+	}
+
+	// Renew alongside the tokens so a long session never loses image access.
+	h.setUploadCookie(c, emp)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data": loginResponse{
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
-			ExpiresIn:    h.accessExpMin * 60,
+			ExpiresIn:    h.jwtCfg.AccessExpireMin * 60,
 			Employee:     emp,
 		},
 	})

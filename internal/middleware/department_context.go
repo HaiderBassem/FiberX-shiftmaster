@@ -71,7 +71,7 @@ func DepartmentContext(deptRepo repository.DepartmentRepository) gin.HandlerFunc
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to verify department access"})
 				return
 			}
-			
+
 			hasAccess := false
 			for _, d := range managedDepts {
 				if d.ID == reqDeptID {
@@ -98,6 +98,5 @@ func DepartmentContext(deptRepo repository.DepartmentRepository) gin.HandlerFunc
 		}
 
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"success": false, "error": "you can only access your own department"})
-		return
 	}
 }

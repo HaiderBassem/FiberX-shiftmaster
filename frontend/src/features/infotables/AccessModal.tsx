@@ -1,21 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, UserPlus, Trash2 } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import type { InfoTable, InfoTableDepartmentAccess, InfoTableEmployeeAccess } from '../../types/infoTable';
+import type { Department, Employee } from '@/types/domain';
 import { useAuthStore } from '@/store/authStore';
-
-interface Department {
-  id: string;
-  name: string;
-}
-
-interface Employee {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-}
 
 interface AccessModalProps {
   isOpen: boolean;
@@ -46,8 +35,8 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
     try {
       setLoading(true);
       const [deps, emps, access] = await Promise.all([
-        api.get('/departments').then(res => res.data?.data || []),
-        api.get('/employees').then(res => res.data?.data || []),
+        api.get('/departments').then(res => (res.data?.data || []) as Department[]),
+        api.get('/employees').then(res => (res.data?.data || []) as Employee[]),
         infoTableService.getAccessLists(table.id)
       ]);
       setDepartments(deps);
@@ -55,7 +44,7 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
       // Filter employees if not admin
       let filteredEmps = emps;
       if (user?.role !== 'admin') {
-        filteredEmps = emps.filter((e: any) => e.department_id === user?.department_id);
+        filteredEmps = emps.filter((e) => e.department_id === user?.department_id);
       }
       setEmployees(filteredEmps);
       
@@ -74,8 +63,8 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
       await infoTableService.shareWithDepartment(table.id, selectedDepId);
       setSelectedDepId('');
       fetchData(); // Refresh list
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to share with department');
+    } catch (error: unknown) {
+      alert(apiError(error) || 'Failed to share with department');
     }
   };
 
@@ -85,8 +74,8 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
       await infoTableService.addEmployeeAccess(table.id, selectedEmpId, accessLevel);
       setSelectedEmpId('');
       fetchData(); // Refresh list
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to add employee access');
+    } catch (error: unknown) {
+      alert(apiError(error) || 'Failed to add employee access');
     }
   };
 
@@ -94,8 +83,8 @@ const AccessModal: React.FC<AccessModalProps> = ({ isOpen, onClose, table }) => 
     try {
       await infoTableService.removeEmployeeAccess(table.id, employeeId);
       fetchData(); // Refresh list
-    } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to remove employee access');
+    } catch (error: unknown) {
+      alert(apiError(error) || 'Failed to remove employee access');
     }
   };
 

@@ -4,29 +4,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"time"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
 	"shiftmaster-backend/internal/service"
+	"shiftmaster-backend/internal/upload"
 )
 
 type AnnouncementHandler struct {
 	announcementRepo repository.AnnouncementRepository
 	announcementSvc  service.AnnouncementService
+	uploadCfg        config.UploadConfig
 }
 
-func NewAnnouncementHandler(ar repository.AnnouncementRepository, svc service.AnnouncementService) *AnnouncementHandler {
+func NewAnnouncementHandler(ar repository.AnnouncementRepository, svc service.AnnouncementService, uploadCfg config.UploadConfig) *AnnouncementHandler {
 	return &AnnouncementHandler{
 		announcementRepo: ar,
 		announcementSvc:  svc,
+		uploadCfg:        uploadCfg,
 	}
 }
-
 
 func (h *AnnouncementHandler) GetActive(c *gin.Context) {
 	depID := getDepartmentID(c)
@@ -81,17 +84,59 @@ func (h *AnnouncementHandler) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": announcements})
 }
 
+// storedUploadPath reports whether s is a same-origin path into the
+// authenticated upload store — the only shape this application has ever
+// written into announcements.images. It is the validation gate for
+// client-supplied image URLs, which round-trip previously stored values
+// through the editor: anything else (absolute URLs, javascript:, data:,
+// traversal or query-bearing strings) has no legitimate way to appear there
+// and is dropped.
+func storedUploadPath(s string) bool {
+	if !strings.HasPrefix(s, "/api/uploads/") && !strings.HasPrefix(s, "/uploads/") {
+		return false
+	}
+	if strings.Contains(s, "..") || strings.ContainsAny(s, "?#\\") {
+		return false
+	}
+	return true
+}
+
+// filterStoredUploadPaths keeps only values storedUploadPath accepts.
+func filterStoredUploadPaths(urls []string) []string {
+	kept := urls[:0]
+	for _, u := range urls {
+		if storedUploadPath(u) {
+			kept = append(kept, u)
+		}
+	}
+	return kept
+}
+
 func (h *AnnouncementHandler) Create(c *gin.Context) {
+	// Authorization first: image files must not be written to disk for a
+	// requester who is not allowed to post announcements at all. The service
+	// re-checks this on create; this early check only prevents the side effect.
+	requesterStr, _ := c.Get("employee_id")
+	requesterID, _ := uuid.Parse(requesterStr.(string))
+	roleValue, _ := c.Get("role")
+	role, _ := roleValue.(string)
+	if !h.announcementSvc.CanManage(c.Request.Context(), requesterID, role) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to post announcements"})
+		return
+	}
+
 	contentType := c.ContentType()
 
 	var req models.Announcement
 
 	if contentType == "application/json" {
-		// Legacy JSON support (no images)
+		// Legacy JSON support. Image URLs arriving this way are client input
+		// too, and pass through the same gate as existing_images below.
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 			return
 		}
+		req.Images = filterStoredUploadPaths(req.Images)
 	} else {
 		// Multipart form data (with images)
 		req.Title = c.PostForm("title")
@@ -103,42 +148,43 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 		req.IsActive = c.PostForm("is_active") == "true"
 		req.IsTicker = c.PostForm("is_ticker") == "true"
 
-		// Handle image uploads
+		// Announcement images go through the same sanitize-and-store pipeline
+		// as every other upload: decoded, re-encoded, stored under a
+		// server-generated name in the configured base path. This used to write
+		// raw client bytes under a hardcoded ./uploads/announcements, which
+		// bypassed validation entirely and broke whenever UPLOAD_BASE_PATH
+		// pointed anywhere else — the serving handler reads the configured path.
 		form, _ := c.MultipartForm()
 		if form != nil && form.File["images"] != nil {
-			uploadDir := "./uploads/announcements"
-			if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "could not create upload directory"})
-				return
+			opts := upload.Options{
+				MaxBytes:     h.uploadCfg.MaxSizeBytes(),
+				AllowedTypes: h.uploadCfg.AllowedTypes,
 			}
+			dir := filepath.Join(h.uploadCfg.BasePath, "announcements")
 
 			var imageURLs []string
 			for _, file := range form.File["images"] {
-				// Max 5MB per image
-				if file.Size > 5*1024*1024 {
-					c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": fmt.Sprintf("Image %s exceeds 5MB limit", file.Filename)})
+				img, err := upload.SanitizeImage(file, opts)
+				if err != nil {
+					respondUploadError(c, err)
 					return
 				}
-
-				fileName := fmt.Sprintf("%s_%d_%s", uuid.New().String()[:8], time.Now().UnixNano(), file.Filename)
-				filePath := fmt.Sprintf("%s/%s", uploadDir, fileName)
-
-				if err := c.SaveUploadedFile(file, filePath); err != nil {
+				if _, err := upload.Store(dir, img); err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "failed to save image"})
 					return
 				}
-
-				publicURL := fmt.Sprintf("/api/uploads/announcements/%s", fileName)
-				imageURLs = append(imageURLs, publicURL)
+				imageURLs = append(imageURLs, fmt.Sprintf("/api/uploads/announcements/%s", img.Filename))
 			}
 			req.Images = imageURLs
 		}
 
-		// Also check for JSON-encoded images field (URLs from existing images)
+		// URLs of already-stored images, round-tripped by the editor when an
+		// announcement is re-posted with its old pictures. Only paths this
+		// server could have issued are accepted.
 		if existingImages := c.PostForm("existing_images"); existingImages != "" {
 			var urls []string
 			if err := json.Unmarshal([]byte(existingImages), &urls); err == nil {
-				req.Images = append(req.Images, urls...)
+				req.Images = append(req.Images, filterStoredUploadPaths(urls)...)
 			}
 		}
 	}
@@ -148,9 +194,6 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 		req.Images = []string{}
 	}
 
-	// Basic authorization check
-	requesterStr, _ := c.Get("employee_id")
-	requesterID, _ := uuid.Parse(requesterStr.(string))
 	req.CreatedBy = requesterID
 
 	depID := getDepartmentID(c)
@@ -159,9 +202,6 @@ func (h *AnnouncementHandler) Create(c *gin.Context) {
 		return
 	}
 	req.DepartmentID = *depID
-
-	roleStr, _ := c.Get("role")
-	role := roleStr.(string)
 
 	if err := h.announcementSvc.CreateAnnouncement(c.Request.Context(), &req, role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -176,6 +216,12 @@ func (h *AnnouncementHandler) Delete(c *gin.Context) {
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
+		return
+	}
+
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
 		return
 	}
 
@@ -199,6 +245,12 @@ func (h *AnnouncementHandler) SetActive(c *gin.Context) {
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
+		return
+	}
+
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
 		return
 	}
 
@@ -233,6 +285,12 @@ func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Invalid announcement ID"})
 		return
 	}
+	me, ok := actorID(c)
+	if !ok || !h.announcementSvc.CanManage(c.Request.Context(), me, actorRole(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "error": "unauthorized to manage announcements"})
+		return
+	}
+
 	depID := getDepartmentID(c)
 	if depID == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "Department ID is required"})
@@ -245,4 +303,3 @@ func (h *AnnouncementHandler) Deactivate(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

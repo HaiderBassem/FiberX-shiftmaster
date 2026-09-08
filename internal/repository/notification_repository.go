@@ -16,10 +16,10 @@ type NotificationRepository interface {
 	GetUnread(ctx context.Context, recipientID uuid.UUID) ([]models.Notification, error)
 	GetUnreadCount(ctx context.Context, recipientID uuid.UUID) (int, error)
 	Create(ctx context.Context, n *models.Notification) error
-	MarkAsRead(ctx context.Context, id uuid.UUID) error
+	MarkAsRead(ctx context.Context, id, recipientID uuid.UUID) error
 	MarkAllAsRead(ctx context.Context, recipientID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
-	
+
 	// Web Push Subscriptions
 	SavePushSubscription(ctx context.Context, sub *models.PushSubscription) error
 	GetPushSubscriptionsByEmployeeID(ctx context.Context, employeeID uuid.UUID) ([]models.PushSubscription, error)
@@ -67,7 +67,11 @@ func (r *notificationRepo) GetUnreadCount(ctx context.Context, recipientID uuid.
 	return count, err
 }
 
-func (r *notificationRepo) scanNotifications(rows interface{ Next() bool; Scan(...interface{}) error; Err() error }) ([]models.Notification, error) {
+func (r *notificationRepo) scanNotifications(rows interface {
+	Next() bool
+	Scan(...interface{}) error
+	Err() error
+}) ([]models.Notification, error) {
 	var notifs []models.Notification
 	for rows.Next() {
 		var n models.Notification
@@ -91,9 +95,13 @@ func (r *notificationRepo) Create(ctx context.Context, n *models.Notification) e
 	).Scan(&n.ID, &n.IsRead, &n.CreatedAt)
 }
 
-func (r *notificationRepo) MarkAsRead(ctx context.Context, id uuid.UUID) error {
+// MarkAsRead flips one notification, but only the recipient's own — without
+// the recipient predicate any authenticated user could mark any notification
+// in the system as read by ID.
+func (r *notificationRepo) MarkAsRead(ctx context.Context, id, recipientID uuid.UUID) error {
 	_, err := r.db.Exec(ctx,
-		`UPDATE notifications SET is_read=true, read_at=CURRENT_TIMESTAMP WHERE id=$1`, id)
+		`UPDATE notifications SET is_read=true, read_at=CURRENT_TIMESTAMP
+		 WHERE id=$1 AND recipient_id=$2`, id, recipientID)
 	return err
 }
 

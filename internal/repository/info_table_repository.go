@@ -176,6 +176,34 @@ func (r *InfoTableRepository) DeleteTable(ctx context.Context, id uuid.UUID) err
 
 // --- Rows ---
 
+// SearchTableRows returns up to limit rows whose JSON matches the search
+// text, for the assistant. Callers MUST have verified table access first
+// (service.GetTableByID); this query bounds work in SQL because GetTableRows
+// is unbounded and a large table must not be dragged into memory per chat turn.
+func (r *InfoTableRepository) SearchTableRows(ctx context.Context, tableID uuid.UUID, search string, limit int) ([]models.InfoTableRow, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT id, table_id, data, created_by, created_at, updated_at
+		 FROM info_table_rows
+		 WHERE table_id = $1 AND ($2 = '' OR data::text ILIKE '%' || $2 || '%')
+		 ORDER BY created_at ASC
+		 LIMIT $3`,
+		tableID, search, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []models.InfoTableRow
+	for rows.Next() {
+		var row models.InfoTableRow
+		if err := rows.Scan(&row.ID, &row.TableID, &row.Data, &row.CreatedBy, &row.CreatedAt, &row.UpdatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (r *InfoTableRepository) GetTableRows(ctx context.Context, tableID uuid.UUID) ([]models.InfoTableRow, error) {
 	query := `SELECT id, table_id, data, created_by, created_at, updated_at FROM info_table_rows WHERE table_id = $1 ORDER BY created_at ASC`
 	rows, err := r.db.Query(ctx, query, tableID)

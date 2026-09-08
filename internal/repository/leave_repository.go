@@ -20,6 +20,10 @@ type LeaveRepository interface {
 	GetByDateRange(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetOverlappingLeavesCount(ctx context.Context, departmentID uuid.UUID, startDate, endDate time.Time) (int, error)
 	GetOverlappingLeavesCountByShift(ctx context.Context, departmentID uuid.UUID, shiftID uuid.UUID, date time.Time, isHourly bool) (int, error)
+	// GetActiveByEmployeeInRange returns the employee's own leaves that are
+	// still live (pending or approved) and whose date range touches [from, to].
+	// Used for double-booking checks; the caller compares hourly windows.
+	GetActiveByEmployeeInRange(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.Leave, error)
 	GetApprovedForSchedule(ctx context.Context, from, to time.Time) ([]models.Leave, error)
 	GetPendingForApproval(ctx context.Context, approverRole string, approverDeptID *uuid.UUID) ([]models.Leave, error)
 	Create(ctx context.Context, leave *models.Leave) error
@@ -45,14 +49,15 @@ func NewLeaveRepository(db *database.DB) LeaveRepository {
 	return &leaveRepo{db: db}
 }
 
-const leaveColumns = `l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en, l.start_date, l.end_date, l.total_days, l.reason, l.status,
+const leaveColumns = `l.id, l.employee_id, l.leave_type_id, lt.name_ar as leave_type_name_ar, lt.name_en as leave_type_name_en,
+	COALESCE(lt.is_hourly, false) as leave_type_is_hourly, l.start_date, l.end_date, l.total_days, l.reason, l.status,
 	l.applied_date, l.approved_by_team_leader, l.approved_by_manager, l.rejection_reason, l.attachments,
 	l.start_time, l.end_time, l.created_at, l.updated_at`
 
 func (r *leaveRepo) scanLeave(row pgx.Row) (*models.Leave, error) {
 	var l models.Leave
 	err := row.Scan(
-		&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
+		&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.LeaveTypeIsHourly, &l.StartDate, &l.EndDate, &l.TotalDays,
 		&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 		&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 	)
@@ -64,7 +69,7 @@ func (r *leaveRepo) scanLeaves(rows pgx.Rows) ([]models.Leave, error) {
 	for rows.Next() {
 		var l models.Leave
 		if err := rows.Scan(
-			&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.StartDate, &l.EndDate, &l.TotalDays,
+			&l.ID, &l.EmployeeID, &l.LeaveTypeID, &l.LeaveTypeNameAr, &l.LeaveTypeNameEn, &l.LeaveTypeIsHourly, &l.StartDate, &l.EndDate, &l.TotalDays,
 			&l.Reason, &l.Status, &l.AppliedDate, &l.ApprovedByTeamLeader, &l.ApprovedByManager,
 			&l.RejectionReason, &l.Attachments, &l.StartTime, &l.EndTime, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
@@ -91,7 +96,12 @@ func (r *leaveRepo) GetLeavesForReminders(ctx context.Context) ([]models.Leave, 
 	rows, err := r.db.Query(ctx,
 		`SELECT `+leaveColumns+` FROM leaves l
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
-		 WHERE l.status IN ('approved_by_team_leader', 'approved_by_manager', 'approved')
+		 -- 'approved' is not one of the leave_status labels ('pending',
+		 -- 'approved_by_team_leader', 'approved_by_manager', 'rejected', 'cancelled'),
+		 -- and an unknown enum literal fails the whole query rather than matching
+		 -- nothing, so this ran hourly and never sent a single reminder:
+		 --   ERROR: invalid input value for enum leave_status: "approved"
+		 WHERE l.status IN ('approved_by_team_leader', 'approved_by_manager')
 		   AND l.reminder_sent_at IS NULL
 		   AND l.start_date = CURRENT_DATE + INTERVAL '2 days'
 		   AND l.applied_date <= l.start_date - INTERVAL '3 days'`)
@@ -105,6 +115,22 @@ func (r *leaveRepo) GetLeavesForReminders(ctx context.Context) ([]models.Leave, 
 func (r *leaveRepo) MarkReminderSent(ctx context.Context, leaveID uuid.UUID) error {
 	_, err := r.db.Exec(ctx, `UPDATE leaves SET reminder_sent_at = CURRENT_TIMESTAMP WHERE id = $1`, leaveID)
 	return err
+}
+
+func (r *leaveRepo) GetActiveByEmployeeInRange(ctx context.Context, employeeID uuid.UUID, from, to time.Time) ([]models.Leave, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT `+leaveColumns+` FROM leaves l
+		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
+		 WHERE l.employee_id = $1
+		   AND l.status IN ('pending', 'approved_by_team_leader', 'approved_by_manager')
+		   AND l.start_date <= $3 AND l.end_date >= $2
+		 ORDER BY l.start_date`,
+		employeeID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("get active leaves in range: %w", err)
+	}
+	defer rows.Close()
+	return r.scanLeaves(rows)
 }
 
 func (r *leaveRepo) GetByEmployee(ctx context.Context, employeeID uuid.UUID) ([]models.Leave, error) {
@@ -146,9 +172,9 @@ func (r *leaveRepo) GetOverlappingLeavesCount(ctx context.Context, departmentID 
 		 LEFT JOIN leave_types lt ON lt.id = l.leave_type_id
 		 WHERE e.department_id = $1 
 		   AND l.status NOT IN ('rejected', 'cancelled')
-		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND COALESCE(lt.bypasses_daily_limit, false) = false
 		   AND l.start_date <= $3 
-		   AND l.end_date >= $2`, 
+		   AND l.end_date >= $2`,
 		departmentID, startDate, endDate).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count: %w", err)
@@ -167,11 +193,11 @@ func (r *leaveRepo) GetOverlappingLeavesCountByShift(ctx context.Context, depart
 		 WHERE e.department_id = $1 
 		   AND COALESCE(es.shift_id, e.default_shift_id) = $2
 		   AND l.status NOT IN ('rejected', 'cancelled')
-		   AND (lt.name_en IS NULL OR LOWER(lt.name_en) != 'emergency')
+		   AND COALESCE(lt.bypasses_daily_limit, false) = false
 		   AND l.start_date <= $3 
 		   AND l.end_date >= $3
-		   AND ($4::boolean = false OR lt.unit = 'hours')
-		   AND ($4::boolean = true OR lt.unit = 'days')`, 
+		   AND ($4::boolean = false OR COALESCE(lt.is_hourly, false) = true)
+		   AND ($4::boolean = true OR COALESCE(lt.is_hourly, false) = false)`,
 		departmentID, shiftID, date, isHourly).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("get overlapping leaves count by shift: %w", err)

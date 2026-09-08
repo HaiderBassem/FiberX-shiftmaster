@@ -48,8 +48,8 @@ type ScheduleRepository interface {
 	UpdateEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	UpdateShiftStatus(ctx context.Context, id uuid.UUID, status string, reason *string) error
 	AssignReplacement(ctx context.Context, id uuid.UUID, replacementEmployeeID uuid.UUID, approvedBy uuid.UUID) error
-	CheckIn(ctx context.Context, id uuid.UUID) error
-	CheckOut(ctx context.Context, id uuid.UUID) error
+	CheckIn(ctx context.Context, id, employeeID uuid.UUID) (bool, error)
+	CheckOut(ctx context.Context, id, employeeID uuid.UUID) (bool, error)
 	UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error
 	// UpsertGeneratedShift writes a pattern-derived day, leaving manual and leave days alone.
 	UpsertGeneratedShift(ctx context.Context, es *models.EmployeeShift) error
@@ -166,6 +166,16 @@ func (r *scheduleRepo) DeleteTemplate(ctx context.Context, id uuid.UUID) error {
 // no historical row is ever removed. A weekday carrying several still-valid entries
 // gets them all updated to the same value, which converges on the right answer
 // whichever one templateWinnerOrder later picks.
+//
+// valid_from is deliberately left untouched. It is part of the table's
+// UNIQUE(employee_id, day_of_week, valid_from), so rewriting it to CURRENT_DATE across
+// several duplicate entries collapses them onto one key and the update fails with
+//
+//	duplicate key value violates unique constraint
+//	"schedule_templates_employee_id_day_of_week_valid_from_key"
+//
+// Older databases really do carry those duplicates. Since no column of the unique key
+// is modified here, this update cannot collide regardless of how many entries exist.
 func (r *scheduleRepo) UpsertTemplateForDay(
 	ctx context.Context,
 	employeeID uuid.UUID,
@@ -177,7 +187,6 @@ func (r *scheduleRepo) UpsertTemplateForDay(
 		`UPDATE schedule_templates
 		    SET shift_id   = $1,
 		        is_off     = $2,
-		        valid_from = CURRENT_DATE,
 		        updated_at = CURRENT_TIMESTAMP
 		  WHERE employee_id = $3 AND day_of_week = $4 AND valid_to IS NULL`,
 		shiftID, isOff, employeeID, dayOfWeek)
@@ -379,7 +388,7 @@ func (r *scheduleRepo) GetDepartmentShiftsInRange(ctx context.Context, from, to 
 		WHERE es.shift_date BETWEEN $1 AND $2
 		  AND e.department_id = $3
 		ORDER BY e.first_name, e.last_name, es.shift_date`
-		
+
 	rows, err := r.db.Query(ctx, query, from, to, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get department shifts in range: %w", err)
@@ -496,18 +505,32 @@ func (r *scheduleRepo) AssignReplacement(ctx context.Context, id uuid.UUID, repl
 	return err
 }
 
-func (r *scheduleRepo) CheckIn(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
-		`UPDATE employee_shifts SET check_in_time=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id)
-	return err
+// CheckIn stamps the check-in once. The predicate keeps it idempotent (a
+// second click cannot rewrite the original time) and self-scoped (only the
+// row's own employee can stamp it — this used to accept any row ID from any
+// authenticated user).
+func (r *scheduleRepo) CheckIn(ctx context.Context, id, employeeID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
+		`UPDATE employee_shifts SET check_in_time=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$1 AND employee_id=$2 AND check_in_time IS NULL`, id, employeeID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
-func (r *scheduleRepo) CheckOut(ctx context.Context, id uuid.UUID) error {
-	_, err := r.db.Exec(ctx,
+// CheckOut stamps the check-out once, only after a check-in exists — a
+// check-out with no check-in used to compute NULL worked hours.
+func (r *scheduleRepo) CheckOut(ctx context.Context, id, employeeID uuid.UUID) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`UPDATE employee_shifts SET check_out_time=CURRENT_TIMESTAMP,
 			actual_worked_hours=EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - check_in_time))/3600,
-			updated_at=CURRENT_TIMESTAMP WHERE id=$1`, id)
-	return err
+			updated_at=CURRENT_TIMESTAMP
+		 WHERE id=$1 AND employee_id=$2 AND check_in_time IS NOT NULL AND check_out_time IS NULL`, id, employeeID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *scheduleRepo) UpsertEmployeeShift(ctx context.Context, es *models.EmployeeShift) error {
@@ -594,7 +617,7 @@ func (r *scheduleRepo) DeleteEmployeeShift(ctx context.Context, id uuid.UUID) er
 // These are the best candidates to cover a shift today since they had rest yesterday.
 func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.Time, departmentID *uuid.UUID) ([]models.Employee, error) {
 	previousDay := date.AddDate(0, 0, -1)
-	
+
 	query := `SELECT e.id, e.employee_code, e.first_name, e.last_name, e.gender, e.phone, e.email, e.password_hash,
 				e.hire_date, e.role, e.department_id, e.position, e.default_shift_id, e.weekly_off_days,
 				e.can_cover_night_shift, e.status, e.profile_image, e.remember_token, e.last_login, e.secondary_phone, e.secondary_email,
@@ -608,7 +631,7 @@ func (r *scheduleRepo) GetAvailableReplacements(ctx context.Context, date time.T
 		       SELECT employee_id FROM employee_shifts
 		       WHERE shift_date = $2 AND shift_status = 'working'
 		   )`
-	
+
 	args := []interface{}{previousDay, date}
 	if departmentID != nil {
 		query += ` AND e.department_id = $3`
@@ -654,7 +677,9 @@ func (r *scheduleRepo) GetEligibleAssignees(ctx context.Context, shiftID uuid.UU
 		   AND NOT EXISTS (
 		       SELECT 1 FROM leaves lr
 		       WHERE lr.employee_id = e.id
-		         AND lr.status = 'approved'
+		         -- Matches GetApprovedForSchedule: manager approval is the terminal
+		         -- approved state. 'approved' is not a leave_status label at all.
+		         AND lr.status = 'approved_by_manager'
 		         AND $2::date BETWEEN lr.start_date AND lr.end_date
 		   )
 		   AND NOT EXISTS (
@@ -807,7 +832,7 @@ func (r *scheduleRepo) GetShiftCoveragePreview(ctx context.Context, shiftID uuid
 		 FROM employee_shifts 
 		 WHERE shift_date = $1 AND shift_id = $2`, date, shiftID,
 	).Scan(&coverage.TotalAssigned, &coverage.TotalWorking, &coverage.TotalOff, &coverage.TotalOnLeave)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("get shift coverage preview: %w", err)
 	}

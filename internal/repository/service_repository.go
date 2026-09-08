@@ -152,8 +152,6 @@ func (r *serviceRepo) DeleteCategory(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-
-
 // ═══════════════════════════════════════════════════════════
 // Plans
 // ═══════════════════════════════════════════════════════════

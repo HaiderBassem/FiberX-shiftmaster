@@ -19,6 +19,10 @@ type LeaveType struct {
 	Unit             string    `json:"unit"`          // 'days' or 'hours'
 	ResetCycle       string    `json:"reset_cycle"`   // 'annual' or 'monthly'
 	CarriesForward   bool      `json:"carries_forward"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	// IsHourly and BypassesDailyLimit carry semantics that used to be inferred by
+	// matching name_en, which administrators can rename at will.
+	IsHourly           bool      `json:"is_hourly"`
+	BypassesDailyLimit bool      `json:"bypasses_daily_limit"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }

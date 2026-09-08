@@ -4,11 +4,12 @@ import { X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useTranslation } from 'react-i18next';
+import type { LeaveType } from '@/types/domain';
 
 interface LeaveRequestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  leaveTypes: any[];
+  leaveTypes: LeaveType[];
   isLoadingTypes: boolean;
   leaveTypeId: string;
   setLeaveTypeId: (id: string) => void;
@@ -81,7 +82,7 @@ export const LeaveRequestModal: React.FC<LeaveRequestModalProps> = ({
                     onChange={(e) => setLeaveTypeId(e.target.value)} 
                     disabled={isLoadingTypes}
                   >
-                    {leaveTypes?.map((type: any) => (
+                    {leaveTypes?.map((type) => (
                       <option key={type.id} value={type.id}>{type.name_en}</option>
                     ))}
                   </select>

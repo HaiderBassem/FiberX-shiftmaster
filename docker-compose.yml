@@ -1,0 +1,116 @@
+# ShiftMaster, end to end: database, migrations, API, web.
+#
+#   cp deploy/docker.env.example .env.docker   # then fill in JWT_SECRET
+#   docker compose up -d --build
+#
+# The assistant is absent from this file on purpose. It needs a multi-gigabyte
+# model that does not belong in an image or a git repository, and the product is
+# designed to run without one — the panel reports itself unavailable and nothing
+# else changes. To add it:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d --build
+
+name: shiftmaster
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      # The schema stores non-ASCII names throughout; an initdb that defaulted
+      # to SQL_ASCII would sort and compare them wrongly.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Deliberately not published. Nothing outside this network needs the
+    # database; add a ports entry locally if you want to attach a client.
+    healthcheck:
+      # $$ escapes for compose, so the shell inside the container expands it and
+      # the check follows POSTGRES_USER instead of hardcoding a name.
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    security_opt: [ "no-new-privileges:true" ]
+
+  # Runs to completion before the API starts, so the API never meets a schema it
+  # does not understand. Same image as the API: one build, and no way for the
+  # migration tool and the server to drift apart.
+  migrate:
+    build:
+      context: .
+      target: api
+    image: shiftmaster/api:local
+    restart: "no"
+    env_file: .env.docker
+    environment:
+      DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["shiftmaster-migrate"]
+    command: ["-dir", "/app/migrations", "up"]
+    read_only: true
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+
+  api:
+    build:
+      context: .
+      target: api
+    image: shiftmaster/api:local
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      DB_HOST: postgres
+      # The default is 127.0.0.1, which is right when Caddy runs on the same
+      # host and wrong here: the proxy is another container, at an address
+      # Docker assigns and neither of us can predict.
+      #
+      # This is only safe because the service below publishes no port, so the
+      # web container is the only thing that can reach it. Publish the API and
+      # this becomes a real hole — X-Forwarded-For feeds the rate limiter and
+      # the IP blocker, and anyone able to connect could then spoof their
+      # address. If you ever need it reachable directly, narrow this to the
+      # proxy's address instead of widening the exposure.
+      TRUSTED_PROXIES: 0.0.0.0/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - uploads:/app/uploads
+    # Not published: the web container is the only thing that should reach it,
+    # and it does so over the compose network.
+    read_only: true
+    tmpfs:
+      # Multipart uploads are buffered through the temp directory before they
+      # are validated and moved into /app/uploads.
+      - /tmp:mode=1777,size=64m
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+
+  web:
+    build:
+      context: ./frontend
+    image: shiftmaster/web:local
+    restart: unless-stopped
+    ports:
+      # Caddy listens on 8080 inside the container so it can run unprivileged.
+      # Publish 80 here when this is the edge; keep 8080 when something else is.
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=16m
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+
+volumes:
+  pgdata:
+  uploads:

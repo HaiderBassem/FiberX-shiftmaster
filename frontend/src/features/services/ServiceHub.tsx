@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/authStore';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import type { ServiceCategory, Province } from './types';
 import { ServicePlans } from './ServicePlans';
 import { ProvinceManager } from './ProvinceManager';
@@ -27,9 +28,11 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import type { User } from '@/store/authStore';
+import type { TFunction } from 'i18next';
 
 /* ─── helpers ─────────────────────────────────────────── */
-const canManage = (user: any) =>
+const canManage = (user: User | null) =>
   user?.role === 'admin' ||
   ((user?.role === 'team_leader' || user?.role === 'manager') && user?.can_manage_services === true);
 
@@ -61,8 +64,8 @@ function CategoryModal({
       }
       onSaved();
       onClose();
-    } catch (e: any) {
-      setErr(e.response?.data?.error ?? t('services.error_occurred'));
+    } catch (e: unknown) {
+      setErr(apiError(e) ?? t('services.error_occurred'));
     } finally { setBusy(false); }
   };
 
@@ -116,11 +119,11 @@ function CategoryModal({
 function SortableCategoryCard({
   cat, manager, province, t, onSelectCategory, setDelConfirm, setModalCat, toggleMut, isDragEnabled
 }: {
-  cat: ServiceCategory; manager: boolean; province: Province; t: any;
+  cat: ServiceCategory; manager: boolean; province: Province; t: TFunction;
   onSelectCategory: (cat: ServiceCategory) => void;
   setDelConfirm: (cat: ServiceCategory) => void;
   setModalCat: (cat: ServiceCategory) => void;
-  toggleMut: any;
+  toggleMut: UseMutationResult<unknown, unknown, ServiceCategory>;
   isDragEnabled: boolean;
 }) {
   const {

@@ -1,0 +1,47 @@
+# Overlay that gives the API a local language model, so the Home-page assistant
+# works inside containers.
+#
+#     AI_MODEL_FILE=/absolute/path/to/model.gguf \
+#       docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d --build
+#
+# There is no separate model container, and that is a design constraint rather
+# than a simplification: internal/config refuses to start when AI_BASE_URL is
+# anything but loopback or a Unix socket, because a remote inference endpoint
+# would send employee data off the premises. Running llama.cpp beside the API in
+# the same container keeps 127.0.0.1 genuinely local.
+#
+# The model file stays on the host and is mounted read-only. It is gigabytes, it
+# has its own release cadence, and baking it into an image would make every
+# code change re-push it.
+#
+# Provision one with deploy/provision-ai.sh, which picks a model the hardware
+# can actually run, or point AI_MODEL_FILE at a GGUF you already have.
+
+services:
+  api:
+    build:
+      target: api-ai
+    image: shiftmaster/api-ai:local
+    volumes:
+      - ${AI_MODEL_FILE:?set AI_MODEL_FILE to the absolute path of a .gguf model}:/app/models/model.gguf:ro
+    environment:
+      AI_ENABLED: "true"
+      AI_MANAGED: "true"
+      AI_MODEL_PATH: /app/models/model.gguf
+      AI_BASE_URL: http://127.0.0.1:8081
+      # CPU inference by default: a container has no GPU unless the runtime was
+      # started with one. Override to -1 to offload everything that fits.
+      AI_GPU_LAYERS: "${AI_GPU_LAYERS:-0}"
+    # Loading a multi-gigabyte model on a cold page cache genuinely takes
+    # minutes, and the API is healthy the whole time — the assistant is not what
+    # /health measures. The longer start period keeps Docker from calling the
+    # container unhealthy while the model is still reading in.
+    healthcheck:
+      start_period: 300s
+
+  # The migrate service shares the api service's build in the base file. Pinning
+  # it back to the smaller image keeps the one-shot from pulling llama.cpp in.
+  migrate:
+    build:
+      target: api
+    image: shiftmaster/api:local

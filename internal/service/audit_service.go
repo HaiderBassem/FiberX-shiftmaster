@@ -22,4 +22,3 @@ func NewAuditService(auditRepo repository.AuditLogRepository) *AuditService {
 func (s *AuditService) GetActivityForEmployee(ctx context.Context, employeeID uuid.UUID, limit int) ([]models.AuditLog, error) {
 	return s.auditRepo.GetByEmployee(ctx, employeeID, limit)
 }
-

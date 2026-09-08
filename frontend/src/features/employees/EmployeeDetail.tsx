@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Key, ArrowLeft, Mail, Phone, Briefcase, Building2, CalendarDays, Users, Edit3, Save, X, PhoneCall, AtSign } from 'lucide-react';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { EmployeeLeaveBalances } from './EmployeeLeaveBalances';
+import { assetUrl } from '@/lib/assets';
+import type { EmployeeStatus } from '@/types/domain';
 
 type Employee = {
   id: string;
@@ -27,7 +29,7 @@ type Employee = {
   weekly_off_days: number;
   can_cover_night_shift: boolean;
   can_post_announcements: boolean;
-  status: string;
+  status: EmployeeStatus;
   last_login: string | null;
   secondary_phone: string | null;
   secondary_email: string | null;
@@ -67,7 +69,7 @@ export const EmployeeDetail = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Partial<Employee>) => {
       setError(null);
       await api.put(`/employees/${id}`, data);
     },
@@ -76,7 +78,7 @@ export const EmployeeDetail = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsEditing(false);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to update'),
   });
 
   const deptMap = useMemo(() => {
@@ -144,7 +146,7 @@ export const EmployeeDetail = () => {
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 sm:gap-3">
               {employee.profile_image ? (
                 <img 
-                  src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${employee.profile_image.startsWith('/api') ? employee.profile_image : '/api' + employee.profile_image}`}
+                  src={assetUrl(employee.profile_image)}
                   alt="Profile"
                   className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border border-border"
                 />
@@ -266,10 +268,11 @@ export const EmployeeDetail = () => {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <select className={selectClass} value={editData.status || ''} onChange={(e) => setEditData({...editData, status: e.target.value})}>
+                <select className={selectClass} value={editData.status || ''} onChange={(e) => setEditData({...editData, status: e.target.value as EmployeeStatus})}>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
-                  <option value="suspended">Suspended</option>
+                  <option value="on_leave">On Leave</option>
+                  <option value="terminated">Terminated</option>
                 </select>
               </div>
             </div>

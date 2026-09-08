@@ -7,23 +7,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Trash2, Plus, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import type { LeaveType } from '@/types/domain';
+
+/**
+ * The editable subset of a leave type. `id` rides along when saving an existing
+ * one; the derived flags (is_hourly, bypasses_daily_limit) are not edited here.
+ */
+type LeaveTypeForm = Pick<
+  LeaveType,
+  'name_en' | 'name_ar' | 'requires_approval' | 'is_active' | 'color_code' |
+  'days_per_year' | 'carries_forward' | 'unit' | 'reset_cycle'
+> & { id?: string };
 
 export const LeaveTypeManager = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false, unit: 'days', reset_cycle: 'annual' });
+  const [formData, setFormData] = useState<LeaveTypeForm>({ name_en: '', name_ar: '', requires_approval: true, is_active: true, color_code: '#3b82f6', days_per_year: 0, carries_forward: false, unit: 'days', reset_cycle: 'annual' });
 
   const { data: leaveTypes, isLoading } = useQuery({
     queryKey: ['leave-types'],
     queryFn: async () => {
       const response = await api.get('/leave-types');
-      return response.data?.data || [];
+      return (response.data?.data || []) as LeaveType[];
     },
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (payload: any) => {
+    mutationFn: async (payload: LeaveTypeForm) => {
       if (editingId && editingId !== 'new') {
         return await api.put(`/leave-types/${editingId}`, payload);
       } else {
@@ -46,7 +57,7 @@ export const LeaveTypeManager = () => {
     },
   });
 
-  const handleEdit = (type: any) => {
+  const handleEdit = (type: LeaveType) => {
     setEditingId(type.id);
     setFormData({
       name_en: type.name_en,
@@ -141,7 +152,7 @@ export const LeaveTypeManager = () => {
                   <select 
                     className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     value={formData.unit} 
-                    onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                    onChange={e => setFormData({ ...formData, unit: e.target.value as LeaveType['unit'] })}
                   >
                     <option value="days">{t('leaves.days')}</option>
                     <option value="hours">{t('leaves.hours')}</option>
@@ -152,7 +163,7 @@ export const LeaveTypeManager = () => {
                   <select 
                     className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     value={formData.reset_cycle} 
-                    onChange={e => setFormData({ ...formData, reset_cycle: e.target.value })}
+                    onChange={e => setFormData({ ...formData, reset_cycle: e.target.value as LeaveType['reset_cycle'] })}
                   >
                     <option value="annual">{t('leaves.annual')}</option>
                     <option value="monthly">{t('leaves.monthly')}</option>
@@ -177,7 +188,7 @@ export const LeaveTypeManager = () => {
         {isLoading ? (
           <div className="col-span-full text-center text-muted-foreground py-8">{t('leaves.loading_types')}</div>
         ) : (
-          leaveTypes?.map((type: any) => (
+          leaveTypes?.map((type) => (
             editingId === type.id ? (
               <Card key={type.id} className="border-primary">
                 <CardHeader>
@@ -214,7 +225,7 @@ export const LeaveTypeManager = () => {
                       <select 
                         className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         value={formData.unit} 
-                        onChange={e => setFormData({ ...formData, unit: e.target.value })}
+                        onChange={e => setFormData({ ...formData, unit: e.target.value as LeaveType['unit'] })}
                       >
                         <option value="days">{t('leaves.days')}</option>
                         <option value="hours">{t('leaves.hours')}</option>
@@ -225,7 +236,7 @@ export const LeaveTypeManager = () => {
                       <select 
                         className="flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                         value={formData.reset_cycle} 
-                        onChange={e => setFormData({ ...formData, reset_cycle: e.target.value })}
+                        onChange={e => setFormData({ ...formData, reset_cycle: e.target.value as LeaveType['reset_cycle'] })}
                       >
                         <option value="annual">{t('leaves.annual')}</option>
                         <option value="monthly">{t('leaves.monthly')}</option>

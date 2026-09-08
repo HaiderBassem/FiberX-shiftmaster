@@ -9,6 +9,7 @@ import (
 
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/service"
+	"shiftmaster-backend/internal/temporal"
 )
 
 // TaskHandler handles task schedule, assignment, execution, and board endpoints.
@@ -538,7 +539,7 @@ func (h *TaskHandler) DeleteAssignment(c *gin.Context) {
 func (h *TaskHandler) DailyAssignments(c *gin.Context) {
 	dateStr := c.Query("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = temporal.DateString(temporal.BusinessDate(time.Now()))
 	}
 	date, err := parseTime(dateStr)
 	if err != nil {
@@ -561,7 +562,7 @@ func (h *TaskHandler) MyTasks(c *gin.Context) {
 	empID, _ := uuid.Parse(empIDStr.(string))
 	dateStr := c.Query("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = temporal.DateString(temporal.BusinessDate(time.Now()))
 	}
 	date, err := parseTime(dateStr)
 	if err != nil {
@@ -590,8 +591,13 @@ func (h *TaskHandler) StartExecution(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid execution ID"})
 		return
 	}
-	if err := h.taskSvc.StartTask(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+	actor, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.taskSvc.StartTask(c.Request.Context(), id, actor, actorRole(c)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"message": "task started"}})
@@ -613,7 +619,12 @@ func (h *TaskHandler) UpdateExecutionStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "invalid request: " + err.Error()})
 		return
 	}
-	if err := h.taskSvc.UpdateTaskStatus(c.Request.Context(), id, req.Status, req.Notes); err != nil {
+	actor, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.taskSvc.UpdateTaskStatus(c.Request.Context(), id, actor, actorRole(c), req.Status, req.Notes); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -636,7 +647,12 @@ func (h *TaskHandler) CompleteExecution(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "completion_type is required (without_issue or with_issue)"})
 		return
 	}
-	if err := h.taskSvc.CompleteTask(c.Request.Context(), id, req.CompletionType, req.Notes); err != nil {
+	actor, ok := actorID(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "error": "authentication required"})
+		return
+	}
+	if err := h.taskSvc.CompleteTask(c.Request.Context(), id, actor, actorRole(c), req.CompletionType, req.Notes); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -647,7 +663,7 @@ func (h *TaskHandler) CompleteExecution(c *gin.Context) {
 func (h *TaskHandler) TaskHistory(c *gin.Context) {
 	dateStr := c.Query("date")
 	if dateStr == "" {
-		dateStr = time.Now().Format("2006-01-02")
+		dateStr = temporal.DateString(temporal.BusinessDate(time.Now()))
 	}
 	date, err := parseTime(dateStr)
 	if err != nil {

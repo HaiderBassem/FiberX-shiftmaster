@@ -11,6 +11,16 @@ import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import type { EmployeeShift, EmployeeShiftExtended, Leave, ShiftSwap, Shift } from '@/types/domain';
+
+/**
+ * A scheduled row as this calendar receives it. The supervisor view reads the
+ * department endpoint, which joins the employee on (name, role, default shift);
+ * the personal view reads one employee's own rows and carries none of that. The
+ * joined fields are therefore optional, and only read on the supervisor path.
+ */
+type CalendarShiftRow = EmployeeShift &
+  Partial<Pick<EmployeeShiftExtended, 'first_name' | 'last_name' | 'employee_role' | 'default_shift_id'>>;
 
 export const InteractiveCalendar = () => {
   const { user } = useAuthStore();
@@ -34,7 +44,7 @@ export const InteractiveCalendar = () => {
     queryKey: ['shifts'],
     queryFn: async () => {
       const res = await api.get('/shifts');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Shift[];
     },
     enabled: isSupervisor,
   });
@@ -45,11 +55,11 @@ export const InteractiveCalendar = () => {
     queryFn: async () => {
       if (isSupervisor) {
         const res = await api.get(`/schedules/department?from=${startDateStr}&to=${endDateStr}`);
-        return res.data?.data || [];
+        return (res.data?.data || []) as CalendarShiftRow[];
       } else {
         if (!employeeIdToFetch) return [];
         const res = await api.get(`/schedules/employee/${employeeIdToFetch}?from=${startDateStr}&to=${endDateStr}`);
-        return res.data?.data || [];
+        return (res.data?.data || []) as CalendarShiftRow[];
       }
     },
     enabled: isSupervisor ? true : !!employeeIdToFetch,
@@ -61,7 +71,7 @@ export const InteractiveCalendar = () => {
     queryFn: async () => {
       const endpoint = isSupervisor ? '/leaves/history' : '/leaves/me';
       const res = await api.get(endpoint);
-      return res.data?.data || [];
+      return (res.data?.data || []) as Leave[];
     },
     enabled: true,
   });
@@ -72,7 +82,7 @@ export const InteractiveCalendar = () => {
     queryFn: async () => {
       const endpoint = isSupervisor ? '/swaps/history' : '/swaps/me';
       const res = await api.get(endpoint);
-      return res.data?.data || [];
+      return (res.data?.data || []) as ShiftSwap[];
     },
     enabled: true,
   });
@@ -86,12 +96,12 @@ export const InteractiveCalendar = () => {
 
   // Group data by date
   const eventsByDate = useMemo(() => {
-    const map: Record<string, { shifts: any[], leaves: any[], swaps: any[] }> = {};
+    const map: Record<string, { shifts: CalendarShiftRow[]; leaves: Leave[]; swaps: ShiftSwap[] }> = {};
     calendarDays.forEach(day => {
       map[format(day, 'yyyy-MM-dd')] = { shifts: [], leaves: [], swaps: [] };
     });
 
-    (shifts || []).forEach((s: any) => {
+    (shifts || []).forEach(s => {
       if (isSupervisor && selectedShiftId !== 'all') {
         if (s.default_shift_id !== selectedShiftId && s.shift_id !== selectedShiftId) return;
       }
@@ -103,7 +113,7 @@ export const InteractiveCalendar = () => {
       if (map[dateKey]) map[dateKey].shifts.push(s);
     });
 
-    (leaves || []).forEach((l: any) => {
+    (leaves || []).forEach(l => {
       if (isSupervisor) return; // For supervisors, leaves are shown via shifts (shift_status = leave)
       const start = parseISO(l.start_date);
       const end = parseISO(l.end_date);
@@ -114,7 +124,7 @@ export const InteractiveCalendar = () => {
       });
     });
 
-    (swaps || []).forEach((s: any) => {
+    (swaps || []).forEach(s => {
       const dateKey = s.shift_date?.split('T')[0];
       if (map[dateKey]) map[dateKey].swaps.push(s);
     });
@@ -147,7 +157,7 @@ export const InteractiveCalendar = () => {
               onChange={(e) => setSelectedShiftId(e.target.value)}
             >
               <option value="all">All Shifts</option>
-              {(availableShifts || []).map((s: any) => (
+              {(availableShifts || []).map(s => (
                 <option key={s.id} value={s.id}>
                   {s.name} ({s.start_time.slice(11, 16)} - {s.end_time.slice(11, 16)})
                 </option>
@@ -228,11 +238,11 @@ export const InteractiveCalendar = () => {
                             {isSupervisor ? (
                               <>
                                 {/* Show all non-working shifts for the department */}
-                                {data?.shifts.filter((s: any) => s.shift_status !== 'working').map((s: any, i: number) => (
+                                {data?.shifts.filter(s => s.shift_status !== 'working').map((s, i) => (
                                   <SupervisorShiftBadge key={`shift-${i}`} shift={s} />
                                 ))}
                                 {/* Show swaps in the department */}
-                                {data?.swaps.map((s: any, i: number) => (
+                                {data?.swaps.map((s, i) => (
                                   <SupervisorSwapBadge key={`swap-${i}`} swap={s} />
                                 ))}
                               </>
@@ -251,12 +261,12 @@ export const InteractiveCalendar = () => {
                                 )}
 
                                 {/* Leaves */}
-                                {data?.leaves.map((l: any, i: number) => (
+                                {data?.leaves.map((l, i) => (
                                   <LeaveBadge key={i} leave={l} />
                                 ))}
 
                                 {/* Swaps */}
-                                {data?.swaps.map((s: any, i: number) => (
+                                {data?.swaps.map((s, i) => (
                                   <SwapBadge key={i} swap={s} currentUserId={user?.id || ''} />
                                 ))}
                               </>
@@ -279,7 +289,9 @@ export const InteractiveCalendar = () => {
 // ─── Subcomponents ────────────────────────────────────────────────────────────
 
 /** Detect if a shift row is actually an hourly leave (stored as 'leave' with [hourly] in reason). */
-function resolveCalendarStatus(row: any): string {
+function resolveCalendarStatus(
+  row: Partial<Pick<EmployeeShift, 'shift_status' | 'leave_reason'>> | null | undefined,
+): string {
   const raw = String(row?.shift_status || 'working').toLowerCase();
   if (raw === 'leave' && row?.leave_reason && String(row.leave_reason).startsWith('[hourly]')) {
     return 'hourly';
@@ -288,7 +300,7 @@ function resolveCalendarStatus(row: any): string {
   return raw;
 }
 
-const ShiftBadge = ({ shift }: { shift: any }) => {
+const ShiftBadge = ({ shift }: { shift: CalendarShiftRow }) => {
   const status = resolveCalendarStatus(shift);
   
   let styles = "bg-muted text-foreground border-border";
@@ -305,7 +317,11 @@ const ShiftBadge = ({ shift }: { shift: any }) => {
   );
 };
 
-const LeaveBadge = ({ leave }: { leave: any }) => {
+const LeaveBadge = ({ leave }: { leave: Leave }) => {
+  // The API sends leave_type_name_ar / _en. A bare `leave_type_name` was read
+  // here and there is no such field, so every leave on the calendar showed the
+  // generic word instead of its type. Same order the task and leave views use.
+  const leaveTypeName = leave.leave_type_name_ar || leave.leave_type_name_en || 'Leave';
   const isApproved = leave.status === 'approved_by_manager' || leave.status === 'approved_by_team_leader';
   const isRejected = leave.status === 'rejected';
   
@@ -314,18 +330,18 @@ const LeaveBadge = ({ leave }: { leave: any }) => {
   if (isRejected) styles = "bg-destructive/10 text-destructive border-destructive/20 line-through opacity-70";
 
   return (
-    <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex justify-between items-center ${styles}`} title={leave.leave_type_name}>
-      <span>🌴 {leave.leave_type_name || 'Leave'}</span>
+    <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex justify-between items-center ${styles}`} title={leaveTypeName}>
+      <span>🌴 {leaveTypeName}</span>
       {!isApproved && !isRejected && <span className="opacity-70 text-[9px]">(Pend)</span>}
     </div>
   );
 };
 
-const SwapBadge = ({ swap, currentUserId }: { swap: any, currentUserId: string }) => {
+const SwapBadge = ({ swap, currentUserId }: { swap: ShiftSwap; currentUserId: string }) => {
   const isRequester = swap.requester_id === currentUserId;
   const isApproved = swap.status === 'approved';
   
-  let styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+  const styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
   
   return (
     <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`Swap ${isRequester ? 'Out' : 'In'}`}>
@@ -335,7 +351,7 @@ const SwapBadge = ({ swap, currentUserId }: { swap: any, currentUserId: string }
   );
 };
 
-const SupervisorShiftBadge = ({ shift }: { shift: any }) => {
+const SupervisorShiftBadge = ({ shift }: { shift: CalendarShiftRow }) => {
   const status = resolveCalendarStatus(shift);
   
   let styles = "bg-muted text-foreground border-border";
@@ -355,9 +371,9 @@ const SupervisorShiftBadge = ({ shift }: { shift: any }) => {
   );
 };
 
-const SupervisorSwapBadge = ({ swap }: { swap: any }) => {
+const SupervisorSwapBadge = ({ swap }: { swap: ShiftSwap }) => {
   const isApproved = swap.status === 'approved';
-  let styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+  const styles = "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
   
   return (
     <div className={`text-[10px] sm:text-[11px] font-medium px-1.5 py-0.5 rounded-md border truncate flex gap-1 items-center ${styles}`} title={`${swap.requester_name} 🔄 ${swap.target_employee_name}`}>

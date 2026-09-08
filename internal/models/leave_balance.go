@@ -8,16 +8,16 @@ import (
 
 // EmployeeLeaveBalance tracks an employee's leave balance for a specific year and leave type.
 type EmployeeLeaveBalance struct {
-	ID            uuid.UUID `json:"id"`
-	EmployeeID    uuid.UUID `json:"employee_id"`
-	LeaveTypeID   uuid.UUID `json:"leave_type_id"`
+	ID              uuid.UUID `json:"id"`
+	EmployeeID      uuid.UUID `json:"employee_id"`
+	LeaveTypeID     uuid.UUID `json:"leave_type_id"`
 	Year            int       `json:"year"`
 	Month           int       `json:"month"` // 0 for annual, 1-12 for monthly
 	AllocatedAmount float64   `json:"allocated_amount"`
 	UsedAmount      float64   `json:"used_amount"`
 	PendingAmount   float64   `json:"pending_amount,omitempty" db:"-"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	// Optional joined fields
 	LeaveTypeNameAr string `json:"leave_type_name_ar,omitempty" db:"-"`

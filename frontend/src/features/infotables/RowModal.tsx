@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { infoTableService } from '../../services/api/infoTableService';
-import type { InfoTable, InfoTableRow } from '../../types/infoTable';
+import type { InfoTable, InfoTableRow, InfoTableCell } from '../../types/infoTable';
+import { apiError } from '@/lib/api';
 
 interface RowModalProps {
   isOpen: boolean;
@@ -11,8 +12,14 @@ interface RowModalProps {
   onSave: (row: InfoTableRow) => void;
 }
 
+/**
+ * A cell as a controlled input wants it. A stored 0 or false is a real value,
+ * so it must not fall through to the empty string the way `|| ''` did.
+ */
+const cellText = (v: InfoTableCell | undefined) => (v === null || v === undefined ? '' : String(v));
+
 const RowModal: React.FC<RowModalProps> = ({ isOpen, onClose, table, initialData, onSave }) => {
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, InfoTableCell>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +33,7 @@ const RowModal: React.FC<RowModalProps> = ({ isOpen, onClose, table, initialData
 
   if (!isOpen) return null;
 
-  const handleChange = (colId: string, value: any) => {
+  const handleChange = (colId: string, value: InfoTableCell) => {
     setFormData(prev => ({ ...prev, [colId]: value }));
   };
 
@@ -44,8 +51,8 @@ const RowModal: React.FC<RowModalProps> = ({ isOpen, onClose, table, initialData
       }
       onSave(savedRow);
       onClose();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save row');
+    } catch (err: unknown) {
+      setError(apiError(err) || 'Failed to save row');
     } finally {
       setLoading(false);
     }
@@ -79,28 +86,28 @@ const RowModal: React.FC<RowModalProps> = ({ isOpen, onClose, table, initialData
                 {col.type === 'text' || col.type === 'link' ? (
                   <input
                     type="text"
-                    value={formData[col.id] || ''}
+                    value={cellText(formData[col.id])}
                     onChange={(e) => handleChange(col.id, e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   />
                 ) : col.type === 'number' ? (
                   <input
                     type="number"
-                    value={formData[col.id] || ''}
+                    value={cellText(formData[col.id])}
                     onChange={(e) => handleChange(col.id, Number(e.target.value))}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   />
                 ) : col.type === 'date' ? (
                   <input
                     type="date"
-                    value={formData[col.id] || ''}
+                    value={cellText(formData[col.id])}
                     onChange={(e) => handleChange(col.id, e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   />
                 ) : (
                   <input
                     type="text"
-                    value={formData[col.id] || ''}
+                    value={cellText(formData[col.id])}
                     onChange={(e) => handleChange(col.id, e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500"
                   />

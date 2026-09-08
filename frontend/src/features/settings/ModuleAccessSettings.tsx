@@ -2,13 +2,14 @@ import { useState, useEffect, Component } from 'react';
 import type { ReactNode } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { 
   useAllLinks, useCreateLink, useDeleteLink, 
   useLinkAccess, useSetDepartmentAccess, useSetEmployeeExclusion 
 } from '@/hooks/useModuleAccess';
 import { Switch } from '@/components/ui/switch';
 import { ShieldCheck, Plus, Trash2, Link as LinkIcon, MapPin, Ticket, ExternalLink, Calendar, Users, BookOpen, AlertCircle } from 'lucide-react';
+import type { Department, Employee } from '@/types/domain';
 
 const ICONS = ['link', 'map-pin', 'ticket', 'external-link', 'calendar', 'users', 'book-open'];
 
@@ -48,19 +49,19 @@ const ModuleAccessSettingsInner = () => {
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     }
   });
-  const departments: any[] = departmentsResponse || [];
+  const departments = departmentsResponse ?? [];
 
   const { data: employeesResponse } = useQuery({
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await api.get('/employees');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     }
   });
-  const employees: any[] = employeesResponse || [];
+  const employees = employeesResponse ?? [];
 
   // Links
   const { data: allLinks, isLoading: isLoadingLinks, error: linksError } = useAllLinks();
@@ -107,8 +108,8 @@ const ModuleAccessSettingsInner = () => {
         setNewUrl('');
         setNewIcon('link');
       },
-      onError: (err: any) => {
-        setErrorMessage(err?.response?.data?.error || err?.message || 'Failed to create link. Please try again.');
+      onError: (err: unknown) => {
+        setErrorMessage(apiError(err) || 'Failed to create link. Please try again.');
       }
     });
   };
@@ -247,7 +248,7 @@ const ModuleAccessSettingsInner = () => {
                       onClick={() => {
                         if (confirm('Are you sure you want to delete this link?')) {
                           deleteLink.mutate(link.id, {
-                            onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to delete link.')
+                            onError: (err: unknown) => setErrorMessage(apiError(err) || 'Failed to delete link.')
                           });
                         }
                       }}
@@ -321,7 +322,7 @@ const ModuleAccessSettingsInner = () => {
                                 onCheckedChange={(checked) => 
                                   setDepartmentAccess.mutate(
                                     { linkId: selectedLink, departmentId: dept.id, grant: checked },
-                                    { onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to update department access.') }
+                                    { onError: (err: unknown) => setErrorMessage(apiError(err) || 'Failed to update department access.') }
                                   )
                                 }
                                 disabled={setDepartmentAccess.isPending}
@@ -345,10 +346,10 @@ const ModuleAccessSettingsInner = () => {
                                   <div key={emp.id} className="flex items-center justify-between py-3">
                                     <div className="flex items-center gap-3">
                                       <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 font-bold text-xs border border-blue-500/30">
-                                        {(emp.first_name || emp.name || '?').charAt(0)}
+                                        {(emp.first_name || '?').charAt(0)}
                                       </div>
                                       <div>
-                                        <p className="text-sm font-medium text-gray-200">{emp.first_name ? `${emp.first_name} ${emp.last_name || ''}`.trim() : (emp.name || 'Unknown')}</p>
+                                        <p className="text-sm font-medium text-gray-200">{`${emp.first_name} ${emp.last_name || ''}`.trim() || 'Unknown'}</p>
                                         <p className="text-xs text-gray-500">{emp.role || emp.position || 'employee'}</p>
                                       </div>
                                     </div>
@@ -362,7 +363,7 @@ const ModuleAccessSettingsInner = () => {
                                           // Exclude if checked is false (meaning they shouldn't have access)
                                           setEmployeeExclusion.mutate(
                                             { linkId: selectedLink, employeeId: emp.id, exclude: !checked },
-                                            { onError: (err: any) => setErrorMessage(err?.response?.data?.error || 'Failed to update employee access.') }
+                                            { onError: (err: unknown) => setErrorMessage(apiError(err) || 'Failed to update employee access.') }
                                           )
                                         }
                                         disabled={setEmployeeExclusion.isPending}

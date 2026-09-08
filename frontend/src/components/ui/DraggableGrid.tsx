@@ -31,12 +31,38 @@ export interface GridLayout {
   order: string[]; // item IDs and folder IDs in order
 }
 
-interface DraggableGridProps {
-  items: any[]; // The raw items (tables or docs)
+/**
+ * Reads a saved grid layout out of the user's stored preferences.
+ *
+ * ui_preferences is free-form JSON persisted by the server, so its contents are
+ * unknown at compile time. This narrows a stored value to a usable layout and
+ * returns null when the shape is not what we expect, rather than asserting and
+ * failing later during render.
+ */
+export function readStoredLayout(value: unknown): GridLayout | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<GridLayout>;
+  if (!Array.isArray(candidate.order)) return null;
+  if (!candidate.folders || typeof candidate.folders !== 'object') return null;
+  return { folders: candidate.folders, order: candidate.order } as GridLayout;
+}
+
+
+/**
+ * The grid arranges whatever it is given by id — tables, docs, anything with
+ * one — and hands each back to the caller's own renderer, so the item type
+ * belongs to the caller rather than to this component.
+ */
+interface GridItem {
+  id: string;
+}
+
+interface DraggableGridProps<T extends GridItem> {
+  items: T[];
   layout: GridLayout;
   onLayoutChange: (layout: GridLayout) => void;
-  renderItem: (item: any) => React.ReactNode;
-  onItemClick: (item: any) => void;
+  renderItem: (item: T) => React.ReactNode;
+  onItemClick: (item: T) => void;
   isSearchActive: boolean;
 }
 
@@ -97,14 +123,14 @@ const AddFolderDropZone = ({ id }: { id: string }) => {
   );
 };
 
-export const DraggableGrid: React.FC<DraggableGridProps> = ({
+export const DraggableGrid = <T extends GridItem>({
   items,
   layout,
   onLayoutChange,
   renderItem,
   onItemClick,
   isSearchActive,
-}) => {
+}: DraggableGridProps<T>) => {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -192,7 +218,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
     if (!over) return;
 
     const activeIdStr = active.id as string;
-    let overIdStr = over.id as string;
+    const overIdStr = over.id as string;
 
     if (activeIdStr === overIdStr) return;
 
@@ -339,7 +365,7 @@ export const DraggableGrid: React.FC<DraggableGridProps> = ({
   };
 
   const getItemMap = () => {
-    const map: Record<string, any> = {};
+    const map: Record<string, T> = {};
     items.forEach(i => map[i.id] = i);
     return map;
   };

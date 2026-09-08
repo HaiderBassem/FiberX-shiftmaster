@@ -21,5 +21,20 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/shiftmaster/uploads /var/log/shiftmaster
 
+# Uploaded files are served only to authenticated users, so nothing the service
+# writes should be readable by other accounts on the host.
+UMask=0027
+
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# The API only needs to speak IP; denying other families removes a large slice
+# of kernel attack surface.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
 [Install]
 WantedBy=multi-user.target

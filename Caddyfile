@@ -6,48 +6,65 @@
 # which routes to 127.0.0.1:80. The old "http://192.168.16.138:80" caused
 # the 502 Bad Gateway because Caddy was ignoring requests from 127.0.0.1.
 :80 {
-    # ── Compression ──
-    encode gzip zstd
+	# ── Compression ──
+	encode gzip zstd
 
-    # ── API Reverse Proxy → Go Backend ──
-    handle /api/* {
-        reverse_proxy 127.0.0.1:8080
-    }
+	# ── API Reverse Proxy → Go Backend ──
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080
+	}
 
-    # ── Health Check Route ──
-    handle /health {
-        reverse_proxy 127.0.0.1:8080
-    }
+	# ── Health Check Route ──
+	handle /health {
+		reverse_proxy 127.0.0.1:8080
+	}
 
-    # ── KMZ Map Service (Node.js) ──
-    # handle_path strips the "/maps" prefix before forwarding to port 9999
-    handle_path /maps/* {
-        reverse_proxy 127.0.0.1:9999
-    }
+	# ── KMZ Map Service (Node.js) ──
+	# handle_path strips the "/maps" prefix before forwarding to port 9999
+	handle_path /maps/* {
+		reverse_proxy 127.0.0.1:9999
+	}
 
-    # ── Frontend Static Files (React) ──
-    handle {
-        # Using Linux production path
-        root * /opt/shiftmaster/frontend/dist
-        try_files {path} /index.html
-        file_server
-    }
+	# ── Frontend Static Files (React) ──
+	handle {
+		# Using Linux production path
+		root * /opt/shiftmaster/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
 
-    # ── Security Headers ──
-    header {
-        X-Content-Type-Options nosniff
-        X-Frame-Options DENY
-        Referrer-Policy strict-origin-when-cross-origin
-        -Server
-    }
+	# ── Security Headers ──
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
 
-    # ── Logging ──
-    log {
-        output file /var/log/caddy/shiftmaster.log {
-            roll_size 10mb
-            roll_keep 5
-            roll_keep_for 720h
-        }
-        format json
-    }
+	# ── Logging ──
+	# Credentials must never reach disk. The application authenticates from the
+	# Authorization header everywhere except the WebSocket upgrade, which carries
+	# a 30-second single-use ticket in the query string. Both are redacted here so
+	# a captured log is worthless, and so this stays true if a future change
+	# reintroduces a credential in a URL.
+	log {
+		output file /var/log/caddy/shiftmaster.log {
+			roll_size 10mb
+			roll_keep 5
+			roll_keep_for 720h
+		}
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace ticket REDACTED
+					replace token REDACTED
+					replace access_token REDACTED
+					replace refresh_token REDACTED
+					# Signed upload URLs carry their credential in "sig".
+					replace sig REDACTED
+				}
+			}
+		}
+	}
 }

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { X, Search, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import type { Employee } from '@/types/domain';
 
 interface AnnouncementPermissionsModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const AnnouncementPermissionsModal: React.FC<AnnouncementPermissionsModal
     queryKey: ['employees'],
     queryFn: async () => {
       const res = await api.get('/employees');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Employee[];
     },
     enabled: isOpen,
   });
@@ -36,7 +37,7 @@ export const AnnouncementPermissionsModal: React.FC<AnnouncementPermissionsModal
 
   const filteredEmployees = useMemo(() => {
     if (!employees) return [];
-    return employees.filter((emp: any) =>
+    return employees.filter((emp: Employee) =>
       `${emp.first_name} ${emp.last_name} ${emp.email}`.toLowerCase().includes(search.toLowerCase())
     );
   }, [employees, search]);
@@ -83,7 +84,7 @@ export const AnnouncementPermissionsModal: React.FC<AnnouncementPermissionsModal
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredEmployees.map((emp: any) => (
+              {filteredEmployees.map((emp: Employee) => (
                 <div key={emp.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
                   <div>
                     <div className="font-medium text-sm flex items-center gap-2">

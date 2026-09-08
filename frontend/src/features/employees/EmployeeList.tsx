@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Users, Plus, Search, Loader2, X, Edit3, Trash2, Save, UserCircle, Key } from 'lucide-react';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
+import { assetUrl } from '@/lib/assets';
 
 interface Employee {
   id: string;
@@ -184,8 +185,8 @@ export const EmployeeList = () => {
       setCreatePosition(''); setCreateDept(''); setCreateShift('');
       setCreateSecPhone(''); setCreateSecEmail('');
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to create employee');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to create employee');
     },
   });
 
@@ -218,7 +219,7 @@ export const EmployeeList = () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setEditId(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to update employee'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to update employee'),
   });
 
   const deleteEmployee = useMutation({
@@ -227,7 +228,7 @@ export const EmployeeList = () => {
       await api.delete(`/employees/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employees'] }),
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to delete employee'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to delete employee'),
   });
 
   const startEdit = (emp: Employee) => {
@@ -523,7 +524,7 @@ export const EmployeeList = () => {
                     <div className="flex items-center gap-3 min-w-0">
                       {emp.profile_image ? (
                         <img 
-                          src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${emp.profile_image.startsWith('/api') ? emp.profile_image : '/api' + emp.profile_image}`}
+                          src={assetUrl(emp.profile_image)}
                           alt="Profile"
                           className="w-10 h-10 rounded-xl object-cover shrink-0 border border-border"
                         />

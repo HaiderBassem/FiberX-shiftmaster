@@ -17,10 +17,16 @@ export interface InfoTable {
   my_access_level?: string;
 }
 
+/**
+ * One cell of a table row. The row editor writes strings; the column is JSONB,
+ * so another writer may have left a number, a boolean, or null in it.
+ */
+export type InfoTableCell = string | number | boolean | null;
+
 export interface InfoTableRow {
   id: string;
   table_id: string;
-  data: Record<string, any>;
+  data: Record<string, InfoTableCell>;
   created_by?: string;
   created_at: string;
   updated_at: string;

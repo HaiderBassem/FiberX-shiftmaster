@@ -1,0 +1,35 @@
+# The API image needs the Go module and nothing else. Everything excluded here
+# is either large, secret, or host-specific — and anything that reaches the
+# build context also invalidates the build cache when it changes, so a stray
+# node_modules costs rebuild time on every run.
+
+.git
+.github
+.gitignore
+
+# The frontend is built by frontend/Dockerfile from its own context.
+frontend
+
+# Host state that must never be baked into an image.
+.env
+.env.*
+!.env.example
+uploads
+models
+*.gguf
+logs
+*.log
+
+# Local tooling and editor droppings.
+.ruff_cache
+.claude
+.DS_Store
+node_modules
+coverage.out
+
+# Docs and deployment scripts are not build inputs. provision-ai.sh and the
+# systemd units describe the bare-metal install, which the images replace.
+*.md
+deploy
+Caddyfile
+LICENSE

@@ -1,0 +1,46 @@
+# Everything CI depends on is pinned — the Go toolchain, the Node version, the
+# golangci-lint release, the action tags, the base images, the llama.cpp build.
+# Pinning is what makes a run reproducible, and it is also what lets a version
+# quietly go stale: this repository has already been through one CI that pinned
+# Go 1.22 while go.mod said 1.26, so every run failed to build and none of them
+# meant anything.
+#
+# These updates are the other half of pinning. They arrive as pull requests, so
+# the full suite runs against each one before anybody merges it.
+
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the routine patch traffic; anything major still arrives on
+      # its own, where it can be read properly.
+      go-minor-and-patch:
+        update-types: [ minor, patch ]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [ minor, patch ]
+
+  # Action tags are pinned to the majors that were current when the workflow was
+  # written; without this they stay there indefinitely.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # The base images in both Dockerfiles: golang, debian, node, caddy.
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /frontend
+    schedule:
+      interval: weekly

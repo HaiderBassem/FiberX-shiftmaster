@@ -2,6 +2,7 @@ import api from '@/lib/api';
 import type {
   InfoTable,
   InfoTableRow,
+  InfoTableCell,
   InfoTableDepartmentAccess,
   InfoTableEmployeeAccess,
 } from '../../types/infoTable';
@@ -31,12 +32,12 @@ export const infoTableService = {
     return res.data.data || [];
   },
 
-  createTableRow: async (tableId: string, data: Record<string, any>): Promise<InfoTableRow> => {
+  createTableRow: async (tableId: string, data: Record<string, InfoTableCell>): Promise<InfoTableRow> => {
     const res = await api.post(`/info-tables/${tableId}/rows`, { data });
     return res.data.data;
   },
 
-  updateTableRow: async (tableId: string, rowId: string, data: Record<string, any>): Promise<InfoTableRow> => {
+  updateTableRow: async (tableId: string, rowId: string, data: Record<string, InfoTableCell>): Promise<InfoTableRow> => {
     const res = await api.put(`/info-tables/${tableId}/rows/${rowId}`, { data });
     return res.data.data;
   },

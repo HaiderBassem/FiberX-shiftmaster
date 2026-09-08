@@ -15,7 +15,7 @@ import type { InfoTable } from '../../types/infoTable';
 import { useAuthStore } from '@/store/authStore';
 import CreateTableModal from './CreateTableModal';
 import { TablePermissionsModal } from './TablePermissionsModal';
-import { DraggableGrid } from '../../components/ui/DraggableGrid';
+import { DraggableGrid, readStoredLayout } from '../../components/ui/DraggableGrid';
 import type { GridLayout } from '../../components/ui/DraggableGrid';
 import api from '@/lib/api';
 
@@ -30,8 +30,9 @@ const InfoTableHub: React.FC = () => {
   const [layout, setLayout] = useState<GridLayout>({ folders: {}, order: [] });
 
   useEffect(() => {
-    if (user?.ui_preferences?.reference_layout) {
-      setLayout(user.ui_preferences.reference_layout);
+    const stored = readStoredLayout(user?.ui_preferences?.reference_layout);
+    if (stored) {
+      setLayout(stored);
     }
   }, [user]);
 

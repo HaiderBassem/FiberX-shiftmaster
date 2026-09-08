@@ -1,65 +1,69 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { AlertCircle, AlertTriangle, Bell, Info, X } from 'lucide-react';
 import { announcementService } from '../../services/announcementService';
-import type { Announcement } from '../../services/announcementService';
+import { assetUrl } from '@/lib/assets';
 
-const getImageUrl = (url: string) => {
-  if (url.startsWith('http')) return url;
-  const base = import.meta.env.VITE_API_URL
-    ? import.meta.env.VITE_API_URL.replace('/api', '')
-    : (import.meta.env.DEV ? 'http://localhost:8080' : '');
-  return `${base}${url.startsWith('/api') ? url : '/api' + url}`;
-};
+const getImageUrl = (url: string) => assetUrl(url);
 
 export const AnnouncementBanner: React.FC = () => {
-  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
-  const [isVisible, setIsVisible] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const { t, i18n } = useTranslation();
+  // Dismissal is per announcement: with the banner now refreshing live over
+  // the WebSocket signal, a plain boolean would keep hiding every future
+  // announcement after one dismiss.
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchActiveAnnouncement();
-  }, []);
+  // Under the ['announcements'] prefix so the WebSocket announcement signal
+  // refreshes this banner live; a new announcement used to require a reload.
+  const { data: announcement, isPending: loading } = useQuery({
+    queryKey: ['announcements', 'active'],
+    queryFn: () => announcementService.getActive(),
+    refetchInterval: 5 * 60 * 1000,
+  });
 
-  const fetchActiveAnnouncement = async () => {
-    try {
-      setLoading(true);
-      const data = await announcementService.getActive();
-      setAnnouncement(data);
-    } catch (err) {
-      console.error('Failed to fetch announcement:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading || !announcement || !isVisible) return null;
+  if (loading || !announcement || announcement.id === dismissedId) return null;
 
   const getPriorityStyles = (priority: string) => {
     switch (priority) {
       case 'critical':
-        return 'bg-red-50 text-red-800 border-red-200';
+        return 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-900';
       case 'important':
-        return 'bg-amber-50 text-amber-800 border-amber-200';
+        return 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900';
       case 'normal':
-        return 'bg-blue-50 text-blue-800 border-blue-200';
+        return 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-900';
       case 'info':
       default:
-        return 'bg-gray-50 text-gray-800 border-gray-200';
+        return 'bg-gray-50 text-gray-800 border-gray-200 dark:bg-gray-900/40 dark:text-gray-200 dark:border-gray-700';
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'critical':
+        return t('announcements.priority_critical');
+      case 'important':
+        return t('announcements.priority_important');
+      case 'normal':
+        return t('announcements.priority_normal');
+      case 'info':
+      default:
+        return t('announcements.priority_info');
     }
   };
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case 'critical':
-        return <AlertTriangle className="h-5 w-5 text-red-600" />;
+        return <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />;
       case 'important':
-        return <AlertCircle className="h-5 w-5 text-amber-600" />;
+        return <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />;
       case 'normal':
-        return <Bell className="h-5 w-5 text-blue-600" />;
+        return <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />;
       case 'info':
       default:
-        return <Info className="h-5 w-5 text-gray-600" />;
+        return <Info className="h-5 w-5 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -70,9 +74,9 @@ export const AnnouncementBanner: React.FC = () => {
           <div className="flex-shrink-0 mt-0.5">
             {getPriorityIcon(announcement.priority)}
           </div>
-          <div className="ml-3 flex-1">
+          <div className="ms-3 flex-1">
             <h3 className="text-sm font-medium uppercase tracking-wider mb-1 opacity-80">
-              {announcement.priority} Announcement
+              {getPriorityLabel(announcement.priority)}
             </h3>
             <h4 className="text-lg font-semibold mb-2">{announcement.title}</h4>
             <div className="text-sm opacity-90 whitespace-pre-wrap">
@@ -86,11 +90,11 @@ export const AnnouncementBanner: React.FC = () => {
                   <button
                     key={idx}
                     onClick={() => setLightboxImg(getImageUrl(img))}
-                    className="relative flex-shrink-0 group rounded-lg overflow-hidden border border-black/10 hover:border-black/30 transition-colors"
+                    className="relative flex-shrink-0 group rounded-lg overflow-hidden border border-black/10 hover:border-black/30 dark:border-white/15 dark:hover:border-white/40 transition-colors"
                   >
                     <img
                       src={getImageUrl(img)}
-                      alt={`Attachment ${idx + 1}`}
+                      alt={t('inbox.attachment_alt', { num: idx + 1 })}
                       className="w-16 h-16 sm:w-20 sm:h-20 object-cover transition-transform group-hover:scale-105"
                     />
                   </button>
@@ -99,20 +103,23 @@ export const AnnouncementBanner: React.FC = () => {
             )}
 
             <div className="mt-3 text-xs opacity-70">
-              Posted by {announcement.creator_name || 'Management'} on {new Date(announcement.created_at).toLocaleDateString()}
+              {t('announcements.posted_by', {
+                name: announcement.creator_name || t('announcements.management'),
+                date: new Date(announcement.created_at).toLocaleDateString(i18n.language?.startsWith('ar') ? 'ar-IQ' : 'en-US'),
+              })}
             </div>
           </div>
           <button
-            onClick={() => setIsVisible(false)}
-            className="ml-auto -mx-1.5 -my-1.5 bg-transparent p-1.5 rounded-lg inline-flex h-8 w-8 hover:bg-black/5 focus:ring-2 focus:ring-black/10"
+            onClick={() => setDismissedId(announcement.id)}
+            className="ms-auto -mx-1.5 -my-1.5 bg-transparent p-1.5 rounded-lg inline-flex h-8 w-8 hover:bg-black/5 dark:hover:bg-white/10 focus:ring-2 focus:ring-black/10 dark:focus:ring-white/20"
           >
-            <span className="sr-only">Dismiss</span>
+            <span className="sr-only">{t('announcements.dismiss')}</span>
             <X className="h-5 w-5" />
           </button>
         </div>
         
         {/* Decorative accent bar */}
-        <div className={`absolute top-0 left-0 w-1 h-full ${
+        <div className={`absolute top-0 start-0 w-1 h-full ${
           announcement.priority === 'critical' ? 'bg-red-500' :
           announcement.priority === 'important' ? 'bg-amber-500' :
           announcement.priority === 'normal' ? 'bg-blue-500' :
@@ -134,7 +141,7 @@ export const AnnouncementBanner: React.FC = () => {
           </button>
           <img
             src={lightboxImg}
-            alt="Full size"
+            alt={t('inbox.full_size')}
             className="max-w-full max-h-[85vh] rounded-xl shadow-2xl object-contain animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           />

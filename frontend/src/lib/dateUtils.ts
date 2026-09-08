@@ -23,7 +23,7 @@ const BAGHDAD_TZ = 'Asia/Baghdad';
  */
 function toUTC(dateStr: string): Date {
   // Already has a timezone marker — parse as-is
-  if (/[Z+\-]\d{0,2}:?\d{0,2}$/.test(dateStr.trim()) && dateStr.trim() !== '') {
+  if (/[Z+-]\d{0,2}:?\d{0,2}$/.test(dateStr.trim()) && dateStr.trim() !== '') {
     return new Date(dateStr);
   }
   // No timezone marker — treat as UTC (append Z)

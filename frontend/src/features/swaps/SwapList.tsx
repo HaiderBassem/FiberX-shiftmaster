@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,9 +8,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fmtDate } from '@/lib/dateUtils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { SwapRequestModal } from './SwapRequestModal';
 import { useTranslation } from 'react-i18next';
+import { assetUrl } from '@/lib/assets';
+import type { ShiftSwap } from '@/types/domain';
 
 export const SwapList = () => {
   const { t } = useTranslation();
@@ -29,13 +31,13 @@ export const SwapList = () => {
   // My outgoing swap requests
   const { data: mySwaps, isLoading: mySwapsLoading } = useQuery({
     queryKey: ['swaps', 'me'],
-    queryFn: async () => { const res = await api.get('/swaps/me'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/swaps/me'); return (res.data?.data || []) as ShiftSwap[]; },
   });
 
   // Incoming swap requests targeting me (pending my accept/decline)
   const { data: pendingForMe, isLoading: pendingLoading } = useQuery({
     queryKey: ['swaps', 'pending', 'for-me'],
-    queryFn: async () => { const res = await api.get('/swaps/pending/for-me'); return res.data?.data || []; },
+    queryFn: async () => { const res = await api.get('/swaps/pending/for-me'); return (res.data?.data || []) as ShiftSwap[]; },
     refetchInterval: 30000, // Poll every 30s for new requests
   });
 
@@ -50,7 +52,7 @@ export const SwapList = () => {
       setTargetEmployeeId('');
       setIsModalOpen(false);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to create swap'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to create swap'),
   });
 
   const respondSwap = useMutation({
@@ -62,7 +64,7 @@ export const SwapList = () => {
       setSuccess(t('swaps.respond_success'));
       setTimeout(() => setSuccess(null), 3000);
     },
-    onError: (err: any) => setError(err?.response?.data?.error || err?.message || 'Failed to respond'),
+    onError: (err: unknown) => setError(apiError(err) || 'Failed to respond'),
   });
 
   const cancelSwapMutation = useMutation({
@@ -70,7 +72,7 @@ export const SwapList = () => {
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ['swaps'] }); 
     },
-    onError: (err: any) => alert(err?.response?.data?.error || err?.message || 'Failed to cancel swap request'),
+    onError: (err: unknown) => alert(apiError(err) || 'Failed to cancel swap request'),
   });
 
   const getStatusBadge = (status: string) => {
@@ -99,15 +101,15 @@ export const SwapList = () => {
 
   const incomingCount = pendingForMe?.length || 0;
   const canSubmit = targetEmployeeId && shiftDate && reason;
-  const pendingMySwaps = mySwaps?.filter((s: any) => s.status === 'pending' || s.status === 'employee_accepted') || [];
-  const historyMySwaps = mySwaps?.filter((s: any) => s.status !== 'pending' && s.status !== 'employee_accepted') || [];
+  const pendingMySwaps = mySwaps?.filter(s => s.status === 'pending' || s.status === 'employee_accepted') || [];
+  const historyMySwaps = mySwaps?.filter(s => s.status !== 'pending' && s.status !== 'employee_accepted') || [];
 
-  const containerVariants: any = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.1 } }
   };
 
-  const itemVariants: any = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
@@ -156,7 +158,7 @@ export const SwapList = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pendingForMe!.map((swap: any) => (
+                  {pendingForMe!.map(swap => (
                   <motion.div 
                     key={swap.id} 
                     initial={{ opacity: 0, x: -20 }}
@@ -166,7 +168,7 @@ export const SwapList = () => {
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {swap.requester_profile_image ? (
-                          <img src={swap.requester_profile_image} alt="" className="w-full h-full object-cover" />
+                          <img src={assetUrl(swap.requester_profile_image)} alt="" className="w-full h-full object-cover" />
                         ) : (
                           <UserCircle className="w-6 h-6 text-amber-500" />
                         )}
@@ -225,13 +227,13 @@ export const SwapList = () => {
                 animate="show"
                 className="space-y-4"
               >
-                {pendingMySwaps?.map((swap: any) => (
+                {pendingMySwaps?.map(swap => (
                   <motion.div key={swap.id} variants={itemVariants}>
                     <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
                       <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex gap-4 items-center">
                           <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                            swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
+                            swap.status === 'approved' ? 'bg-emerald-500/10' :
                             swap.status === 'rejected' ? 'bg-destructive/10' :
                             swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
                             swap.status === 'cancelled' ? 'bg-gray-500/10' :
@@ -244,7 +246,7 @@ export const SwapList = () => {
                               <ArrowLeftRight className="w-4 h-4 text-primary" />
                               {t('swaps.swap_with')}
                               {swap.target_profile_image && (
-                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                <img src={assetUrl(swap.target_profile_image)} alt="" className="w-5 h-5 rounded-full object-cover" />
                               )}
                               {swap.target_employee_name || t('swaps.colleague')}
                             </div>
@@ -298,13 +300,13 @@ export const SwapList = () => {
                 animate="show"
                 className="space-y-4"
               >
-                {historyMySwaps?.map((swap: any) => (
+                {historyMySwaps?.map(swap => (
                   <motion.div key={swap.id} variants={itemVariants}>
                     <Card className="rounded-2xl border-white/5 hover:border-primary/20 hover:shadow-xl hover:shadow-primary/5 transition-all bg-card/50 backdrop-blur-sm overflow-hidden">
                       <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex gap-4 items-center">
                           <div className={`h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ${
-                            swap.status === 'approved' || swap.status === 'completed' ? 'bg-emerald-500/10' :
+                            swap.status === 'approved' ? 'bg-emerald-500/10' :
                             swap.status === 'rejected' ? 'bg-destructive/10' :
                             swap.status === 'employee_accepted' ? 'bg-blue-500/10' :
                             swap.status === 'cancelled' ? 'bg-gray-500/10' :
@@ -317,7 +319,7 @@ export const SwapList = () => {
                               <ArrowLeftRight className="w-4 h-4 text-primary" />
                               {t('swaps.swap_with')}
                               {swap.target_profile_image && (
-                                <img src={swap.target_profile_image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                                <img src={assetUrl(swap.target_profile_image)} alt="" className="w-5 h-5 rounded-full object-cover" />
                               )}
                               {swap.target_employee_name || t('swaps.colleague')}
                             </div>

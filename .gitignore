@@ -89,9 +89,8 @@ Icon
 *.sln
 
 
- seed_db.sh
- seed.sql
- 008_seed_data.sql 
+seed_db.sh
+seed.sql
 
 # Root node_modules and other scratch/tmp files
 node_modules/
@@ -100,3 +99,26 @@ scratch/
 tmp_build
 tmp_migration.sql
 backend_add_*.py
+
+# ==============================
+# Compiled Go binaries
+# ==============================
+# Five build artifacts (Linux, macOS and Windows) had been committed here,
+# accounting for most of the ~200MB of history. The names below are the ones the
+# build scripts and local workflows actually produce.
+build-api
+build-migrate
+shiftmaster-migrate
+cmd/api/api
+cmd/migrate/migrate
+tmp_app
+tmp_bin
+tmp_test_bin
+tmp_*_bin
+
+# Coverage output
+coverage.out
+
+# Compose environment. deploy/docker.env.example is the committed template;
+# the real file carries the database password and the JWT signing key.
+.env.docker

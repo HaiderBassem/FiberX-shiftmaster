@@ -3,15 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
-	"shiftmaster-backend/internal/config"
 	"shiftmaster-backend/internal/models"
 	"shiftmaster-backend/internal/repository"
+	"shiftmaster-backend/internal/testutil"
 	"shiftmaster-backend/pkg/database"
 )
 
@@ -24,45 +23,17 @@ import (
 //
 //	SHIFTMASTER_TEST_DB=shiftmaster_verify go test ./internal/service/ -run Pattern -v
 //
-// Skipped when SHIFTMASTER_TEST_DB is unset.
+// SHIFTMASTER_TEST_DB accepts a bare database name or a full postgres:// URL;
+// see internal/testutil. Skipped when it is unset.
 
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
 
-	name := os.Getenv("SHIFTMASTER_TEST_DB")
-	if name == "" {
-		t.Skip("SHIFTMASTER_TEST_DB not set; skipping database-backed test")
-	}
+	cfg := testutil.TestDatabaseConfig(t)
 
-	host := os.Getenv("SHIFTMASTER_TEST_DB_HOST")
-	if host == "" {
-		host = "localhost"
-	}
-	user := os.Getenv("SHIFTMASTER_TEST_DB_USER")
-	if user == "" {
-		user = os.Getenv("USER")
-	}
-
-	db, err := database.New(config.DatabaseConfig{
-		Host:              host,
-		Port:              "5432",
-		User:              user,
-		Password:          os.Getenv("SHIFTMASTER_TEST_DB_PASSWORD"),
-		DBName:            name,
-		SSLMode:           "disable",
-		MaxOpenConns:      4,
-		MinConns:          1,
-		MaxConnLifetime:   time.Minute,
-		MaxConnIdleTime:   time.Minute,
-		ConnectTimeout:    5 * time.Second,
-		QueryTimeout:      15 * time.Second,
-		LongQueryTimeout:  30 * time.Second,
-		HealthCheckPeriod: time.Minute,
-		MaxRetries:        1,
-		RetryInterval:     time.Second,
-	})
+	db, err := database.New(cfg)
 	if err != nil {
-		t.Fatalf("connect to test db %q: %v", name, err)
+		t.Fatalf("connect to test db %q on %s:%s: %v", cfg.DBName, cfg.Host, cfg.Port, err)
 	}
 	t.Cleanup(db.Close)
 	return db
@@ -335,4 +306,37 @@ func TestSetPatternAppliesToFutureWeeksOnly(t *testing.T) {
 		(after.ShiftID != nil && shiftBefore != nil && *after.ShiftID != *shiftBefore) {
 		t.Errorf("today's shift_id changed unexpectedly")
 	}
+}
+
+// TestPatternUpdateWithDuplicateTemplateRows reproduces the production failure:
+//
+//	upsert template for day (update): duplicate key value violates unique constraint
+//	"schedule_templates_employee_id_day_of_week_valid_from_key"
+//
+// Databases that predate the single-entry-per-weekday rule can hold several still-valid
+// entries for one weekday, distinguished only by valid_from. Rewriting valid_from on all
+// of them collapses them onto the same key.
+func TestPatternUpdateWithDuplicateTemplateRows(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+
+	// Two still-valid Tuesday entries, exactly as an older database would hold them.
+	for _, vf := range []string{"2024-01-01", "2024-06-01"} {
+		if _, err := f.db.Exec(ctx,
+			`INSERT INTO schedule_templates (employee_id, day_of_week, shift_id, is_off, valid_from)
+			 VALUES ($1, 2, $2, false, $3::date)`, f.employeeID, f.eveningID, vf); err != nil {
+			t.Fatalf("seed duplicate template (%s): %v", vf, err)
+		}
+	}
+
+	tuesday := weekStart(1).AddDate(0, 0, 2)
+	if _, err := f.svc.SetEmployeeShift(ctx, f.employeeID, tuesday, &f.morningID, "working", nil, f.employeeID, "admin", true); err != nil {
+		t.Fatalf("permanent set failed with duplicate pattern rows: %v", err)
+	}
+
+	// The change must still carry into later weeks.
+	if err := f.svc.EnsureWeekSchedule(ctx, weekStart(3), &f.deptID); err != nil {
+		t.Fatalf("ensure later week: %v", err)
+	}
+	f.assertDay(t, weekStart(3).AddDate(0, 0, 2), "working", &f.morningID, "week +3 after duplicate-row update")
 }

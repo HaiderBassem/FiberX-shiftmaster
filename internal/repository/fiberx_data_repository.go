@@ -21,7 +21,7 @@ func NewFiberxDataRepository(db *database.DB) *FiberxDataRepository {
 // Get accessible documents for an employee
 func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageFiberxData bool) ([]models.FiberxDataResponse, error) {
 	docs := []models.FiberxDataResponse{}
-	
+
 	query := `
 		SELECT 
 			d.id, d.department_id, d.title, d.content, d.created_by, d.created_at, d.updated_at,
@@ -40,12 +40,12 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 		WHERE 
 			(d.department_id = $1 OR ds.id IS NOT NULL)
 	`
-	
+
 	// If not manager/admin and doesn't have explicit manage permission, hide documents marked as 'hide'
 	if role != "manager" && role != "admin" && role != "team_leader" && !canManageFiberxData {
 		query += ` AND COALESCE(ea.access_level, 'read') != 'hide' `
 	}
-	
+
 	query += ` ORDER BY d.created_at DESC`
 
 	rows, err := r.db.Query(ctx, query, departmentID, employeeID)
@@ -65,17 +65,57 @@ func (r *FiberxDataRepository) GetVisibleDocuments(ctx context.Context, departme
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// If manager or has can_manage_fiberx_data and it belongs to their department, grant 'write' access globally
 		if (role == "manager" || role == "admin" || role == "team_leader" || canManageFiberxData) && !d.IsShared {
 			accLevel = "write"
 		}
-		
+
 		d.AccessLevel = accLevel
 		docs = append(docs, d)
 	}
 
 	return docs, nil
+}
+
+// SearchDocuments mirrors GetVisibleDocuments' visibility predicate exactly
+// (own department or an active share, employee-level hide respected) with a
+// case-insensitive match and a hard limit, for the assistant's knowledge
+// lookup. Content is truncated in SQL.
+func (r *FiberxDataRepository) SearchDocuments(ctx context.Context, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageFiberxData bool, search string, limit int) ([]models.FiberxDataResponse, error) {
+	query := `
+		SELECT
+			d.id, d.department_id, d.title, LEFT(d.content, 4000), d.created_at, d.updated_at,
+			dep.name as department_name,
+			CASE WHEN d.department_id = $1 THEN false ELSE true END as is_shared
+		FROM fiberx_data d
+		LEFT JOIN departments dep ON dep.id = d.department_id
+		LEFT JOIN fiberx_data_department_shares ds ON ds.data_id = d.id AND ds.department_id = $1
+		LEFT JOIN fiberx_data_employee_access ea ON ea.data_id = d.id AND ea.employee_id = $2
+		WHERE (d.department_id = $1 OR ds.id IS NOT NULL)
+		  AND (d.title ILIKE '%' || $3 || '%' OR d.content ILIKE '%' || $3 || '%')
+	`
+	if role != "manager" && role != "admin" && role != "team_leader" && !canManageFiberxData {
+		query += ` AND COALESCE(ea.access_level, 'read') != 'hide' `
+	}
+	query += ` ORDER BY d.updated_at DESC LIMIT $4`
+
+	rows, err := r.db.Query(ctx, query, departmentID, employeeID, search, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	docs := []models.FiberxDataResponse{}
+	for rows.Next() {
+		var d models.FiberxDataResponse
+		if err := rows.Scan(&d.ID, &d.DepartmentID, &d.Title, &d.Content,
+			&d.CreatedAt, &d.UpdatedAt, &d.DepartmentName, &d.IsShared); err != nil {
+			return nil, err
+		}
+		docs = append(docs, d)
+	}
+	return docs, rows.Err()
 }
 
 func (r *FiberxDataRepository) GetDocumentByID(ctx context.Context, id uuid.UUID, departmentID uuid.UUID, employeeID uuid.UUID, role string, canManageFiberxData bool) (*models.FiberxDataResponse, error) {
@@ -133,7 +173,7 @@ func (r *FiberxDataRepository) CreateDocument(ctx context.Context, doc *models.F
 	`
 	err := r.db.QueryRow(ctx, query, doc.DepartmentID, doc.Title, doc.Content, doc.CreatedBy).
 		Scan(&doc.ID, &doc.CreatedAt, &doc.UpdatedAt)
-		
+
 	if err != nil {
 		return nil, err
 	}

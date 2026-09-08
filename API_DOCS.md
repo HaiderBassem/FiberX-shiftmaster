@@ -1,108 +1,358 @@
 # ShiftMaster API Reference
 
-**Base URL:** `http://localhost:8080/api`
+**Base URL:** `https://<host>/api`
 **Content-Type:** `application/json`
-**Authorization:** `Bearer <JWT_TOKEN>` (Include in the header for all protected routes)
+
+Every response uses the same envelope:
+
+```json
+{ "success": true, "data": { }, "meta": { "count": 0 } }
+```
+
+Failures return `{ "success": false, "error": "..." }` with a 4xx or 5xx status.
+
+> This file is maintained against `cmd/api/router.go`. The previous version had
+> drifted badly — it documented logging in with `employee_code` when the API takes
+> `email`, a `POST /schedules/generate` route that does not exist, and the
+> `leave_type` enum that migration 017 removed.
 
 ---
 
-## 🔒 Authentication (Public)
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `POST` | `/auth/login` | Login | `{"employee_code", "password"}` |
+## Authentication
 
-### 🛡️ Authentication (Protected)
+Three token types exist and are **not interchangeable**. Each carries a `typ`
+claim and is accepted on exactly one surface.
+
+| Type | Lifetime | Accepted by |
+|---|---|---|
+| `access` | `JWT_ACCESS_EXPIRE_MIN` (default 15 min) | All protected routes, via `Authorization: Bearer` |
+| `refresh` | `JWT_REFRESH_EXPIRE_DAYS` (default 7 days) | `POST /auth/refresh` only |
+| `ws_ticket` | 30 seconds, single use | `GET /notifications/ws` only |
+
+Presenting a refresh token as a bearer credential is rejected, as is presenting
+an access token at the refresh endpoint.
+
+Credentials are read **only** from the `Authorization` header. There is no
+`?token=` query fallback; the WebSocket uses a ticket instead.
+
+### Public
+
 | Method | Endpoint | Description | Payload |
 |---|---|---|---|
-| `GET`  | `/auth/me` | Current user profile | |
+| `POST` | `/auth/login` | Sign in | `{"email", "password"}` |
+| `POST` | `/auth/refresh` | Exchange a refresh token | `{"refresh_token"}` |
+| `POST` | `/auth/logout` | Clear the upload cookie | — |
+
+`login` and `refresh` both return `{access_token, refresh_token, expires_in, employee}`
+and set an `HttpOnly` cookie scoped to `/api/uploads` (see **Files**).
+
+**Account lockout.** After `MAX_LOGIN_ATTEMPTS` consecutive failures an account is
+locked for `LOCKOUT_DURATION_MIN` minutes and returns `account is locked or inactive`.
+The lock expires on its own; it does not change employment status.
+
+### Protected
+
+| Method | Endpoint | Description | Payload |
+|---|---|---|---|
+| `GET` | `/auth/me` | Current user | |
 | `POST` | `/auth/change-password` | Change own password | `{"old_password", "new_password"}` |
-| `POST` | `/auth/reset-password/:id`| Admin reset | `{"new_password"}` (Manager/Admin only) |
+| `POST` | `/auth/reset-password/:id` | Admin reset (manager/admin) | `{"new_password"}` |
 
 ---
 
-## 👥 Employees (Manager/Admin for CRUD)
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `GET`  | `/employees` | List employees | Query: `?status=active&department=IT` |
-| `GET`  | `/employees/:id` | Get employee | |
-| `POST` | `/employees` | Create employee | `{"employee_code", "first_name", "last_name", "email", "gender" (male/female), "role" (employee/team_leader/manager/hr), "hire_date" (YYYY-MM-DD), "password"}` |
-| `PUT`  | `/employees/:id` | Update employee | `{"first_name", "last_name", "phone", "email"}` |
-| `PATCH`| `/employees/:id/status`| Change status | `{"status"}` |
-| `DELETE`|`/employees/:id` | Delete employee | |
+## Department context
+
+Admins and managers may act within a chosen department by sending:
+
+```
+X-Department-ID: <uuid>
+```
+
+Admins may use any department; a manager must manage the one they name; everyone
+else is pinned to the department in their token.
 
 ---
 
-## 🏢 Departments (Manager/Admin)
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `GET`  | `/departments` | List all | |
-| `POST` | `/departments` | Create | `{"code", "name", "manager_id"}` |
-| `PUT`  | `/departments/:id` | Update | `{"name", "manager_id"}` |
+## Roles
+
+`employee` → `team_leader` → `manager` → `admin`. Route groups:
+
+| Group | Roles |
+|---|---|
+| protected | any authenticated user |
+| supervisor | team_leader, manager, admin |
+| tlWrite | team_leader, manager, admin |
+| admin | manager, admin |
+| adminOnly | admin |
+
+Some endpoints check a per-employee capability flag as well
+(`can_create_tables`, `can_manage_help_docs`, `can_post_announcements`,
+`can_manage_fiberx_data`, `can_manage_services`).
 
 ---
 
-## ⏰ Shifts (Manager/Admin)
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `GET`  | `/shifts` | List shifts | |
-| `POST` | `/shifts` | Create shift | `{"shift_code", "name", "start_time" (15:04:05), "end_time", "color_code"}` |
-| `PUT`  | `/shifts/:id` | Update shift | `{"name", "start_time", "end_time"}` |
+## Employees
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/employees` | List, scoped by role and department context |
+| `GET` | `/employees/:id` | One employee |
+| `GET` | `/employees/me/profile-stats` | Own balances and task counts |
+| `POST` | `/employees/me/profile-picture` | Upload own photo (multipart, field `profile_picture`) |
+| `POST` | `/employees` | Create (tlWrite) |
+| `PUT` | `/employees/:id` | Update (tlWrite) |
+| `PATCH` | `/employees/:id/status` | Change status (tlWrite) |
+| `DELETE` | `/employees/:id` | Delete (tlWrite) |
+| `PUT` | `/employees/:id/password` | Set password |
+| `PUT` | `/employees/:id/preferences` | Save UI preferences |
+| `PUT` | `/employees/:id/{fiberx,help,announcement,table,service}-permission` | Toggle a capability flag |
 
 ---
 
-## 📅 Schedules
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `POST` | `/schedules/generate` | Generate week (Mgr) | `{"week_start_date": "YYYY-MM-DD"}` |
-| `POST` | `/schedules/:id/publish`| Publish week (Mgr) | |
-| `GET`  | `/schedules/daily` | Get day schedule | Query: `?date=YYYY-MM-DD` |
-| `GET`  | `/schedules/employee/:id`| Get emp schedule | Query: `?from=YYYY-MM-DD&to=YYYY-MM-DD`|
-| `POST` | `/schedules/shifts/:id/check-in` | Check in | |
-| `POST` | `/schedules/shifts/:id/check-out`| Check out | |
+## Departments
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/departments` | List |
+| `GET` | `/departments/my-managed` | Departments the caller manages |
+| `GET` | `/departments/:id` | One department |
+| `POST` `PUT` `DELETE` | `/departments[/:id]` | CRUD (**admin only**) |
+| `POST` | `/departments/:id/managers` | Add a manager (admin) |
+| `DELETE` | `/departments/:id/managers/:manager_id` | Remove a manager (admin) |
+| `PUT` | `/departments/:id/fiberx-toggle` | Enable/disable FiberX data (admin) |
 
 ---
 
-## 🏖️ Leaves
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `POST` | `/leaves` | Request Leave | `{"leave_type" (annual/sick), "start_date" (YYYY-MM-DD), "end_date", "reason"}` |
-| `GET`  | `/leaves/me` | My Leave Req | |
-| `GET`  | `/leaves/pending` | Needs Approval | Query: `?role=manager` |
-| `POST` | `/leaves/:id/approve/team-leader` | TL Approve | |
-| `POST` | `/leaves/:id/approve/manager` | Mgr Approve | |
-| `POST` | `/leaves/:id/reject` | Reject Leave | `{"reason"}` |
+## Shifts and schedules
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/shifts`, `/shifts/:id` | Read |
+| `POST` `PUT` `DELETE` | `/shifts[/:id]` | Manage (tlWrite) |
+| `GET` | `/schedules/daily?date=YYYY-MM-DD` | One day |
+| `GET` | `/schedules/department?...` | A department's week |
+| `GET` | `/schedules/employee/:id?from=&to=` | One employee's range |
+| `GET` | `/schedules/replacements?date=` | Candidates who were off the previous day |
+| `GET` | `/schedules/pattern/:id` | An employee's weekly pattern |
+| `PUT` | `/schedules/pattern/:id` | Replace the weekly pattern (tlWrite) |
+| `POST` | `/schedules/shifts/set` | Set one day (tlWrite) |
+| `DELETE` | `/schedules/shifts/:id` | Clear one day (tlWrite) |
+| `POST` | `/schedules/shifts/:id/check-in`, `/check-out` | Attendance |
+| `POST` | `/schedules/:id/publish` | Publish a week (manager/admin) |
+| `POST` | `/schedules/shifts/:id/replace` | Assign a replacement (manager/admin) |
+
+`POST /schedules/shifts/set` takes
+`{"employee_id", "shift_date", "shift_id", "shift_status", "leave_reason", "permanent"}`.
+`shift_status` is one of `working`, `off`, `leave`, `vacation`, `hourly`.
+With `permanent: true` the weekly pattern is updated as well and future weeks are
+resynchronised; the day and the pattern are written in one transaction.
+
+Weeks are materialised lazily on read. Only rows with `source = "generated"` and
+dated today or later are ever rewritten — manual edits, leave overlays and past
+days are immutable.
 
 ---
 
-## 🔄 Shift Swaps
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `POST` | `/swaps` | Request Swap | `{"target_employee_id", "shift_date", "reason"}` |
-| `GET`  | `/swaps/me` | My Requests | |
-| `GET`  | `/swaps/pending` | Need my answer | |
-| `GET`  | `/swaps/pending/manager`| Need Mgr Approval | |
-| `POST` | `/swaps/:id/respond` | Emp Accept/Reject| `{"accepted": true/false}` |
-| `POST` | `/swaps/:id/approve` | Mgr/TL Approve | |
-| `POST` | `/swaps/:id/reject` | Mgr Reject | |
+## Leaves
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/leaves` | Request `{"leave_type_id", "start_date", "end_date", "reason", "start_time", "end_time"}` |
+| `GET` | `/leaves/me` | Own requests |
+| `GET` | `/leaves/my-balances?year=` | Own balances |
+| `GET` | `/leaves/pending` | Awaiting the caller's approval |
+| `POST` | `/leaves/:id/cancel` | Cancel own pending request |
+| `GET` | `/leaves/pending/rich`, `/leaves/history`, `/leaves/coverage-preview` | Supervisor views |
+| `POST` | `/leaves/:id/approve/team-leader` | Team-leader approval |
+| `POST` | `/leaves/:id/approve/manager` | Manager approval |
+| `POST` | `/leaves/:id/reject` | Reject `{"reason"}` |
+| `POST` | `/leaves/:id/cancel-approval` | Undo an approval |
+
+`status` is one of `pending`, `approved_by_team_leader`, `approved_by_manager`,
+`rejected`, `cancelled`. **There is no `approved` value.**
+
+Leave-type behaviour comes from explicit columns, never from the type's name:
+`is_hourly` marks part-day leave, `bypasses_daily_limit` exempts a type from the
+department's daily caps. Both are editable through `/leave-types`.
+
+### Leave types and balances
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/leave-types`, `/leave-types/:id` | Read |
+| `POST` `PUT` `DELETE` | `/leave-types[/:id]` | Manage (manager/admin) |
+| `POST` | `/leave-balances/sync` | Rebuild balances (admin) |
+| `GET` | `/leave-balances/employee/:id` | Read (supervisor) |
+| `PUT` | `/leave-balances/employee/:id/:leave_type_id` | Adjust (admin) |
 
 ---
 
-## ✅ Tasks
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `POST` | `/tasks/schedules` | Create task def | `{"title", "description", "schedule_type": "daily_task", "recurrence": "daily", "shift_id"}` |
-| `GET`  | `/tasks/assignments` | Daily assignees | Query: `?date=YYYY-MM-DD` |
-| `POST` | `/tasks/assign` | Assign employee | `{"schedule_id", "employee_id", "assigned_date"}` |
-| `GET`  | `/tasks/assignments/me` | My Tasks | Query: `?date=YYYY-MM-DD` |
-| `PATCH`| `/tasks/executions/:id/status`| Change status | `{"status": "in_progress"}` |
-| `POST` | `/tasks/executions/:id/complete`| Finish task | `{"notes"}` |
+## Swaps
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/swaps` | Request `{"target_employee_id", "shift_date", "reason"}` |
+| `GET` | `/swaps/me`, `/swaps/pending/for-me` | Own and incoming |
+| `GET` | `/swaps/eligible-targets`, `/swaps/eligible-shift-targets` | Candidates |
+| `POST` | `/swaps/:id/respond` | Accept or decline `{"accepted": true}` |
+| `POST` | `/swaps/:id/cancel` | Withdraw |
+| `GET` | `/swaps/pending/manager`, `/swaps/history` | Supervisor views |
+| `POST` | `/swaps/:id/approve`, `/reject`, `/cancel-approval` | Supervisor decisions |
 
 ---
 
-## 🔔 Notifications
-| Method | Endpoint | Description | Payload |
-|---|---|---|---|
-| `GET`  | `/notifications` | List all | |
-| `GET`  | `/notifications/unread`| List unread | |
-| `POST` | `/notifications/:id/read` | Mark read | |
-| `POST` | `/notifications/read-all` | Mark all read | |
+## Tasks
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/tasks/schedules`, `/tasks/boards`, `/tasks/boards/stats` | Definitions and boards |
+| `GET` | `/tasks/boards/:id/view`, `/tasks/boards/:id/recurring` | Board detail |
+| `GET` | `/tasks/assignments?date=`, `/tasks/assignments/me`, `/tasks/my-week` | Assignments |
+| `POST` | `/tasks/executions/:id/start` | Start |
+| `PATCH` | `/tasks/executions/:id/status` | `{"status": "in_progress"}` |
+| `POST` | `/tasks/executions/:id/complete` | `{"completion_type", "notes"}` |
+| `POST` `PUT` `PATCH` `DELETE` | `/tasks/schedules[/:id]`, `/tasks/boards[/:id]` | Manage (tlWrite) |
+| `POST` | `/tasks/assign`, `/tasks/recurring-assign` | Assign (tlWrite) |
+| `GET` | `/tasks/history` | Supervisor view |
+
+---
+
+## Notifications and real time
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/notifications`, `/notifications/unread`, `/notifications/unread/count` | Read |
+| `POST` | `/notifications/:id/read`, `/notifications/read-all` | Mark read |
+| `POST` | `/notifications/ws-ticket` | Mint a 30-second single-use ticket |
+| `GET` | `/notifications/ws?ticket=<ticket>` | WebSocket upgrade |
+| `GET` | `/push/public-key` | VAPID public key |
+| `POST` | `/push/subscribe` | Register a push subscription |
+
+The socket is a **signal**, not a delivery channel: on any frame the client
+refetches `/notifications`. Deduplication happens there, against notification
+ids, so an event arriving over both the socket and the poll is shown once.
+
+Every notification persisted through the notification service is also
+delivered in real time (WebSocket signal plus web push when subscribed) —
+domain services no longer opt in individually. A notification row may carry
+`action_url`, a same-origin path the client renders as the card's
+destination (e.g. `/approvals`, `/leaves`); it is also the web-push click
+target.
+
+Upgrades are refused unless the `Origin` header exactly matches an entry in
+`CORS_ALLOWED_ORIGINS`.
+
+---
+
+## Files
+
+Uploads are validated by content, never by filename or declared type. Only JPEG,
+PNG and GIF are accepted; each is decoded and re-encoded before being stored, so
+appended payloads do not survive. The stored name is generated server-side.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/upload/image` | Upload an image (multipart) |
+| `GET` | `/api/uploads/{images,profiles,documents,assignments}/<name>` | Retrieve |
+
+Retrieval requires either the `shiftmaster_uploads` cookie (set at login and
+refresh, `HttpOnly`, scoped to `/api/uploads`) or a signed URL carrying `exp` and
+`sig`. Unauthorised requests return **404**, so probing cannot confirm that a
+file exists.
+
+---
+
+## Other modules
+
+| Area | Endpoints |
+|---|---|
+| Handovers | `GET POST /handovers`, `PUT /handovers/:id/{claim,unclaim,complete}`, `POST /handovers/:id/comments` |
+| Tickets | `GET POST /tickets`, `POST /tickets/:id/comments`, `PUT /tickets/:id/close` |
+| Announcements | `GET /announcements[/active|/active-ticker]`, `POST /announcements`, `PUT /announcements/:id/{activate,deactivate}`, `DELETE /announcements/:id` |
+| Info tables | `GET POST /info-tables`, `PUT DELETE /info-tables/:id`, rows under `/:id/rows`, `/:id/export`, `/:id/import`, access under `/:id/access` |
+| Help docs | `GET POST /help-docs`, `GET PUT DELETE /help-docs/:id`, `GET POST /help-docs/:id/access` |
+| FiberX data | `GET POST /fiberx-data`, `GET PUT DELETE /fiberx-data/:id`, `/:id/access`, `/:id/shares` |
+| Item requests | `GET /item-requests/{categories,me}`, `POST /item-requests`, `POST /item-requests/:id/cancel`, supervisor `/item-requests/pending` and `/:id/status` |
+| External links | `GET /external-links/my-links`, plus management routes (tlWrite) |
+| Services | `GET /services/categories`, `/categories/:id/plans`, `/plans/:id`; writes gated by `can_manage_services` |
+| Provinces | `GET POST /provinces`, `PUT DELETE /provinces/:id`, shares under `/:id/shares`. Sharing, unsharing and listing shares require **ownership** of the province, not merely visibility of it. |
+| Audit | `GET /activity`, `GET /audit` |
+| Security | `GET /security/blocked-ips`, `DELETE /security/blocked-ips/:ip` (admin) |
+
+---
+
+## AI assistant
+
+The assistant runs a language model **on the ShiftMaster server itself** — a
+llama.cpp process bound to loopback. No request, message or retrieved document
+reaches a hosted AI service; there is no OpenAI, Anthropic or Gemini key, and
+the API refuses to start if the runtime URL is not loopback or a Unix socket.
+Provision it once with `deploy/provision-ai.sh`.
+
+All routes require a normal access token. The model can only call read tools
+and *stage* actions; every state change requires the user to approve the staged
+action through the endpoints below.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/assistant/status` | `{state, ready, enabled, detail?}` — see below. Never exposes model paths, ports or errors |
+| POST | `/api/assistant/chat` | Body `{message, conversation_id?}`. Streams SSE events: `status`, `text`, `tool`, `approval`, `error`, `done`. 429 on rate limit, 409 while a previous turn is running, 503 while the model is unavailable |
+| GET | `/api/assistant/actions/:id` | Current state of one of the caller's staged actions |
+| POST | `/api/assistant/actions/:id/approve` | Executes the exact frozen action after re-validation. Single-use: replays, double clicks and other users get 409 with the action's real state |
+| POST | `/api/assistant/actions/:id/reject` | Marks the staged action rejected; nothing executes |
+
+### Status states
+
+`state` is coarse on purpose — enough for the UI to be honest, never enough to
+describe the deployment:
+
+| state | Meaning | UI |
+|---|---|---|
+| `disabled` | An operator set `AI_ENABLED=false` | Panel hidden |
+| `starting` | The model is loading | Panel shown, input disabled, "starting up" |
+| `ready` | Answering | Panel shown and usable |
+| `degraded` | Reachable but recently failing, or restarting | Panel shown with a warning |
+| `unavailable` | Configured but not reachable | Panel shown, input disabled |
+
+The panel is rendered in every state except `disabled`. This is deliberate: the
+previous version hid the assistant whenever no AI provider key was configured,
+which meant a deployment without one had no assistant and no explanation.
+
+### The security boundary
+
+The model plans; the application decides. Concretely:
+
+- **Identity is never model-supplied.** No tool schema has an employee id, role
+  or permission field, so "act as an admin" has nothing to attach to. The actor
+  is loaded fresh from the database on every request and every approval, so a
+  deactivation or role change takes effect on the next call.
+- **No SQL tool exists**, and no tool takes a query. The one place the
+  assistant issues its own SQL is ranked knowledge search, whose access
+  predicates are the same as the Info Bank list endpoints.
+- **Reads answer immediately; writes only stage.** A `propose_*` tool validates
+  against live state and freezes exact parameters plus a server-rendered
+  summary card. Approving re-validates and executes only those frozen
+  parameters. There is no tool that approves and no tool that executes, and the
+  approval endpoint needs the person's own token.
+- **A "yes" in chat is not approval.** Only the approve endpoint executes.
+- **Retrieved content is data.** Documents, tasks, tickets and announcements
+  are user-authored; instruction-shaped text inside them is ignored and
+  reported, not followed.
+
+Staged actions expire after `AI_PENDING_ACTION_TTL_SECONDS` (default 5 minutes)
+and are superseded when a newer action is staged in the same conversation.
+Executed and failed actions are written to the normal audit log as
+`assistant.<action_type>`.
+
+### Observability
+
+`assistant_requests` records one row per turn: latencies (model, tools, total),
+tool call count, rounds, token counts, outcome, and `tool_free` — whether the
+model answered having decided it needed no ShiftMaster data. No message content
+is stored there; transcripts live in `assistant_messages` under their owner's
+access.
+
+## Health
+
+`GET /health` (outside `/api`) returns `{"status": "healthy"}` and performs a real
+database ping. It is what the deploy script gates on.

@@ -275,8 +275,12 @@ func (s *ScheduleService) applyApprovedLeavesForRange(ctx context.Context, ws *m
 			}
 
 			shiftStatus := "leave"
-			if leave.LeaveTypeNameEn != nil && (strings.ToLower(*leave.LeaveTypeNameEn) == "hourly" || strings.ToLower(*leave.LeaveTypeNameEn) == "زمنية") {
-				leaveReason = "[hourly] " + leaveReason
+			// Driven by leave_types.is_hourly rather than by matching the type's
+			// name, which administrators can rename and translate. The previous
+			// check also compared an Arabic literal against the English column,
+			// so that half of it could never match.
+			if leave.LeaveTypeIsHourly {
+				leaveReason = models.HourlyLeaveReasonPrefix + leaveReason
 			}
 
 			es := &models.EmployeeShift{
@@ -479,14 +483,49 @@ func (s *ScheduleService) AssignReplacement(ctx context.Context, shiftID uuid.UU
 	return nil
 }
 
-// CheckIn records an employee's check-in time.
-func (s *ScheduleService) CheckIn(ctx context.Context, shiftID uuid.UUID) error {
-	return s.scheduleRepo.CheckIn(ctx, shiftID)
+// CheckIn records the actor's check-in on their own shift row. Repeating an
+// already-done check-in succeeds without rewriting the original timestamp;
+// someone else's row is reported as not found rather than forbidden, so the
+// endpoint cannot be used to probe which row IDs exist.
+func (s *ScheduleService) CheckIn(ctx context.Context, shiftRowID, actorID uuid.UUID) error {
+	stamped, err := s.scheduleRepo.CheckIn(ctx, shiftRowID, actorID)
+	if err != nil {
+		return fmt.Errorf("check in: %w", err)
+	}
+	if stamped {
+		return nil
+	}
+	es, err := s.scheduleRepo.GetEmployeeShiftByID(ctx, shiftRowID)
+	if err != nil || es == nil || es.EmployeeID != actorID {
+		return fmt.Errorf("shift not found")
+	}
+	if es.CheckInTime != nil {
+		return nil // already checked in — idempotent
+	}
+	return fmt.Errorf("check in failed")
 }
 
-// CheckOut records an employee's check-out time and calculates hours.
-func (s *ScheduleService) CheckOut(ctx context.Context, shiftID uuid.UUID) error {
-	return s.scheduleRepo.CheckOut(ctx, shiftID)
+// CheckOut records the actor's check-out and computed hours, requiring a prior
+// check-in. A repeated check-out succeeds without recomputing hours.
+func (s *ScheduleService) CheckOut(ctx context.Context, shiftRowID, actorID uuid.UUID) error {
+	stamped, err := s.scheduleRepo.CheckOut(ctx, shiftRowID, actorID)
+	if err != nil {
+		return fmt.Errorf("check out: %w", err)
+	}
+	if stamped {
+		return nil
+	}
+	es, err := s.scheduleRepo.GetEmployeeShiftByID(ctx, shiftRowID)
+	if err != nil || es == nil || es.EmployeeID != actorID {
+		return fmt.Errorf("shift not found")
+	}
+	if es.CheckOutTime != nil {
+		return nil // already checked out — idempotent
+	}
+	if es.CheckInTime == nil {
+		return fmt.Errorf("cannot check out before checking in")
+	}
+	return fmt.Errorf("check out failed")
 }
 
 // GetDailyShifts returns all shifts for a specific date.
@@ -592,24 +631,34 @@ func (s *ScheduleService) SetEmployeeShift(ctx context.Context, employeeID uuid.
 		Source:      models.ShiftSourceManual,
 	}
 
-	if err := s.scheduleRepo.UpsertEmployeeShift(ctx, es); err != nil {
-		return nil, err
-	}
+	// The day, the pattern entry and the push onto future weeks are one unit of work.
+	// Writing the day first and only then failing on the pattern left the caller with a
+	// 400 describing a change that had in fact been saved — the UI treats that as a
+	// failure and never refreshes, so the edit looks lost until a manual reload.
+	err = s.db.ExecTx(ctx, func(txCtx context.Context, _ pgx.Tx) error {
+		if upsertErr := s.scheduleRepo.UpsertEmployeeShift(txCtx, es); upsertErr != nil {
+			return upsertErr
+		}
 
-	// Write the change into the fixed weekly pattern so it repeats every week.
-	// "leave"/"vacation"/"hourly" are always one-off states, never a pattern.
-	if permanent && (shiftStatus == "off" || shiftStatus == "working") {
+		// Write the change into the fixed weekly pattern so it repeats every week.
+		// "leave"/"vacation"/"hourly" are always one-off states, never a pattern.
+		if !permanent || (shiftStatus != "off" && shiftStatus != "working") {
+			return nil
+		}
+
 		dayOfWeek := int(shiftDate.UTC().Weekday()) // 0=Sunday … 6=Saturday
 		isOff := shiftStatus == "off"
-		if tmplErr := s.scheduleRepo.UpsertTemplateForDay(ctx, employeeID, dayOfWeek, isOff, shiftID); tmplErr != nil {
-			// Pattern save failed — surface it, because the day was saved but will
-			// NOT repeat next week, which is exactly what the caller asked for.
-			return nil, fmt.Errorf("shift saved but weekly pattern update failed (change will not repeat next week): %w", tmplErr)
+		if tmplErr := s.scheduleRepo.UpsertTemplateForDay(txCtx, employeeID, dayOfWeek, isOff, shiftID); tmplErr != nil {
+			return fmt.Errorf("weekly pattern update failed (change would not repeat next week): %w", tmplErr)
 		}
 		// Push it onto future weeks that were already materialised from the old pattern.
-		if err := s.scheduleRepo.ResyncGeneratedForWeekday(ctx, employeeID, dayOfWeek, shiftDate, shiftStatus, shiftID); err != nil {
-			return nil, fmt.Errorf("shift saved but future weeks were not updated: %w", err)
+		if resyncErr := s.scheduleRepo.ResyncGeneratedForWeekday(txCtx, employeeID, dayOfWeek, shiftDate, shiftStatus, shiftID); resyncErr != nil {
+			return fmt.Errorf("future weeks were not updated: %w", resyncErr)
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return es, nil

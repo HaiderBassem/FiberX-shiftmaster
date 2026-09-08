@@ -2,14 +2,36 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import api from '@/lib/api';
+import api, { signOut } from '@/lib/api';
 import {
   LayoutDashboard, Users, Calendar, CheckSquare,
   ShieldCheck, ClipboardList, Building2, Database,
   Clock, X, Table, BookOpen, Inbox, Megaphone, CalendarDays, Link as LinkIcon, LogOut, Ticket, Wifi
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { Department } from '@/types/domain';
 
-const navItems = [
+/**
+ * One sidebar entry. Every optional field is declared so the filter below can
+ * read it without casting: a literal array infers a union that only carries the
+ * keys each member happens to have.
+ */
+interface NavItem {
+  to: string;
+  labelKey: string;
+  icon: LucideIcon;
+  roles: string[];
+  /** Always visible for the listed roles — not gated by the department's modules. */
+  core?: boolean;
+  /** Hidden unless the department's active_modules includes this id. */
+  moduleId?: string;
+  /** Hidden for non-leadership when the department has FiberX turned off. */
+  requiresFiberx?: boolean;
+  /** A per-employee capability flag that grants access on its own. */
+  permission?: 'can_post_announcements';
+}
+
+const navItems: NavItem[] = [
   { to: '/', labelKey: 'dashboard', icon: LayoutDashboard, roles: ['employee', 'team_leader', 'manager', 'admin'], core: true },
   { to: '/tasks', labelKey: 'my_tasks', icon: CheckSquare, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'tasks' },
   { to: '/handovers', labelKey: 'handovers', icon: ClipboardList, roles: ['employee', 'team_leader', 'manager', 'admin'], moduleId: 'handovers' },
@@ -32,13 +54,13 @@ const navItems = [
 ];
 
 export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
   const { t } = useTranslation();
 
   const handleLogout = () => {
-    logout();
+    void signOut();
     navigate('/login');
   };
 
@@ -47,7 +69,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     queryKey: ['my-department', user?.department_id],
     queryFn: async () => {
       const res = await api.get(`/departments/${user?.department_id}`);
-      return res.data?.data;
+      return res.data?.data as Department | undefined;
     },
     enabled: !!user?.department_id,
   });
@@ -59,10 +81,8 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     let hasAccess = item.roles.includes(user.role);
 
     // Additional permission checks (e.g. can_post_announcements)
-    if (!hasAccess && (item as any).permission) {
-      if ((item as any).permission === 'can_post_announcements' && (user as any).can_post_announcements) {
-        hasAccess = true;
-      }
+    if (!hasAccess && item.permission === 'can_post_announcements' && user.can_post_announcements) {
+      hasAccess = true;
     }
 
     if (!hasAccess) return false;
@@ -72,7 +92,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     if (deptLoading || !userDepartment) return true;
 
     // FiberX: hide for non-leadership if not enabled for department
-    if ((item as any).requiresFiberx) {
+    if (item.requiresFiberx) {
       const isLeadership = user.role === 'admin' || user.role === 'manager' || user.role === 'team_leader';
       if (!isLeadership && !userDepartment?.fiberx_enabled) {
         return false;
@@ -80,11 +100,11 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
     }
 
     // Module toggling: only hide if active_modules explicitly excludes this module
-    if ((item as any).moduleId) {
+    if (item.moduleId) {
       const activeModules: string[] = userDepartment?.active_modules || [];
       // If active_modules is an empty array, that means ALL modules are disabled (intentional)
       // If it's missing/null (shouldn't happen after migration fix), show everything
-      if (activeModules.length > 0 && !activeModules.includes((item as any).moduleId)) {
+      if (activeModules.length > 0 && !activeModules.includes(item.moduleId)) {
         return false;
       }
     }
@@ -93,7 +113,7 @@ export const Sidebar = ({ onClose }: { onClose?: () => void }) => {
   });
 
   return (
-    <aside className="w-64 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-r border-border/30">
+    <aside className="w-64 h-screen bg-sidebar text-sidebar-foreground flex flex-col border-e border-border/30">
       {/* ── Brand ── */}
       <div className="px-5 py-6 flex items-center justify-between border-b border-white/5">
         <div className="flex items-center gap-3">

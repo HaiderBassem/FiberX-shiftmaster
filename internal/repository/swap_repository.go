@@ -34,8 +34,6 @@ func NewSwapRepository(db *database.DB) SwapRepository {
 	return &swapRepo{db: db}
 }
 
-const swapColumns = `id, requester_id, target_employee_id, shift_date, shift_id, reason, status,
-	approved_by_team_leader, approved_by_manager, approval_date, created_at, updated_at`
 const swapColumnsWithNames = `ss.id, ss.requester_id, ss.target_employee_id, ss.shift_date, ss.shift_id, ss.reason, ss.status,
 	ss.approved_by_team_leader, ss.approved_by_manager, ss.approval_date, ss.created_at, ss.updated_at,
 	(CONCAT(r.first_name, ' ', r.last_name)) AS requester_name, r.profile_image as requester_profile_image,

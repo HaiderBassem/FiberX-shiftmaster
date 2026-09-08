@@ -55,6 +55,9 @@ type TaskRepository interface {
 	// Task Executions
 	GetExecutionByAssignment(ctx context.Context, assignmentID uuid.UUID) (*models.TaskExecution, error)
 	GetAssignmentDateByExecution(ctx context.Context, executionID uuid.UUID) (time.Time, error)
+	// GetExecutionOwner resolves who an execution belongs to, for ownership
+	// checks on the self-service status transitions.
+	GetExecutionOwner(ctx context.Context, executionID uuid.UUID) (employeeID uuid.UUID, departmentID *uuid.UUID, err error)
 	CreateExecution(ctx context.Context, te *models.TaskExecution) error
 	StartExecution(ctx context.Context, id uuid.UUID) error
 	UpdateExecutionStatus(ctx context.Context, id uuid.UUID, status string, notes *string) error
@@ -142,7 +145,7 @@ func (r *taskRepo) GetSchedulesByBoard(ctx context.Context, boardID uuid.UUID) (
 }
 
 func (r *taskRepo) GetActiveSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
-	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ts.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	query := `SELECT ` + scheduleColumns + ` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ts.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get active schedules: %w", err)
@@ -152,7 +155,7 @@ func (r *taskRepo) GetActiveSchedules(ctx context.Context, departmentID *uuid.UU
 }
 
 func (r *taskRepo) GetAllSchedules(ctx context.Context, departmentID *uuid.UUID) ([]models.TaskSchedule, error) {
-	query := `SELECT `+scheduleColumns+` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
+	query := `SELECT ` + scheduleColumns + ` FROM task_schedules ts LEFT JOIN task_boards tb ON tb.id = ts.board_id WHERE ($1::uuid IS NULL OR tb.department_id = $1) ORDER BY ts.schedule_type, ts.title`
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get all schedules: %w", err)
@@ -240,6 +243,9 @@ func (r *taskRepo) GetBoardView(ctx context.Context, boardID uuid.UUID, shiftID 
 		args = append(args, *toDate)
 		argIdx++
 	}
+	// argIdx is deliberately left in step with args even though nothing reads it
+	// again here, so a clause appended below cannot reuse a placeholder number.
+	_ = argIdx
 
 	query += ` ORDER BY e.first_name, e.last_name, ta.assigned_date`
 
@@ -282,7 +288,7 @@ func (r *taskRepo) GetBoardStats(ctx context.Context, departmentID *uuid.UUID) (
 		WHERE tb.is_active = true AND ($1::uuid IS NULL OR tb.department_id = $1)
 		GROUP BY tb.id, tb.name
 		ORDER BY tb.name`
-		
+
 	rows, err := r.db.Query(ctx, query, departmentID)
 	if err != nil {
 		return nil, fmt.Errorf("get board stats: %w", err)
@@ -351,6 +357,7 @@ func (r *taskRepo) GetBoardEligibleEmployees(ctx context.Context, shiftID *uuid.
 		args = append(args, *date)
 		argIdx++
 	}
+	_ = argIdx
 
 	query += ` ORDER BY first_name, last_name`
 
@@ -601,6 +608,22 @@ func (r *taskRepo) GetAssignmentDateByExecution(ctx context.Context, executionID
 	return assignedDate, nil
 }
 
+func (r *taskRepo) GetExecutionOwner(ctx context.Context, executionID uuid.UUID) (uuid.UUID, *uuid.UUID, error) {
+	var employeeID uuid.UUID
+	var departmentID *uuid.UUID
+	err := r.db.QueryRow(ctx,
+		`SELECT ta.employee_id, e.department_id
+		 FROM task_executions te
+		 JOIN task_assignments ta ON ta.id = te.assignment_id
+		 JOIN employees e ON e.id = ta.employee_id
+		 WHERE te.id = $1`, executionID,
+	).Scan(&employeeID, &departmentID)
+	if err != nil {
+		return uuid.Nil, nil, fmt.Errorf("get execution owner: %w", err)
+	}
+	return employeeID, departmentID, nil
+}
+
 func (r *taskRepo) CreateExecution(ctx context.Context, te *models.TaskExecution) error {
 	return r.db.QueryRow(ctx,
 		`INSERT INTO task_executions (assignment_id, status) VALUES ($1,$2) RETURNING id, created_at, updated_at`,
@@ -672,7 +695,6 @@ func (r *taskRepo) GetTaskHistory(ctx context.Context, date time.Time, boardID *
 	}
 
 	query += " ORDER BY te.completed_at DESC NULLS LAST, e.first_name"
-
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {

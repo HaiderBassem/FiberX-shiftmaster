@@ -8,50 +8,50 @@ import (
 
 // Internal models
 type Department struct {
-	ID             uuid.UUID   `json:"id"`
-	DepartmentCode string      `json:"department_code"`
-	Name           string      `json:"name"`
-	Description    *string     `json:"description"`
-	FiberxEnabled  bool        `json:"fiberx_enabled"`
-	MaxLeavesPerDay *int       `json:"max_leaves_per_day"`
-	MaxHourlyLeavesPerDay *int `json:"max_hourly_leaves_per_day"`
-	ManagerIDs     []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
-	ActiveModules  []string    `json:"active_modules"`
-	CreatedAt      time.Time   `json:"created_at"`
-	UpdatedAt      time.Time   `json:"updated_at"`
+	ID                    uuid.UUID   `json:"id"`
+	DepartmentCode        string      `json:"department_code"`
+	Name                  string      `json:"name"`
+	Description           *string     `json:"description"`
+	FiberxEnabled         bool        `json:"fiberx_enabled"`
+	MaxLeavesPerDay       *int        `json:"max_leaves_per_day"`
+	MaxHourlyLeavesPerDay *int        `json:"max_hourly_leaves_per_day"`
+	ManagerIDs            []uuid.UUID `json:"manager_ids"` // populated via department_managers join table
+	ActiveModules         []string    `json:"active_modules"`
+	CreatedAt             time.Time   `json:"created_at"`
+	UpdatedAt             time.Time   `json:"updated_at"`
 }
 
 type Employee struct {
-	ID                 uuid.UUID `json:"id"`
-	EmployeeCode       string    `json:"employee_code"`
-	FirstName          string    `json:"first_name"`
-	LastName           string    `json:"last_name"`
-	Gender             string    `json:"gender"`
-	Phone              *string   `json:"phone"`
-	Email              string    `json:"email"`
-	PasswordHash       *string   `json:"-"` // Omit from JSON
-	HireDate           time.Time `json:"hire_date"`
-	Role               string    `json:"role"`
-	DepartmentID       *uuid.UUID `json:"department_id"`
-	Position           *string   `json:"position"`
-	DefaultShiftID     *uuid.UUID `json:"default_shift_id"`
-	WeeklyOffDays      int       `json:"weekly_off_days"`
-	CanCoverNightShift bool      `json:"can_cover_night_shift"`
-	Status             string    `json:"status"`
-	ProfileImage       *string   `json:"profile_image"`
-	RememberToken      *string   `json:"-"`
-	LastLogin          *time.Time `json:"last_login"`
-	SecondaryPhone     *string   `json:"secondary_phone"`
-	SecondaryEmail     *string   `json:"secondary_email"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
-	CreatedBy          *uuid.UUID `json:"created_by"`
-	CanCreateTables    bool      `json:"can_create_tables"`
-	CanManageHelpDocs  bool      `json:"can_manage_help_docs"`
-	CanPostAnnouncements bool    `json:"can_post_announcements"`
-	CanManageFiberxData  bool      `json:"can_manage_fiberx_data"`
-	CanManageServices    bool      `json:"can_manage_services"`
-	UIPreferences      map[string]interface{} `json:"ui_preferences"`
+	ID                   uuid.UUID              `json:"id"`
+	EmployeeCode         string                 `json:"employee_code"`
+	FirstName            string                 `json:"first_name"`
+	LastName             string                 `json:"last_name"`
+	Gender               string                 `json:"gender"`
+	Phone                *string                `json:"phone"`
+	Email                string                 `json:"email"`
+	PasswordHash         *string                `json:"-"` // Omit from JSON
+	HireDate             time.Time              `json:"hire_date"`
+	Role                 string                 `json:"role"`
+	DepartmentID         *uuid.UUID             `json:"department_id"`
+	Position             *string                `json:"position"`
+	DefaultShiftID       *uuid.UUID             `json:"default_shift_id"`
+	WeeklyOffDays        int                    `json:"weekly_off_days"`
+	CanCoverNightShift   bool                   `json:"can_cover_night_shift"`
+	Status               string                 `json:"status"`
+	ProfileImage         *string                `json:"profile_image"`
+	RememberToken        *string                `json:"-"`
+	LastLogin            *time.Time             `json:"last_login"`
+	SecondaryPhone       *string                `json:"secondary_phone"`
+	SecondaryEmail       *string                `json:"secondary_email"`
+	CreatedAt            time.Time              `json:"created_at"`
+	UpdatedAt            time.Time              `json:"updated_at"`
+	CreatedBy            *uuid.UUID             `json:"created_by"`
+	CanCreateTables      bool                   `json:"can_create_tables"`
+	CanManageHelpDocs    bool                   `json:"can_manage_help_docs"`
+	CanPostAnnouncements bool                   `json:"can_post_announcements"`
+	CanManageFiberxData  bool                   `json:"can_manage_fiberx_data"`
+	CanManageServices    bool                   `json:"can_manage_services"`
+	UIPreferences        map[string]interface{} `json:"ui_preferences"`
 }
 
 type Shift struct {
@@ -69,15 +69,15 @@ type Shift struct {
 }
 
 type ScheduleTemplate struct {
-	ID          uuid.UUID  `json:"id"`
-	EmployeeID  uuid.UUID  `json:"employee_id"`
-	DayOfWeek   int        `json:"day_of_week"`
-	ShiftID     *uuid.UUID `json:"shift_id"`
-	IsOff       bool       `json:"is_off"`
-	ValidFrom   *time.Time `json:"valid_from"`
-	ValidTo     *time.Time `json:"valid_to"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID         uuid.UUID  `json:"id"`
+	EmployeeID uuid.UUID  `json:"employee_id"`
+	DayOfWeek  int        `json:"day_of_week"`
+	ShiftID    *uuid.UUID `json:"shift_id"`
+	IsOff      bool       `json:"is_off"`
+	ValidFrom  *time.Time `json:"valid_from"`
+	ValidTo    *time.Time `json:"valid_to"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 type WeeklySchedule struct {
@@ -124,6 +124,20 @@ const (
 	ShiftSourceManual    = "manual"
 	ShiftSourceLeave     = "leave"
 )
+
+// HourlyLeaveReasonPrefix marks a leave row that occupies part of a day rather
+// than the whole of it.
+//
+// This is a wire contract, not an implementation detail: the calendar and
+// schedule views both detect hourly leave by testing leave_reason for this
+// prefix. It exists because shift_status cannot reliably carry 'hourly' — the
+// enum does not have that value on every deployed database — so the information
+// rides along in the reason text instead.
+//
+// Whether to apply it is decided by leave_types.is_hourly. It used to be decided
+// by comparing the type's name against "hourly" and against an Arabic literal
+// that was tested against the English column and so never matched.
+const HourlyLeaveReasonPrefix = "[hourly] "
 
 // PatternDay is one weekday of an employee's fixed weekly pattern.
 type PatternDay struct {
@@ -189,7 +203,7 @@ type TaskRecurringAssignment struct {
 type TaskExecution struct {
 	ID             uuid.UUID  `json:"id"`
 	AssignmentID   uuid.UUID  `json:"assignment_id"`
-	Status         string     `json:"status"` // pending, in_progress, completed, cancelled
+	Status         string     `json:"status"`          // pending, in_progress, completed, cancelled
 	CompletionType *string    `json:"completion_type"` // without_issue, with_issue
 	StartedAt      *time.Time `json:"started_at"`
 	CompletedAt    *time.Time `json:"completed_at"`
@@ -201,21 +215,21 @@ type TaskExecution struct {
 
 // TaskHistoryRow — a completed task row for the supervisor history view.
 type TaskHistoryRow struct {
-	AssignmentID   uuid.UUID  `json:"assignment_id"`
-	ExecutionID    uuid.UUID  `json:"execution_id"`
-	AssignedDate   time.Time  `json:"assigned_date"`
-	TaskTitle      string     `json:"task_title"`
-	TaskDesc       *string    `json:"task_description"`
-	BoardName      *string    `json:"board_name"`
-	EmployeeID     uuid.UUID  `json:"employee_id"`
-	EmployeeName   string     `json:"employee_name"`
-	EmployeeCode   string     `json:"employee_code"`
-	EmployeeProfileImage *string `json:"employee_profile_image"`
-	Status         string     `json:"status"`
-	CompletionType *string    `json:"completion_type"`
-	StartedAt      *time.Time `json:"started_at"`
-	CompletedAt    *time.Time `json:"completed_at"`
-	Notes          *string    `json:"notes"`
+	AssignmentID         uuid.UUID  `json:"assignment_id"`
+	ExecutionID          uuid.UUID  `json:"execution_id"`
+	AssignedDate         time.Time  `json:"assigned_date"`
+	TaskTitle            string     `json:"task_title"`
+	TaskDesc             *string    `json:"task_description"`
+	BoardName            *string    `json:"board_name"`
+	EmployeeID           uuid.UUID  `json:"employee_id"`
+	EmployeeName         string     `json:"employee_name"`
+	EmployeeCode         string     `json:"employee_code"`
+	EmployeeProfileImage *string    `json:"employee_profile_image"`
+	Status               string     `json:"status"`
+	CompletionType       *string    `json:"completion_type"`
+	StartedAt            *time.Time `json:"started_at"`
+	CompletedAt          *time.Time `json:"completed_at"`
+	Notes                *string    `json:"notes"`
 }
 
 type Leave struct {
@@ -224,6 +238,7 @@ type Leave struct {
 	LeaveTypeID          uuid.UUID  `json:"leave_type_id"`
 	LeaveTypeNameAr      *string    `json:"leave_type_name_ar"`
 	LeaveTypeNameEn      *string    `json:"leave_type_name_en"`
+	LeaveTypeIsHourly    bool       `json:"leave_type_is_hourly"`
 	StartDate            time.Time  `json:"start_date"`
 	EndDate              time.Time  `json:"end_date"`
 	TotalDays            int        `json:"total_days"`
@@ -243,32 +258,32 @@ type Leave struct {
 
 // LeaveApproval tracks individual approval/rejection actions on a leave request.
 type LeaveApproval struct {
-	ID           uuid.UUID  `json:"id"`
-	LeaveID      uuid.UUID  `json:"leave_id"`
-	ApproverID   uuid.UUID  `json:"approver_id"`
-	ApproverRole string     `json:"approver_role"`
-	Action       string     `json:"action"` // approved, rejected
-	Notes        *string    `json:"notes"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID           uuid.UUID `json:"id"`
+	LeaveID      uuid.UUID `json:"leave_id"`
+	ApproverID   uuid.UUID `json:"approver_id"`
+	ApproverRole string    `json:"approver_role"`
+	Action       string    `json:"action"` // approved, rejected
+	Notes        *string   `json:"notes"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // LeaveHistoryRow is a rich view for the leave history page.
 type LeaveHistoryRow struct {
-	LeaveID       uuid.UUID  `json:"leave_id"`
-	EmployeeName  string     `json:"employee_name"`
-	EmployeeCode  string     `json:"employee_code"`
-	EmployeeProfileImage *string `json:"employee_profile_image"`
-	LeaveTypeID   uuid.UUID  `json:"leave_type_id"`
-	LeaveTypeNameAr *string  `json:"leave_type_name_ar"`
-	LeaveTypeNameEn *string  `json:"leave_type_name_en"`
-	StartDate     time.Time  `json:"start_date"`
-	EndDate       time.Time  `json:"end_date"`
-	TotalDays     int        `json:"total_days"`
-	Reason        *string    `json:"reason"`
-	Status        string     `json:"status"`
-	AppliedDate   *time.Time `json:"applied_date"`
-	RejectionReason *string  `json:"rejection_reason"`
-	Approvals     []LeaveApprovalDetail `json:"approvals"`
+	LeaveID              uuid.UUID             `json:"leave_id"`
+	EmployeeName         string                `json:"employee_name"`
+	EmployeeCode         string                `json:"employee_code"`
+	EmployeeProfileImage *string               `json:"employee_profile_image"`
+	LeaveTypeID          uuid.UUID             `json:"leave_type_id"`
+	LeaveTypeNameAr      *string               `json:"leave_type_name_ar"`
+	LeaveTypeNameEn      *string               `json:"leave_type_name_en"`
+	StartDate            time.Time             `json:"start_date"`
+	EndDate              time.Time             `json:"end_date"`
+	TotalDays            int                   `json:"total_days"`
+	Reason               *string               `json:"reason"`
+	Status               string                `json:"status"`
+	AppliedDate          *time.Time            `json:"applied_date"`
+	RejectionReason      *string               `json:"rejection_reason"`
+	Approvals            []LeaveApprovalDetail `json:"approvals"`
 }
 
 // LeaveApprovalDetail is a single approval action with approver name.
@@ -282,47 +297,47 @@ type LeaveApprovalDetail struct {
 
 // PendingLeaveRich is a pending leave with employee details for the approval dashboard.
 type PendingLeaveRich struct {
-	ID             uuid.UUID  `json:"id"`
-	EmployeeID     uuid.UUID  `json:"employee_id"`
-	LeaveTypeID    uuid.UUID  `json:"leave_type_id"`
-	LeaveTypeNameAr *string   `json:"leave_type_name_ar"`
-	LeaveTypeNameEn *string   `json:"leave_type_name_en"`
-	StartDate      time.Time  `json:"start_date"`
-	EndDate        time.Time  `json:"end_date"`
-	TotalDays      int        `json:"total_days"`
-	Reason         *string    `json:"reason"`
-	Status         string     `json:"status"`
-	AppliedDate    *time.Time `json:"applied_date"`
-	EmployeeName   string     `json:"employee_name"`
-	EmployeeCode   string     `json:"employee_code"`
-	EmployeeProfileImage *string `json:"employee_profile_image"`
-	DefaultShiftID string     `json:"default_shift_id"`
-	ShiftName      string     `json:"shift_name"`
-	ShiftCode      string     `json:"shift_code"`
-	DepartmentName string     `json:"department_name"`
-	TLApprovals    int        `json:"tl_approvals"`
-	TotalTLs       int        `json:"total_tls"`
-	StartTime      *string    `json:"start_time"`
-	EndTime        *string    `json:"end_time"`
+	ID                   uuid.UUID  `json:"id"`
+	EmployeeID           uuid.UUID  `json:"employee_id"`
+	LeaveTypeID          uuid.UUID  `json:"leave_type_id"`
+	LeaveTypeNameAr      *string    `json:"leave_type_name_ar"`
+	LeaveTypeNameEn      *string    `json:"leave_type_name_en"`
+	StartDate            time.Time  `json:"start_date"`
+	EndDate              time.Time  `json:"end_date"`
+	TotalDays            int        `json:"total_days"`
+	Reason               *string    `json:"reason"`
+	Status               string     `json:"status"`
+	AppliedDate          *time.Time `json:"applied_date"`
+	EmployeeName         string     `json:"employee_name"`
+	EmployeeCode         string     `json:"employee_code"`
+	EmployeeProfileImage *string    `json:"employee_profile_image"`
+	DefaultShiftID       string     `json:"default_shift_id"`
+	ShiftName            string     `json:"shift_name"`
+	ShiftCode            string     `json:"shift_code"`
+	DepartmentName       string     `json:"department_name"`
+	TLApprovals          int        `json:"tl_approvals"`
+	TotalTLs             int        `json:"total_tls"`
+	StartTime            *string    `json:"start_time"`
+	EndTime              *string    `json:"end_time"`
 }
 
 type ShiftSwap struct {
-	ID                   uuid.UUID  `json:"id"`
-	RequesterID          uuid.UUID  `json:"requester_id"`
-	RequesterName        string     `json:"requester_name"`
-	RequesterProfileImage *string   `json:"requester_profile_image"`
-	TargetEmployeeID     uuid.UUID  `json:"target_employee_id"`
-	TargetEmployeeName   string     `json:"target_employee_name"`
-	TargetProfileImage   *string    `json:"target_profile_image"`
-	ShiftDate            time.Time  `json:"shift_date"`
-	ShiftID              uuid.UUID  `json:"shift_id"`
-	Reason               *string    `json:"reason"`
-	Status               string     `json:"status"`
-	ApprovedByTeamLeader *uuid.UUID `json:"approved_by_team_leader"`
-	ApprovedByManager    *uuid.UUID `json:"approved_by_manager"`
-	ApprovalDate         *time.Time `json:"approval_date"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                    uuid.UUID  `json:"id"`
+	RequesterID           uuid.UUID  `json:"requester_id"`
+	RequesterName         string     `json:"requester_name"`
+	RequesterProfileImage *string    `json:"requester_profile_image"`
+	TargetEmployeeID      uuid.UUID  `json:"target_employee_id"`
+	TargetEmployeeName    string     `json:"target_employee_name"`
+	TargetProfileImage    *string    `json:"target_profile_image"`
+	ShiftDate             time.Time  `json:"shift_date"`
+	ShiftID               uuid.UUID  `json:"shift_id"`
+	Reason                *string    `json:"reason"`
+	Status                string     `json:"status"`
+	ApprovedByTeamLeader  *uuid.UUID `json:"approved_by_team_leader"`
+	ApprovedByManager     *uuid.UUID `json:"approved_by_manager"`
+	ApprovalDate          *time.Time `json:"approval_date"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
 }
 
 type Permission struct {
@@ -360,8 +375,8 @@ type AuditLog struct {
 	Action     string     `json:"action"`
 	TableName  string     `json:"table_name"`
 	RecordID   *uuid.UUID `json:"record_id"`
-	OldData    *string    `json:"old_data"` // JSONB
-	NewData    *string    `json:"new_data"` // JSONB
+	OldData    *string    `json:"old_data"`   // JSONB
+	NewData    *string    `json:"new_data"`   // JSONB
 	IPAddress  *string    `json:"ip_address"` // INET maps to string
 	UserAgent  *string    `json:"user_agent"`
 	CreatedAt  time.Time  `json:"created_at"`
@@ -375,12 +390,12 @@ type SwapEligibleEmployee struct {
 
 // ShiftCoverage provides staffing metrics for a specific shift on a specific date
 type ShiftCoverage struct {
-	ShiftID      uuid.UUID `json:"shift_id"`
-	ShiftDate    time.Time `json:"shift_date"`
-	TotalAssigned int      `json:"total_assigned"`
-	TotalWorking  int      `json:"total_working"`
-	TotalOff      int      `json:"total_off"`
-	TotalOnLeave  int      `json:"total_on_leave"`
+	ShiftID       uuid.UUID `json:"shift_id"`
+	ShiftDate     time.Time `json:"shift_date"`
+	TotalAssigned int       `json:"total_assigned"`
+	TotalWorking  int       `json:"total_working"`
+	TotalOff      int       `json:"total_off"`
+	TotalOnLeave  int       `json:"total_on_leave"`
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -416,7 +431,7 @@ type BoardViewRow struct {
 	TaskTitle    *string    `json:"task_title"`
 	AssignmentID *uuid.UUID `json:"assignment_id"`
 	ExecutionID  *uuid.UUID `json:"execution_id"`
-	Status       *string    `json:"status"`       // pending, in_progress, completed
+	Status       *string    `json:"status"` // pending, in_progress, completed
 	StartedAt    *time.Time `json:"started_at"`
 	CompletedAt  *time.Time `json:"completed_at"`
 }
@@ -440,7 +455,7 @@ type HelpDocument struct {
 	CreatedBy    *uuid.UUID `json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
-	
+
 	// Virtual field for frontend
 	AccessLevel *string `json:"access_level,omitempty"`
 }

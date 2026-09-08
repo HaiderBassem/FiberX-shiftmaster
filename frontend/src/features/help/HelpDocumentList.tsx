@@ -6,7 +6,7 @@ import { helpDocumentService } from '../../services/api/helpDocumentService';
 import { useAuthStore } from '../../store/authStore';
 import { format } from 'date-fns';
 import { HelpPermissionsModal } from './HelpPermissionsModal';
-import { DraggableGrid } from '../../components/ui/DraggableGrid';
+import { DraggableGrid, readStoredLayout } from '../../components/ui/DraggableGrid';
 import type { GridLayout } from '../../components/ui/DraggableGrid';
 import { Search } from 'lucide-react';
 import api from '@/lib/api';
@@ -19,8 +19,9 @@ export function HelpDocumentList() {
   const [layout, setLayout] = useState<GridLayout>({ folders: {}, order: [] });
 
   useEffect(() => {
-    if (user?.ui_preferences?.info_bank_layout) {
-      setLayout(user.ui_preferences.info_bank_layout);
+    const stored = readStoredLayout(user?.ui_preferences?.info_bank_layout);
+    if (stored) {
+      setLayout(stored);
     }
   }, [user]);
 

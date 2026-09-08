@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,8 +34,8 @@ export const Login = () => {
       const { access_token, refresh_token, employee } = response.data.data;
       setAuth(access_token, employee, refresh_token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error || t('auth.login_failed'));
+    } catch (err: unknown) {
+      setError(apiError(err) || t('auth.login_failed'));
     } finally {
       setIsLoading(false);
     }

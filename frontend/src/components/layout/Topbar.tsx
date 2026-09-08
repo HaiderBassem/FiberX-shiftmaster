@@ -3,15 +3,33 @@ import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
 import { Sun, Moon, User, Menu, Key, Bell } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChangePasswordModal } from '@/features/auth/ChangePasswordModal';
 import { useNotification } from '@/providers/NotificationProvider';
+import { assetUrl } from '@/lib/assets';
+import type { Department, AppNotification } from '@/types/domain';
 
 export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void; sidebarOpen?: boolean }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
+
+  /**
+   * Applies a change of department context.
+   *
+   * Every request carries the selected department in an X-Department-ID header,
+   * so switching invalidates all server state. This used to call
+   * window.location.reload(), which reloaded the whole application — losing
+   * scroll position, open dialogs and unsaved input — to achieve what clearing
+   * the query cache does. Removing every query rather than invalidating avoids
+   * briefly rendering the previous department's data while refetches are in
+   * flight.
+   */
+  const switchDepartmentContext = () => {
+    queryClient.removeQueries();
+  };
   const { requestPermission, permission } = useNotification();
   const {
     user,
@@ -29,7 +47,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['departments'],
     queryFn: async () => {
       const res = await api.get('/departments');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     },
     enabled: user?.role === 'admin',
   });
@@ -39,7 +57,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['my-managed-departments'],
     queryFn: async () => {
       const res = await api.get('/departments/my-managed');
-      return res.data?.data || [];
+      return (res.data?.data || []) as Department[];
     },
     enabled: user?.role === 'manager',
   });
@@ -49,12 +67,12 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
     queryKey: ['notifications'],
     queryFn: async () => {
       const res = await api.get('/notifications');
-      return res.data?.data || [];
+      return (res.data?.data || []) as AppNotification[];
     },
     enabled: !!user,
   });
   
-  const unreadCount = notifications?.filter((n: any) => !n.is_read).length || 0;
+  const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
 
   // Auto-select first managed department for managers on first load
   useEffect(() => {
@@ -80,7 +98,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={onMenuClick}
           className="text-muted-foreground hover:text-foreground"
-          title={sidebarOpen ? 'Close menu' : 'Open menu'}
+          title={sidebarOpen ? t('topbar.close_menu') : t('topbar.open_menu')}
         >
           <Menu className="w-5 h-5" />
         </Button>
@@ -91,17 +109,17 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
 
         {/* ── Admin department selector ── */}
         {user?.role === 'admin' && allDepartments && allDepartments.length > 0 && (
-          <div className="ml-4 hidden md:flex items-center">
+          <div className="ms-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               value={adminSelectedDepartmentId || ''}
               onChange={(e) => {
                 setAdminSelectedDepartmentId(e.target.value || null);
-                window.location.reload();
+                switchDepartmentContext();
               }}
             >
-              <option value="">All Departments</option>
-              {allDepartments.map((d: any) => (
+              <option value="">{t('topbar.all_departments')}</option>
+              {allDepartments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -112,16 +130,16 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
 
         {/* ── Manager department selector ── */}
         {user?.role === 'manager' && managedDepartments && managedDepartments.length > 0 && (
-          <div className="ml-4 hidden md:flex items-center">
+          <div className="ms-4 hidden md:flex items-center">
             <select
               className="bg-transparent border border-border text-sm rounded-md px-2 py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               value={managerSelectedDepartmentId || ''}
               onChange={(e) => {
                 setManagerSelectedDepartmentId(e.target.value || null);
-                window.location.reload();
+                switchDepartmentContext();
               }}
             >
-              {managedDepartments.map((d: any) => (
+              {managedDepartments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
                 </option>
@@ -152,13 +170,13 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
         <div 
           onClick={() => navigate('/profile')}
           className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors"
-          title="My Profile"
+          title={t('topbar.my_profile')}
         >
           <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-primary/15 flex items-center justify-center overflow-hidden">
             {user?.profile_image ? (
               <img 
-                src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : (import.meta.env.DEV ? 'http://localhost:8080' : '')}${user.profile_image.startsWith('/api') ? user.profile_image : '/api' + user.profile_image}`} 
-                alt="Profile" 
+                src={assetUrl(user.profile_image)} 
+                alt={t('topbar.my_profile')} 
                 className="w-full h-full object-cover" 
               />
             ) : (
@@ -177,9 +195,9 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
             size="sm"
             onClick={requestPermission}
             className="flex text-primary bg-primary/10 hover:bg-primary/20 rounded-lg h-8 sm:h-9 text-xs sm:text-sm animate-pulse px-2 sm:px-3"
-            title="Enable Push Notifications"
+            title={t('topbar.enable_push_notifications')}
           >
-            Enable Notifications
+            {t('topbar.enable_notifications')}
           </Button>
         )}
         <Button
@@ -187,11 +205,11 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={() => navigate('/notifications')}
           className="relative text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
-          title="Notifications"
+          title={t('inbox.title')}
         >
           <Bell className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[16px] h-4 sm:min-w-[18px] sm:h-[18px] px-1 text-[9px] sm:text-[10px] font-bold text-white bg-destructive rounded-full border border-card shadow-sm">
+            <span className="absolute -top-1 -end-1 flex items-center justify-center min-w-[16px] h-4 sm:min-w-[18px] sm:h-[18px] px-1 text-[9px] sm:text-[10px] font-bold text-white bg-destructive rounded-full border border-card shadow-sm">
               {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
@@ -203,7 +221,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="icon"
           onClick={() => setShowChangePassword(true)}
           className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg w-8 h-8 sm:w-9 sm:h-9"
-          title="Change Password"
+          title={t('topbar.change_password')}
         >
           <Key className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
         </Button>
@@ -214,7 +232,7 @@ export const Topbar = ({ onMenuClick, sidebarOpen }: { onMenuClick?: () => void;
           size="sm"
           onClick={() => i18n.changeLanguage(i18n.language === 'ar' ? 'en' : 'ar')}
           className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg font-medium w-8 h-8 sm:w-9 sm:h-9"
-          title="Switch Language"
+          title={t('topbar.switch_language')}
         >
           {i18n.language === 'ar' ? 'EN' : 'عربي'}
         </Button>

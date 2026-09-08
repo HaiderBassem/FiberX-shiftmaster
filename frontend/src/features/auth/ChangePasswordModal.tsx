@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Key } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import api from '@/lib/api';
+import api, { apiError } from '@/lib/api';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -41,8 +41,8 @@ export const ChangePasswordModal = ({ isOpen, onClose, employeeId, requireOldPas
     onSuccess: () => {
       handleClose();
     },
-    onError: (err: any) => {
-      setError(err?.response?.data?.error || err?.message || 'Failed to change password');
+    onError: (err: unknown) => {
+      setError(apiError(err) || 'Failed to change password');
     },
   });
 

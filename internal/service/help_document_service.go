@@ -29,12 +29,12 @@ func (s *HelpDocumentService) GetVisibleDocuments(ctx context.Context, departmen
 	return s.repo.GetVisibleDocuments(ctx, *departmentID, employeeID, role, emp.CanManageHelpDocs)
 }
 
-func (s *HelpDocumentService) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) (*models.HelpDocument, error) {
+func (s *HelpDocumentService) GetDocumentByID(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, departmentID *uuid.UUID, role string) (*models.HelpDocument, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetDocumentByID(ctx, id, employeeID, role, emp.CanManageHelpDocs)
+	return s.repo.GetDocumentByID(ctx, id, employeeID, departmentID, role, emp.CanManageHelpDocs)
 }
 
 func (s *HelpDocumentService) CreateDocument(ctx context.Context, doc *models.HelpDocument, role string) (*models.HelpDocument, error) {
@@ -54,12 +54,12 @@ func (s *HelpDocumentService) CreateDocument(ctx context.Context, doc *models.He
 	return s.repo.CreateDocument(ctx, doc)
 }
 
-func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.HelpDocument, employeeID uuid.UUID, role string) (*models.HelpDocument, error) {
+func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.HelpDocument, employeeID uuid.UUID, departmentID *uuid.UUID, role string) (*models.HelpDocument, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
 	}
-	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, employeeID, role, emp.CanManageHelpDocs)
+	existing, err := s.repo.GetDocumentByID(ctx, doc.ID, employeeID, departmentID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return nil, err
 	}
@@ -69,18 +69,18 @@ func (s *HelpDocumentService) UpdateDocument(ctx context.Context, doc *models.He
 	if existing.AccessLevel == nil || *existing.AccessLevel != "write" {
 		return nil, errors.New("you do not have write access to this document")
 	}
-	
+
 	existing.Title = doc.Title
 	existing.Content = doc.Content
 	return s.repo.UpdateDocument(ctx, existing)
 }
 
-func (s *HelpDocumentService) DeleteDocument(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, role string) error {
+func (s *HelpDocumentService) DeleteDocument(ctx context.Context, id uuid.UUID, employeeID uuid.UUID, departmentID *uuid.UUID, role string) error {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return err
 	}
-	existing, err := s.repo.GetDocumentByID(ctx, id, employeeID, role, emp.CanManageHelpDocs)
+	existing, err := s.repo.GetDocumentByID(ctx, id, employeeID, departmentID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (s *HelpDocumentService) DeleteDocument(ctx context.Context, id uuid.UUID, 
 	return s.repo.DeleteDocument(ctx, id)
 }
 
-func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID, targetEmployeeID uuid.UUID, accessLevel string, employeeID uuid.UUID, role string) error {
+func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID, targetEmployeeID uuid.UUID, accessLevel string, employeeID uuid.UUID, departmentID *uuid.UUID, role string) error {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return err
@@ -109,8 +109,8 @@ func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID,
 	if err != nil {
 		return err
 	}
-	
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role, emp.CanManageHelpDocs)
+
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, departmentID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func (s *HelpDocumentService) SetEmployeeAccess(ctx context.Context, documentID,
 	return s.repo.SetEmployeeAccess(ctx, documentID, targetEmployeeID, accessLevel, employeeID)
 }
 
-func (s *HelpDocumentService) GetDocumentAccessList(ctx context.Context, documentID uuid.UUID, employeeID uuid.UUID, role string) ([]models.HelpDocumentAccess, error) {
+func (s *HelpDocumentService) GetDocumentAccessList(ctx context.Context, documentID uuid.UUID, employeeID uuid.UUID, departmentID *uuid.UUID, role string) ([]models.HelpDocumentAccess, error) {
 	emp, err := s.empRepo.GetByID(ctx, employeeID)
 	if err != nil {
 		return nil, err
@@ -134,13 +134,13 @@ func (s *HelpDocumentService) GetDocumentAccessList(ctx context.Context, documen
 		return nil, errors.New("only managers and authorized employees can view access lists")
 	}
 	// Verify doc exists and they have access
-	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, role, emp.CanManageHelpDocs)
+	doc, err := s.repo.GetDocumentByID(ctx, documentID, employeeID, departmentID, role, emp.CanManageHelpDocs)
 	if err != nil {
 		return nil, err
 	}
 	if doc == nil {
 		return nil, errors.New("document not found")
 	}
-	
+
 	return s.repo.GetDocumentAccessList(ctx, documentID)
 }

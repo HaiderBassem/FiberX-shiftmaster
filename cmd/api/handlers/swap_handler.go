@@ -23,8 +23,8 @@ type createSwapRequest struct {
 	TargetEmployeeID string `json:"target_employee_id" binding:"required"`
 	ShiftDate        string `json:"shift_date" binding:"required"`
 	// Phase 3: frontend may omit shift_id; backend will infer from requester's shift.
-	ShiftID          string `json:"shift_id"`
-	Reason           *string `json:"reason"`
+	ShiftID string  `json:"shift_id"`
+	Reason  *string `json:"reason"`
 }
 
 // Request creates a new shift swap request.
