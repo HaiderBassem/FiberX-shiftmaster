@@ -16,7 +16,7 @@
 # the migration step — a second image would only let the two drift apart.
 
 # ── Build ────────────────────────────────────────────────────────────────────
-FROM golang:1.26.8-bookworm AS build
+FROM golang:1.27.1-bookworm AS build
 WORKDIR /src
 
 # Dependencies resolve in their own layer, so editing application code does not
