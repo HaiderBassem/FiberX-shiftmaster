@@ -153,11 +153,58 @@ jobs:
 
       # Reports only vulnerabilities in code paths this module actually reaches,
       # so it stays actionable instead of listing every advisory in the graph.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      # golang/govulncheck-action has no allowlist mechanism, and one finding
+      # here is a stale-database false positive: GO-2026-6452's advisory (aka
+      # CVE-2026-59162 / GHSA-fx5j-qcqg-grpf, negative shared-string index
+      # panic in xuri/excelize) has no "fixed" version recorded yet, but the
+      # actual fix — qax-os/excelize@93f0b3c, "Prevent panic on get cell
+      # value with invalid shared string table index" — already shipped in
+      # v2.11.0, the version go.mod pins (`go list -m -versions` tops out at
+      # v2.11.0; there is nothing newer to move to). Confirmed by reading the
+      # vendored source directly: xlsxC.getValueFrom in cell.go already has
+      # the `xlsxSI < 0 || xlsxSI >= len(d.SI)` bounds check the fix adds.
+      #
+      # So rather than silence the whole check, run it for real and only let
+      # this one already-patched, explicitly documented ID through; anything
+      # else — today or newly introduced later — still fails the build. Drop
+      # the allowlist once the advisory's affected-range metadata catches up
+      # (govulncheck will then report it clean on its own).
       - name: Check dependencies for known vulnerabilities
-        uses: golang/govulncheck-action@v1
-        with:
-          go-version-input: ${{ env.GO_VERSION }}
-          repo-checkout: false
+        run: |
+          # GitHub's default `run:` shell is `bash -e`, which aborts the
+          # script the instant `govulncheck` returns its expected non-zero
+          # exit status inside the command substitution below -- before
+          # STATUS=$? or any of the allowlist logic below it ever runs. `set
+          # +e` turns that off so the script can inspect the exit status
+          # itself instead of being killed by it.
+          set +e
+          set -u
+          ALLOWLISTED_IDS="GO-2026-6452"
+
+          OUTPUT="$(govulncheck -C . ./... 2>&1)"
+          STATUS=$?
+          echo "$OUTPUT"
+
+          if [ "$STATUS" -eq 0 ]; then
+            exit 0
+          fi
+
+          FOUND_IDS="$(echo "$OUTPUT" | grep -oE 'Vulnerability #[0-9]+: GO-[0-9]{4}-[0-9]+' | grep -oE 'GO-[0-9]{4}-[0-9]+' | sort -u)"
+          if [ -z "$FOUND_IDS" ]; then
+            echo "::error::govulncheck exited $STATUS with no vulnerability findings parsed from its output; treating this as a real failure rather than silently passing."
+            exit "$STATUS"
+          fi
+
+          UNEXPECTED_IDS="$(comm -23 <(echo "$FOUND_IDS") <(echo "$ALLOWLISTED_IDS" | tr ' ' '\n' | sort -u))"
+          if [ -n "$UNEXPECTED_IDS" ]; then
+            echo "::error::govulncheck found vulnerabilities that are not on the allowlist: $UNEXPECTED_IDS"
+            exit "$STATUS"
+          fi
+
+          echo "Only allowlisted, already-patched advisories found ($FOUND_IDS); treating as pass."
 
   frontend:
     name: Frontend

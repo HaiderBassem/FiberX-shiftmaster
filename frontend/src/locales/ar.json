@@ -269,7 +269,15 @@
     "eg_smooth_shift": "مثال: مناوبة هادئة، اكتملت جميع الفحوصات المعتادة...",
     "what_is_left": "ما المتبقي للمناوبة التالية للتعامل معه؟",
     "eg_ticket_open": "مثال: تذكرة رقم #1234 لا تزال مفتوحة، بانتظار رد العميل.",
-    "submit_handover": "تقديم التسليم"
+    "submit_handover": "تقديم التسليم",
+    "search_placeholder": "ابحث برقم التسليم، رقم التذكرة، الاسم، أو كلمة مفتاحية...",
+    "search_results_count_zero": "ماكو تسليمات مطابقة",
+    "search_results_count_one": "تسليم واحد مطابق",
+    "search_results_count_two": "تسليمان مطابقان",
+    "search_results_count_few": "{{count}} تسليمات مطابقة",
+    "search_results_count_many": "{{count}} تسليماً مطابقاً",
+    "search_results_count_other": "{{count}} تسليم مطابق",
+    "no_search_results": "لا توجد تسليمات مطابقة لبحثك."
   },
   "approvals": {
     "approval_center": "مركز الموافقات",

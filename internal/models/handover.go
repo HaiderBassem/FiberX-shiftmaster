@@ -7,16 +7,17 @@ import (
 )
 
 type Handover struct {
-	ID            uuid.UUID  `json:"id"`
-	DepartmentID  uuid.UUID  `json:"department_id"`
-	CreatorID     uuid.UUID  `json:"creator_id"`
-	ShiftSummary  string     `json:"shift_summary"`
-	PendingIssues string     `json:"pending_issues"`
-	Status        string     `json:"status"` // open, claimed, completed
-	ClaimedBy     *uuid.UUID `json:"claimed_by"`
-	DoneBy        *uuid.UUID `json:"done_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID             uuid.UUID  `json:"id"`
+	HandoverNumber int64      `json:"handover_number"`
+	DepartmentID   uuid.UUID  `json:"department_id"`
+	CreatorID      uuid.UUID  `json:"creator_id"`
+	ShiftSummary   string     `json:"shift_summary"`
+	PendingIssues  string     `json:"pending_issues"`
+	Status         string     `json:"status"` // open, claimed, completed
+	ClaimedBy      *uuid.UUID `json:"claimed_by"`
+	DoneBy         *uuid.UUID `json:"done_by"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 
 	// Joined fields for UI
 	CreatorName *string           `json:"creator_name,omitempty" db:"-"`

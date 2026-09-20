@@ -1,10 +1,39 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { Plus, CheckCircle, Hand } from 'lucide-react';
+import { Plus, CheckCircle, Hand, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import CreateHandoverModal from './CreateHandoverModal';
 import { useTranslation } from 'react-i18next';
+
+// Rich-text fields are stored as HTML; strip tags so search matches the text
+// a person actually reads (and so a stray "<p>" never counts as a hit).
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, ' ');
+}
+
+function matchesSearch(h: Handover, term: string): boolean {
+  const needle = term.trim().toLowerCase();
+  if (!needle) return true;
+
+  if (String(h.handover_number).includes(needle) || `#${h.handover_number}`.toLowerCase().includes(needle)) {
+    return true;
+  }
+
+  const haystack = [
+    stripHtml(h.shift_summary),
+    stripHtml(h.pending_issues),
+    h.creator_name,
+    h.claimer_name,
+    h.done_by_name,
+    ...(h.comments || []).map((c) => `${c.author_name} ${c.comment}`),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return haystack.includes(needle);
+}
 
 export type HandoverComment = {
   id: string;
@@ -16,6 +45,7 @@ export type HandoverComment = {
 
 export type Handover = {
   id: string;
+  handover_number: number;
   department_id: string;
   creator_id: string;
   shift_summary: string;
@@ -35,6 +65,7 @@ export default function HandoverBoard() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: handovers, isLoading } = useQuery({
     queryKey: ['handovers'],
@@ -72,8 +103,18 @@ export default function HandoverBoard() {
     },
   });
 
-  const activeHandovers = handovers?.filter((h) => h.status !== 'completed') || [];
-  const completedHandovers = handovers?.filter((h) => h.status === 'completed') || [];
+  const isSearching = searchTerm.trim().length > 0;
+
+  const matchedHandovers = useMemo(
+    () => (handovers || []).filter((h) => matchesSearch(h, searchTerm)),
+    [handovers, searchTerm]
+  );
+
+  const activeHandovers = matchedHandovers.filter((h) => h.status !== 'completed');
+  const completedHandoversAll = matchedHandovers.filter((h) => h.status === 'completed');
+  // Outside a search, only the most recent 10 completed handovers are shown as
+  // a history preview; a search should be able to surface an older match too.
+  const completedHandovers = isSearching ? completedHandoversAll : completedHandoversAll.slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -91,6 +132,24 @@ export default function HandoverBoard() {
         </button>
       </div>
 
+      <div className="bg-card rounded-xl shadow-sm border border-border p-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder={t('handovers.search_placeholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          />
+        </div>
+        {isSearching && (
+          <p className="text-xs text-muted-foreground mt-2">
+            {t('handovers.search_results_count', { count: matchedHandovers.length })}
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-4">
           <h2 className="text-xl font-semibold flex items-center gap-2 text-foreground">
@@ -100,13 +159,16 @@ export default function HandoverBoard() {
           {isLoading ? (
             <p>{t('common.loading')}</p>
           ) : activeHandovers.length === 0 ? (
-            <p className="text-muted-foreground">{t('handovers.no_active_handovers')}</p>
+            <p className="text-muted-foreground">{isSearching ? t('handovers.no_search_results') : t('handovers.no_active_handovers')}</p>
           ) : (
             activeHandovers.map((h) => (
               <div key={h.id} className={`bg-card rounded-xl shadow-sm border ${h.status === 'open' ? 'border-l-4 border-l-yellow-500 border-border' : 'border-l-4 border-l-blue-500 border-border'}`}>
                 <div className="p-4 border-b border-border flex justify-between items-start">
                   <div>
-                    <h3 className="text-lg font-semibold text-foreground">{t('handovers.handover_from')} {h.creator_name}</h3>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {t('handovers.handover_from')} {h.creator_name}
+                      <span className="ms-2 text-xs font-normal text-muted-foreground">#{h.handover_number}</span>
+                    </h3>
                     <p className="text-xs text-muted-foreground">{new Date(h.created_at).toLocaleString()}</p>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded-md font-medium ${h.status === 'open' ? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'}`}>
@@ -236,11 +298,17 @@ export default function HandoverBoard() {
             {t('handovers.history_completed')}
             <span className="bg-muted text-muted-foreground px-2 py-0.5 rounded-full text-xs">{completedHandovers.length}</span>
           </h2>
-          {completedHandovers.slice(0, 10).map((h) => (
+          {completedHandovers.length === 0 && isSearching && (
+            <p className="text-muted-foreground">{t('handovers.no_search_results')}</p>
+          )}
+          {completedHandovers.map((h) => (
             <div key={h.id} className="bg-card rounded-xl shadow-sm border border-border opacity-70">
               <div className="p-4 flex justify-between items-start">
                 <div>
-                  <h3 className="text-md font-semibold text-foreground">{t('handovers.handover_from')} {h.creator_name}</h3>
+                  <h3 className="text-md font-semibold text-foreground">
+                    {t('handovers.handover_from')} {h.creator_name}
+                    <span className="ms-2 text-xs font-normal text-muted-foreground">#{h.handover_number}</span>
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-1">
                     {h.claimer_name && h.claimer_name !== h.done_by_name ? (
                       <>{t('handovers.claimed_by')} {h.claimer_name} {t('handovers.and_done_by')} {h.done_by_name}</>
