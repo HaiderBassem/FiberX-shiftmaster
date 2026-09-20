@@ -174,7 +174,14 @@ jobs:
       # (govulncheck will then report it clean on its own).
       - name: Check dependencies for known vulnerabilities
         run: |
-          set -uo pipefail
+          # GitHub's default `run:` shell is `bash -e`, which aborts the
+          # script the instant `govulncheck` returns its expected non-zero
+          # exit status inside the command substitution below -- before
+          # STATUS=$? or any of the allowlist logic below it ever runs. `set
+          # +e` turns that off so the script can inspect the exit status
+          # itself instead of being killed by it.
+          set +e
+          set -u
           ALLOWLISTED_IDS="GO-2026-6452"
 
           OUTPUT="$(govulncheck -C . ./... 2>&1)"
