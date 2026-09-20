@@ -32,15 +32,15 @@ func (r *handoverRepo) Create(ctx context.Context, handover *models.Handover) er
 	query := `
 		INSERT INTO shift_handovers (department_id, creator_id, shift_summary, pending_issues, status)
 		VALUES ($1, $2, $3, $4, 'open')
-		RETURNING id, created_at, updated_at
+		RETURNING id, handover_number, created_at, updated_at
 	`
 	return r.db.QueryRow(ctx, query, handover.DepartmentID, handover.CreatorID, handover.ShiftSummary, handover.PendingIssues).
-		Scan(&handover.ID, &handover.CreatedAt, &handover.UpdatedAt)
+		Scan(&handover.ID, &handover.HandoverNumber, &handover.CreatedAt, &handover.UpdatedAt)
 }
 
 func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UUID) ([]models.Handover, error) {
 	query := `
-		SELECT h.id, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.done_by, h.created_at, h.updated_at,
+		SELECT h.id, h.handover_number, h.department_id, h.creator_id, h.shift_summary, h.pending_issues, h.status, h.claimed_by, h.done_by, h.created_at, h.updated_at,
 		       c.first_name || ' ' || c.last_name as creator_name,
 		       cl.first_name || ' ' || cl.last_name as claimer_name,
 		       d.first_name || ' ' || d.last_name as done_by_name,
@@ -76,7 +76,7 @@ func (r *handoverRepo) GetByDepartment(ctx context.Context, departmentID uuid.UU
 		var h models.Handover
 		var commentsJSON []byte
 		if err := rows.Scan(
-			&h.ID, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.DoneBy, &h.CreatedAt, &h.UpdatedAt,
+			&h.ID, &h.HandoverNumber, &h.DepartmentID, &h.CreatorID, &h.ShiftSummary, &h.PendingIssues, &h.Status, &h.ClaimedBy, &h.DoneBy, &h.CreatedAt, &h.UpdatedAt,
 			&h.CreatorName, &h.ClaimerName, &h.DoneByName, &commentsJSON,
 		); err != nil {
 			return nil, err

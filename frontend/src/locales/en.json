@@ -269,7 +269,11 @@
     "eg_smooth_shift": "E.g., Smooth shift, all regular checks completed...",
     "what_is_left": "What is left for the next shift to handle?",
     "eg_ticket_open": "E.g., Ticket #1234 is still open, waiting for customer reply.",
-    "submit_handover": "Submit Handover"
+    "submit_handover": "Submit Handover",
+    "search_placeholder": "Search by handover #, ticket #, name, or keyword...",
+    "search_results_count_one": "{{count}} matching handover",
+    "search_results_count_other": "{{count}} matching handovers",
+    "no_search_results": "No handovers match your search."
   },
   "approvals": {
     "approval_center": "Approval Center",
